@@ -89,5 +89,7 @@ struct TrackRowView: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(track.displayTitle), \(track.displayArtist)")
     }
 }

@@ -5,6 +5,9 @@ import SwiftUI
 struct Artwork: View {
     let raw: String?
     var cornerRadius: CGFloat = 10
+    /// VoiceOver label. When nil the artwork is treated as decorative and hidden
+    /// from assistive tech (the accompanying text carries the meaning).
+    var label: String? = nil
 
     @Environment(AppSettings.self) private var settings
 
@@ -27,6 +30,8 @@ struct Artwork: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Brand.border, lineWidth: 1)
         )
+        .accessibilityLabel(label ?? "")
+        .accessibilityHidden(label == nil)
     }
 
     private var placeholder: some View {

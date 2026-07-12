@@ -18,6 +18,7 @@ struct PlaysView: View {
                         } label: {
                             Image(systemName: model.includeFailed ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                         }
+                        .accessibilityLabel("Filter history")
                     }
                 }
                 .grooveScreenBackground()
@@ -111,5 +112,7 @@ struct PlayRowView: View {
                 .foregroundStyle(Brand.muted)
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(play.displayTitle), \(play.displayArtist), \(Format.relative(play.startedAt))")
     }
 }

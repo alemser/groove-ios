@@ -31,12 +31,12 @@ struct NowPlayingView: View {
 
     private func playing(_ pb: Playback) -> some View {
         ScrollView {
-            VStack(spacing: 24) {
-                Artwork(raw: pb.artworkUrl, cornerRadius: 20)
-                    .frame(maxWidth: 320)
+            VStack(spacing: 18) {
+                Artwork(raw: pb.artworkUrl, cornerRadius: 20, label: artworkLabel(pb))
+                    .frame(maxWidth: 300, maxHeight: 300)
                     .aspectRatio(1, contentMode: .fit)
                     .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
-                    .padding(.top, 12)
+                    .padding(.top, 4)
 
                 VStack(spacing: 6) {
                     Text(pb.title?.nonEmpty ?? "Unknown title")
@@ -56,8 +56,6 @@ struct NowPlayingView: View {
                 }
                 .padding(.horizontal)
 
-                progress(pb)
-
                 HStack(spacing: 8) {
                     if let source = pb.source?.nonEmpty {
                         Badge(text: SourceStyle.label(for: source), color: SourceStyle.color(for: source), filled: true)
@@ -70,22 +68,36 @@ struct NowPlayingView: View {
                     }
                 }
 
-                if let trackId = pb.trackId, trackId > 0 {
-                    NavigationLink {
-                        TrackDetailView(trackId: trackId)
-                    } label: {
-                        Label("Open in Library", systemImage: "arrow.up.forward.square")
-                            .font(.subheadline.weight(.medium))
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Brand.accent)
-                }
+                progress(pb)
             }
             .padding()
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
         .refreshable { await model.refresh(CatalogService(settings: settings)) }
+        .safeAreaInset(edge: .bottom) {
+            if let trackId = pb.trackId, trackId > 0 {
+                NavigationLink {
+                    TrackDetailView(trackId: trackId)
+                } label: {
+                    Label("Open in Library", systemImage: "arrow.up.forward.square")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Brand.accent)
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial)
+            }
+        }
+    }
+
+    private func artworkLabel(_ pb: Playback) -> String {
+        [pb.title?.nonEmpty, pb.artist?.nonEmpty].compactMap { $0 }.joined(separator: " by ")
     }
 
     private func progress(_ pb: Playback) -> some View {

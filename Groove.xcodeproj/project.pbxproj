@@ -13,6 +13,7 @@
 		2064198A29833B829697C5A7 /* PlaysModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED2271519E9C4BD15C81F95 /* PlaysModel.swift */; };
 		2F5CF009B81C7D08A2EB3E6C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0E83562951C9D7BD7A48EAE5 /* Assets.xcassets */; };
 		319EF9BE91669E7469DB384D /* ReleaseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D14EECF13D2E7740D76994 /* ReleaseDetailView.swift */; };
+		360BB6AE36C8A7A1F3F00FF0 /* AttentionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27254E509C0A5183FE8A30CB /* AttentionCenter.swift */; };
 		3DC92DF1917A2059D79AD808 /* EditTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C822D3C9AD028578CD3ABBBE /* EditTrackView.swift */; };
 		3E248FD660D01CE13FD67284 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27ED92912FF018764F1314A9 /* RootView.swift */; };
 		4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9253360D61A0BC5E0BE49D /* LibraryView.swift */; };
@@ -43,6 +44,7 @@
 		0550B0EA639BF23889C28AD2 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		0E83562951C9D7BD7A48EAE5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		120B89C4B5CF8DA81D12078E /* ReviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewModel.swift; sourceTree = "<group>"; };
+		27254E509C0A5183FE8A30CB /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		27ED92912FF018764F1314A9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		3A9BAD5549550DECAB6614F5 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -104,6 +106,7 @@
 			children = (
 				CFF1193157A2AE8C0D67BA94 /* APIClient.swift */,
 				B328C114E82F254E4675A5AA /* AppSettings.swift */,
+				27254E509C0A5183FE8A30CB /* AttentionCenter.swift */,
 				BC847C6CED4853F2D4663F1D /* CatalogService.swift */,
 				B26F2A1EC6AA9160C8B6AB11 /* Formatters.swift */,
 			);
@@ -300,6 +303,7 @@
 				FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */,
 				6EB577E6A6586EA2225A3FCD /* AppSettings.swift in Sources */,
 				9124A458EAEC8E255255C2FB /* Artwork.swift in Sources */,
+				360BB6AE36C8A7A1F3F00FF0 /* AttentionCenter.swift in Sources */,
 				AE367722C2E95FFDA2CDD01B /* CatalogService.swift in Sources */,
 				BD7A83E2039F5B642078C509 /* Components.swift in Sources */,
 				C96CB0EB65E0329AC011FE8B /* ConnectView.swift in Sources */,

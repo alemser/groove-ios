@@ -16,9 +16,16 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Catalog Server") {
-                    ConnectionFields(host: $host, port: $port, scheme: $scheme)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                    TextField("Host or IP", text: $host)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    TextField("Port", text: $port)
+                        .keyboardType(.numberPad)
+                    Picker("Scheme", selection: $scheme) {
+                        Text("http").tag("http")
+                        Text("https").tag("https")
+                    }
                 }
 
                 Section {

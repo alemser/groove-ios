@@ -31,6 +31,7 @@ struct TrackDetailView: View {
                                 Label("Delete Track", systemImage: "trash")
                             }
                         } label: { Image(systemName: "ellipsis.circle") }
+                        .accessibilityLabel("Track actions")
                     }
                 }
             }

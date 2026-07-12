@@ -122,5 +122,7 @@ struct ReleaseCardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(release.album), \(release.artist)\(release.owned ? ", owned" : "")")
     }
 }

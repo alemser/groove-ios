@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ReviewView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(AttentionCenter.self) private var attention
     @State private var model = ReviewModel()
 
     var body: some View {
@@ -13,7 +14,10 @@ struct ReviewView: View {
                 }
                 .grooveScreenBackground()
         }
-        .task { model.configure(settings) }
+        .task {
+            model.configure(settings)
+            await attention.refresh()
+        }
     }
 
     @ViewBuilder
@@ -39,8 +43,8 @@ struct ReviewView: View {
                     ForEach(model.associations) { item in
                         AssociationRowView(
                             item: item,
-                            onAccept: { Task { await model.acceptSuggestion(item) } },
-                            onDismiss: { Task { await model.dismiss(item) } }
+                            onAccept: { Task { await model.acceptSuggestion(item); await attention.refresh() } },
+                            onDismiss: { Task { await model.dismiss(item); await attention.refresh() } }
                         )
                         .listRowBackground(Brand.surface)
                     }
@@ -86,17 +90,22 @@ struct AssociationRowView: View {
             HStack(spacing: 10) {
                 if let tid = item.suggestedTrackId, tid > 0 {
                     Button(action: onAccept) {
-                        Label("Accept", systemImage: "checkmark").font(.caption.weight(.semibold))
+                        Label("Accept", systemImage: "checkmark")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .buttonStyle(.borderedProminent).tint(Brand.ok).controlSize(.small)
+                    .buttonStyle(.borderedProminent).tint(Brand.ok)
                 }
                 Button(action: onDismiss) {
-                    Label("Dismiss", systemImage: "xmark").font(.caption.weight(.semibold))
+                    Label("Dismiss", systemImage: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.muted)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.bordered).tint(Brand.muted).controlSize(.small)
+                .buttonStyle(.bordered).tint(Brand.muted)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 
