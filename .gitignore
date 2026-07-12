@@ -1,0 +1,23 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# The Xcode project is generated from project.yml via `xcodegen generate`.
+# It is committed for convenience but regenerated on demand; ignore user cruft.
+Groove.xcodeproj/xcuserdata/
+Groove.xcodeproj/project.xcworkspace/xcuserdata/
+
+# macOS
+.DS_Store
+
+# SwiftPM
+.build/
+.swiftpm/
