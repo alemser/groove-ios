@@ -65,6 +65,32 @@ open Groove.xcodeproj         # build & run on a simulator or device
 On first launch, enter your catalog server's host/IP and port; the app verifies
 the connection before saving it. Change it any time in **Settings → Catalog Server**.
 
+## Try it with mock data (no backend)
+
+Preview every screen with realistic sample data — no Pi, no catalog server:
+
+```bash
+# 1. Start the bundled fake catalog (pure Python 3, no dependencies).
+#    Leave it running in its own terminal; Ctrl-C to stop.
+python3 Mock/mock-catalog.py            # serves http://127.0.0.1:7073
+
+# 2. In another terminal, open and run the app on a simulator.
+open Groove.xcodeproj                    # press ▶︎ Run (⌘R) on an iPhone simulator
+```
+
+In the app's connect screen, enter host **`127.0.0.1`**, port **`7073`**, scheme
+**http**, and tap **Connect**. The simulator shares your Mac's network, so it
+reaches the mock on localhost. Now Playing, History, Library, and Review are all
+populated with sample tracks and generated cover art.
+
+> Prefer the command line? Build & launch headless:
+> ```bash
+> xcodebuild -scheme Groove -sdk iphonesimulator \
+>   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+> ```
+> On a **physical iPhone**, use your Mac's LAN IP instead of `127.0.0.1` and keep
+> the phone on the same Wi-Fi.
+
 ## Related repositories
 
 - **[groove-catalog](https://github.com/alemser/groove-catalog)** — library store, enrichment, studio UI, and the API this app consumes
