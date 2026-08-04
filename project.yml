@@ -43,6 +43,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
         NSLocalNetworkUsageDescription: Groove connects to your groove-catalog server on the local network to manage your library.
+        NSBonjourServices:
+          - _http._tcp
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
           NSAllowsLocalNetworking: true
