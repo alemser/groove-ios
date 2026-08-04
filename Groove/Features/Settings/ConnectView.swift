@@ -14,6 +14,7 @@ struct ConnectView: View {
     @State private var discovery = CatalogDiscovery()
     @State private var showManualEntry = false
     @State private var showSlowHint = false
+    @State private var autoConnectAttemptedIDs: Set<String> = []
 
     var body: some View {
         ScrollView {
@@ -36,7 +37,9 @@ struct ConnectView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                manualEntryToggle
+                if showManualEntry || !discovery.hosts.isEmpty {
+                    manualEntryToggle
+                }
             }
             .padding(24)
             .frame(maxWidth: 480)
@@ -46,12 +49,23 @@ struct ConnectView: View {
         .task { discovery.startBrowsing() }
         .onDisappear { discovery.stopBrowsing() }
         .task {
-            try? await Task.sleep(for: .seconds(6))
+            try? await Task.sleep(for: .seconds(3))
             guard discovery.hosts.isEmpty, !showManualEntry else { return }
             withAnimation { showSlowHint = true }
         }
         .animation(.easeInOut(duration: 0.3), value: showManualEntry)
         .animation(.easeInOut(duration: 0.3), value: discovery.hosts.isEmpty)
+        .onChange(of: discovery.hosts) { _, hosts in
+            // Every listed host already answered /status as a groove-catalog,
+            // so when there's exactly one there is nothing left to choose —
+            // connect without waiting for a tap. One attempt per host: if it
+            // fails (or a second server appears) the user decides.
+            guard !showManualEntry, !probe.isProbing,
+                  hosts.count == 1, let only = hosts.first,
+                  !autoConnectAttemptedIDs.contains(only.id) else { return }
+            autoConnectAttemptedIDs.insert(only.id)
+            select(only)
+        }
     }
 
     // MARK: - Header
@@ -81,21 +95,35 @@ struct ConnectView: View {
     // MARK: - Searching state
 
     private var searchingState: some View {
-        VStack(spacing: 10) {
-            Text("Looking for your Groove…")
-                .font(.headline)
-                .foregroundStyle(Brand.text)
-            Text("Make sure your phone and the groove-catalog server are on the same Wi-Fi.")
-                .font(.subheadline)
-                .foregroundStyle(Brand.muted)
-                .multilineTextAlignment(.center)
-            if showSlowHint {
-                Text("Taking longer than usual? Some networks block device discovery — enter the server manually below.")
-                    .font(.footnote)
-                    .foregroundStyle(Brand.warn)
+        VStack(spacing: 20) {
+            VStack(spacing: 10) {
+                Text("Looking for your Groove…")
+                    .font(.headline)
+                    .foregroundStyle(Brand.text)
+                Text("Make sure your phone and the groove-catalog server are on the same Wi-Fi.")
+                    .font(.subheadline)
+                    .foregroundStyle(Brand.muted)
                     .multilineTextAlignment(.center)
-                    .padding(.top, 8)
-                    .transition(.opacity)
+            }
+
+            if showSlowHint {
+                VStack(spacing: 12) {
+                    Text("Couldn't find it automatically — some networks block device discovery between phones and other devices.")
+                        .font(.footnote)
+                        .foregroundStyle(Brand.muted)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        showManualEntry = true
+                    } label: {
+                        Label("Enter Server Manually", systemImage: "keyboard")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Brand.accent)
+                    .controlSize(.large)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 8)

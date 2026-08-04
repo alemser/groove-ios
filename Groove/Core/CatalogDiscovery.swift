@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Observation
+import dnssd
 
 struct DiscoveredCatalogHost: Identifiable, Equatable {
     let id: String
@@ -74,7 +75,7 @@ final class CatalogDiscovery {
             guard !resolvedIDs.contains(meta.id), !resolvingIDs.contains(meta.id) else { continue }
             resolvingIDs.insert(meta.id)
             Task {
-                guard let resolved = await Self.resolveHostPort(for: meta.endpoint) else {
+                guard let resolved = await Self.resolveHostPort(name: meta.name, type: meta.type, domain: meta.domain) else {
                     self.resolvingIDs.remove(meta.id)
                     return
                 }
@@ -107,47 +108,76 @@ final class CatalogDiscovery {
         return true
     }
 
-    nonisolated private static func extractServiceMeta(from result: NWBrowser.Result) -> (id: String, name: String, endpoint: NWEndpoint)? {
+    nonisolated private static func extractServiceMeta(from result: NWBrowser.Result) -> (id: String, name: String, type: String, domain: String)? {
         switch result.endpoint {
         case let .service(name, type, domain, _):
-            return (id: "\(name)|\(type)|\(domain)", name: name, endpoint: result.endpoint)
+            return (id: "\(name)|\(type)|\(domain)", name: name, type: type, domain: domain)
         default:
             return nil
         }
     }
 
-    nonisolated private static func resolveHostPort(for endpoint: NWEndpoint) async -> (host: String, port: Int)? {
+    /// Resolves a Bonjour service to the hostname its SRV record advertises
+    /// (e.g. `oceano.local`) rather than to an IP address. Opening a throwaway
+    /// NWConnection and reading `remoteEndpoint` tended to capture an IPv6
+    /// address the phone couldn't route to; handing URLSession the hostname
+    /// lets it pick a reachable address family per request, and the stored
+    /// setting survives DHCP lease changes.
+    nonisolated private static func resolveHostPort(name: String, type: String, domain: String) async -> (host: String, port: Int)? {
         await withCheckedContinuation { continuation in
-            let connection = NWConnection(to: endpoint, using: .tcp)
             let queue = DispatchQueue(label: "groove.discovery.resolve")
-            // Every mutation below runs on `queue` (state handler + the timeout
-            // fallback are both dispatched onto it), so access is already
-            // serialized — the compiler just can't see that through the closures.
-            nonisolated(unsafe) var finished = false
+            let resolution = SRVResolution(continuation: continuation)
+            let contextPtr = Unmanaged.passRetained(resolution).toOpaque()
 
-            @Sendable func finish(_ value: (host: String, port: Int)?) {
-                guard !finished else { return }
-                finished = true
-                connection.cancel()
-                continuation.resume(returning: value)
-            }
-
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    if let path = connection.currentPath, case let .hostPort(host, port) = path.remoteEndpoint {
-                        finish((host: host.debugDescription.trimmingCharacters(in: CharacterSet(charactersIn: "[]")), port: Int(port.rawValue)))
-                    } else {
-                        finish(nil)
-                    }
-                case .failed, .cancelled:
-                    finish(nil)
-                default:
-                    break
+            var ref: DNSServiceRef?
+            let err = DNSServiceResolve(&ref, 0, 0, name, type, domain, { _, _, _, errorCode, _, hosttarget, port, _, _, rawContext in
+                guard let rawContext else { return }
+                let resolution = Unmanaged<SRVResolution>.fromOpaque(rawContext).takeUnretainedValue()
+                guard errorCode == DNSServiceErrorType(kDNSServiceErr_NoError), let hosttarget else {
+                    resolution.finish(nil)
+                    return
                 }
+                var host = String(cString: hosttarget)
+                if host.hasSuffix(".") { host.removeLast() }
+                resolution.finish((host: host, port: Int(UInt16(bigEndian: port))))
+            }, contextPtr)
+
+            guard err == DNSServiceErrorType(kDNSServiceErr_NoError), let serviceRef = ref else {
+                Unmanaged<SRVResolution>.fromOpaque(contextPtr).release()
+                continuation.resume(returning: nil)
+                return
             }
-            connection.start(queue: queue)
-            queue.asyncAfter(deadline: .now() + 5) { finish(nil) }
+            resolution.serviceRef = serviceRef
+            DNSServiceSetDispatchQueue(serviceRef, queue)
+            // The timeout closure's strong reference also keeps `resolution`
+            // alive until the once-only guard has definitely run.
+            queue.asyncAfter(deadline: .now() + 5) { resolution.finish(nil) }
         }
+    }
+}
+
+/// One in-flight DNSServiceResolve: the service ref, the continuation, and a
+/// once-only guard. `finish` is only ever called on the resolve queue (the
+/// dnssd callback and the timeout are both dispatched there), so access is
+/// serialized without extra locking.
+private final class SRVResolution: @unchecked Sendable {
+    var serviceRef: DNSServiceRef?
+    private var finished = false
+    private let continuation: CheckedContinuation<(host: String, port: Int)?, Never>
+
+    init(continuation: CheckedContinuation<(host: String, port: Int)?, Never>) {
+        self.continuation = continuation
+    }
+
+    func finish(_ value: (host: String, port: Int)?) {
+        guard !finished else { return }
+        finished = true
+        if let serviceRef {
+            DNSServiceRefDeallocate(serviceRef)
+            self.serviceRef = nil
+        }
+        continuation.resume(returning: value)
+        // Balances the passRetained taken when this resolution began.
+        Unmanaged.passUnretained(self).release()
     }
 }
