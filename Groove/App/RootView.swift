@@ -16,39 +16,65 @@ struct RootView: View {
 }
 
 struct MainTabView: View {
-    /// Restore the tab the user was last on.
-    @AppStorage("selectedTab") private var selectedTab = 0
     @Environment(AppSettings.self) private var settings
     @Environment(AttentionCenter.self) private var attention
+    @Environment(NavigationState.self) private var navigation
+    @Environment(NowPlayingModel.self) private var nowPlaying
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NowPlayingView()
-                .tabItem { Label("Now Playing", systemImage: "waveform") }
-                .tag(0)
+        @Bindable var navigation = navigation
+        // `TabView` owns a native UITabBar that doesn't shrink for a SwiftUI
+        // safeAreaInset the way a ScrollView would, so the mini-bar is placed
+        // with a plain bottom-aligned overlay instead — offset by the
+        // standard 49pt tab bar content height (stable across iPhone form
+        // factors pre-iOS 18's dedicated `tabViewBottomAccessory`).
+        ZStack(alignment: .bottom) {
+            TabView(selection: $navigation.selectedTab) {
+                HomeView()
+                    .tabItem { Label("Home", systemImage: "house") }
+                    .tag(NavigationState.Tab.home)
 
-            PlaysView()
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
-                .tag(1)
+                LibraryView()
+                    .tabItem { Label("Library", systemImage: "square.stack") }
+                    .tag(NavigationState.Tab.library)
 
-            LibraryView()
-                .tabItem { Label("Library", systemImage: "square.stack") }
-                .tag(2)
+                PlaysView()
+                    .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+                    .tag(NavigationState.Tab.history)
 
-            ReviewView()
-                .tabItem { Label("Review", systemImage: "checkmark.seal") }
-                .badge(attention.count)
-                .tag(3)
+                ReviewView()
+                    .tabItem { Label("Review", systemImage: "checkmark.seal") }
+                    .badge(attention.count)
+                    .tag(NavigationState.Tab.review)
 
-            SettingsView()
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-                .tag(4)
+                RigView()
+                    .tabItem { Label("Rig", systemImage: "hifispeaker.and.homepod") }
+                    .badge(attention.rigAttentionCount)
+                    .tag(NavigationState.Tab.rig)
+            }
+            .tint(Brand.accent)
+
+            if !navigation.isNowPlayingSheetPresented, nowPlaying.status?.playback.active == true {
+                NowPlayingMiniBar()
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 57)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
-        .tint(Brand.accent)
+        .animation(.easeInOut(duration: 0.2), value: nowPlaying.status?.playback.active)
+        .sheet(isPresented: $navigation.isNowPlayingSheetPresented) {
+            NowPlayingView()
+        }
         .task { attention.start(settings) }
+        .task { nowPlaying.start(settings) }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await attention.refresh() } }
+            if phase == .active {
+                Task { await attention.refresh() }
+                nowPlaying.start(settings)
+            } else {
+                nowPlaying.stop()
+            }
         }
     }
 }

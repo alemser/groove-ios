@@ -69,6 +69,57 @@ def release(i):
         "owned": i%3==0,"deletable": i%3==0,"tracklist_count":10+i,"catalog_tracks":i%4,
         "confirmed_at":"2026-07-10T12:00:00Z"}
 
+def stylus_state():
+    return {"active":True,"profile":{"id":1,"catalog_id":9,"brand":"Ortofon","model":"2M Blue",
+        "stylus_profile":"Nude Elliptical","lifetime_hours":800,"initial_used_hours":0,
+        "installed_at":"2026-05-01T10:00:00Z","is_custom":False},
+        "metrics":{"vinyl_hours_since_install":312.4,"stylus_hours_total":312.4,
+        "remaining_hours":487.6,"wear_percent":39.05,"state":"healthy"}}
+
+def recognition_providers():
+    return {"chain_mode":"sequential",
+        "chain":[{"id":"acrcloud","display_name":"ACRCloud","enabled":True,"configured":True},
+            {"id":"audd","display_name":"AudD","enabled":True,"configured":False},
+            {"id":"local_index","display_name":"Local Index","enabled":True,"configured":True}],
+        "builtins":{
+            "acrcloud":{"name":"acrcloud","enabled":True,"host":"identify-eu-west-1.acrcloud.com",
+                "api_key":"••••••••","api_secret":"••••••••","configured":True},
+            "audd":{"name":"audd","enabled":True,"host":"","api_key":"","api_secret":"","configured":False}}}
+
+def rig_equipment():
+    return {"items":[{"id":"cd_player","label":"CD Player","backend":"broadlink",
+        "actions":["power_toggle","play","pause","stop","next","previous","eject"],
+        "role":"physical_media","physical_format":"cd","input_ids":["cd"],"has_remote":True}]}
+
+def rig_status():
+    return {"schema_version":1,
+        "targets":[{"id":"amplifier","label":"Amplifier","backend":"broadlink",
+            "capabilities":["power_toggle","volume_up","volume_down","next_input","prev_input","select_input"],
+            "actions":{"power_toggle":{"learned":True},"volume_up":{"learned":True},
+                "volume_down":{"learned":True},"next_input":{"learned":True},
+                "prev_input":{"learned":True},"select_input":{"learned":True}}},
+            {"id":"cd_player","label":"CD Player","backend":"broadlink",
+            "capabilities":["power_toggle","play","pause","stop","next","previous","eject"],
+            "actions":{"power_toggle":{"learned":True},"play":{"learned":True},
+                "pause":{"learned":True},"stop":{"learned":False},
+                "next":{"learned":False},"previous":{"learned":False},"eject":{"learned":False}}}],
+        "amplifier":{"profile_id":"denon-pma","maker":"Denon","model":"PMA-600NE","input_mode":"discrete",
+            "active_input_id":"phono","active_input_label":"Phono",
+            "inputs":[{"id":"phono","label":"Phono","visible":True},
+                {"id":"cd","label":"CD","visible":True},
+                {"id":"airplay","label":"AirPlay","visible":True}],
+            "power":{"state":"on","confidence":"high","method":"vu_probe"}}}
+
+def stylus_catalog():
+    return {"items":[
+        {"id":9,"brand":"Ortofon","model":"2M Blue","stylus_profile":"Nude Elliptical",
+            "min_hours":500,"max_hours":1000,"recommended_hours":800,"confidence":"low"},
+        {"id":2,"brand":"Denon","model":"DL-103","stylus_profile":"Conical",
+            "min_hours":300,"max_hours":500,"recommended_hours":500,"confidence":"medium"},
+        {"id":6,"brand":"Audio-Technica","model":"AT-VM95ML","stylus_profile":"MicroLine",
+            "min_hours":800,"max_hours":1200,"recommended_hours":1000,"confidence":"low"},
+    ]}
+
 class H(http.server.BaseHTTPRequestHandler):
     def log_message(self,*a): pass
     def _json(self,obj,code=200):
@@ -124,9 +175,48 @@ class H(http.server.BaseHTTPRequestHandler):
                 {"id":"musicbrainz","display_name":"MusicBrainz","enabled":True,"configured":True},
                 {"id":"discogs","display_name":"Discogs","enabled":True,"configured":True},
                 {"id":"itunes","display_name":"iTunes","enabled":False,"configured":False}]})
+        if path=="/catalog/stylus":
+            return self._json(stylus_state())
+        if path=="/catalog/stylus/catalog":
+            return self._json(stylus_catalog())
+        if path=="/rig/status":
+            return self._json(rig_status())
+        if path=="/rig/equipment":
+            return self._json(rig_equipment())
+        if path=="/identity/recognition/providers":
+            return self._json(recognition_providers())
+        m=re.match(r"/rig/sessions/(.+)",path)
+        if m:
+            return self._json({"id":m.group(1),"kind":"learn","status":"success",
+                "backend":"broadlink","target_id":"cd_player","action":"stop"})
         self._json({"error":"not found"},404)
-    def do_POST(self): self._json({"ok":True})
-    def do_PATCH(self): self._json(track(0))
+    def do_POST(self):
+        if self.path=="/catalog/stylus/replace": return self._json(stylus_state())
+        if self.path.startswith("/rig/targets/") and "/actions/" in self.path:
+            return self._json(rig_status())
+        if self.path=="/rig/observe/power/ensure_on":
+            return self._json({"state":"on","confidence":"high","method":"vu_probe"})
+        if self.path=="/rig/observe/power/ensure_off":
+            return self._json({"state":"off","confidence":"high","method":"vu_probe"})
+        if self.path=="/rig/runtime/active_input":
+            return self._json({"input_id":"phono","input_label":"Phono"})
+        if self.path=="/rig/sessions/learn":
+            return self._json({"id":"sess-1","kind":"learn","status":"success",
+                "backend":"broadlink","target_id":"cd_player","action":"stop"},202)
+        if self.path=="/rig/equipment":
+            return self._json({"id":"new_device","label":"New Device","backend":"broadlink",
+                "actions":["power_toggle"],"role":"physical_media","physical_format":"cd",
+                "has_remote":True},201)
+        self._json({"ok":True})
+    def do_PUT(self):
+        if self.path=="/catalog/stylus": return self._json(stylus_state())
+        if self.path.startswith("/identity/recognition/providers"):
+            return self._json(recognition_providers())
+        self._json({"ok":True})
+    def do_PATCH(self):
+        if self.path.startswith("/identity/recognition/providers/"):
+            return self._json(recognition_providers())
+        self._json(track(0))
     def do_DELETE(self): self._json({"ok":True})
 
 socketserver.TCPServer.allow_reuse_address=True

@@ -8,11 +8,15 @@ struct ConnectView: View {
     @State private var port = "7073"
     @State private var scheme = "http"
     @State private var probe = ProbeState.idle
+    @State private var discovery = CatalogDiscovery()
 
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
                 header
+                if !discovery.hosts.isEmpty {
+                    discoveredHosts
+                }
                 form
                 connectButton
                 if case let .failed(message) = probe {
@@ -32,6 +36,51 @@ struct ConnectView: View {
             .frame(maxWidth: .infinity)
         }
         .grooveScreenBackground()
+        .task { discovery.startBrowsing() }
+        .onDisappear { discovery.stopBrowsing() }
+    }
+
+    private var discoveredHosts: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionLabel(text: "On Your Network")
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+            ForEach(discovery.hosts) { discovered in
+                Button {
+                    select(discovered)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "server.rack")
+                            .foregroundStyle(Brand.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(discovered.displayName).foregroundStyle(Brand.text)
+                            Text("\(discovered.host):\(discovered.port)")
+                                .font(.caption)
+                                .foregroundStyle(Brand.muted)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Brand.muted)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(.plain)
+                if discovered.id != discovery.hosts.last?.id {
+                    Divider().overlay(Brand.border).padding(.leading, 16)
+                }
+            }
+        }
+        .grooveCard()
+    }
+
+    private func select(_ discovered: DiscoveredCatalogHost) {
+        host = discovered.host
+        port = String(discovered.port)
+        scheme = "http"
+        Task { await connect() }
     }
 
     private var header: some View {

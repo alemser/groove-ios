@@ -1,6 +1,10 @@
 import SwiftUI
 
-struct SettingsView: View {
+/// Server connection plus everything hardware/back-office: stylus tracking,
+/// the amplifier and remote (added in later phases), metadata enrichers, and
+/// stack health. The catalog-management tabs (Library/History/Review) stay
+/// lean; this is the hub for "how the rig is set up."
+struct RigView: View {
     @Environment(AppSettings.self) private var settings
 
     @State private var host = ""
@@ -11,6 +15,10 @@ struct SettingsView: View {
 
     @State private var enrichers: [EnricherSlot] = []
     @State private var enrichersError: String?
+
+    @State private var stylusStatusText: String?
+    @State private var ampStatusText: String?
+    @State private var recognitionStatusText: String?
 
     var body: some View {
         NavigationStack {
@@ -48,6 +56,57 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Hardware") {
+                    NavigationLink {
+                        StylusView()
+                    } label: {
+                        hardwareRow(
+                            title: "Stylus Tracking",
+                            subtitle: stylusStatusText ?? "Loading…",
+                            icon: "gauge.with.dots.needle.33percent",
+                            tint: Brand.gold
+                        )
+                    }
+                    NavigationLink {
+                        AmplifierView()
+                    } label: {
+                        hardwareRow(
+                            title: "Amplifier",
+                            subtitle: ampStatusText ?? "Loading…",
+                            icon: "hifispeaker.and.homepod",
+                            tint: Brand.teal
+                        )
+                    }
+                    NavigationLink {
+                        EquipmentRemoteView()
+                    } label: {
+                        hardwareRow(
+                            title: "Equipment & Remote",
+                            subtitle: "CD player and other IR devices",
+                            icon: "appletvremote.gen4",
+                            tint: Brand.muted
+                        )
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        RecognitionProvidersScreen()
+                    } label: {
+                        hardwareRow(
+                            title: "Recognition Providers",
+                            subtitle: recognitionStatusText ?? "Loading…",
+                            icon: "waveform.badge.magnifyingglass",
+                            tint: Brand.gold
+                        )
+                    }
+                } header: {
+                    Text("Recognition")
+                } footer: {
+                    Text("What identifies a spinning record (ACRCloud, AudD, local fingerprints) — separate from the metadata enrichers below.")
+                        .foregroundStyle(Brand.muted)
+                }
+
                 Section("Metadata Enrichers") {
                     if let enrichersError {
                         Text(enrichersError).font(.footnote).foregroundStyle(Brand.muted)
@@ -80,10 +139,25 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
-            .navigationTitle("Settings")
+            .navigationTitle("Rig")
         }
         .onAppear(perform: loadFields)
         .task { await loadEnrichers() }
+        .task { await loadStylusStatus() }
+        .task { await loadAmpStatus() }
+        .task { await loadRecognitionStatus() }
+    }
+
+    private func hardwareRow(title: String, subtitle: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(Brand.text)
+                Text(subtitle).font(.caption).foregroundStyle(Brand.muted)
+            }
+        }
     }
 
     private func enricherRow(_ slot: EnricherSlot) -> some View {
@@ -129,6 +203,9 @@ struct SettingsView: View {
             saved = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             await loadEnrichers()
+            await loadStylusStatus()
+            await loadAmpStatus()
+            await loadRecognitionStatus()
         } catch {
             probe = .failed((error as? APIError)?.localizedDescription ?? error.localizedDescription)
         }
@@ -150,6 +227,47 @@ struct SettingsView: View {
             await loadEnrichers()
         } catch {
             await loadEnrichers()
+        }
+    }
+
+    private func loadStylusStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let state = try await CatalogService(settings: settings).stylusState()
+            guard let p = state.profile else {
+                stylusStatusText = "Not configured"
+                return
+            }
+            stylusStatusText = "\(p.brand) \(p.model) · \(String(format: "%.0f%% worn", state.metrics.wearPercent))"
+        } catch {
+            stylusStatusText = "Unavailable"
+        }
+    }
+
+    private func loadAmpStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let snapshot = try await CatalogService(settings: settings).rigStatus()
+            guard let amp = snapshot.amplifier else {
+                ampStatusText = "Not configured"
+                return
+            }
+            let device = [amp.maker, amp.model].compactMap { $0.nonEmpty }.joined(separator: " ")
+            let power = (amp.power?.state ?? "unknown").replacingOccurrences(of: "_", with: " ").capitalized
+            ampStatusText = device.isEmpty ? power : "\(device) · \(power)"
+        } catch {
+            ampStatusText = "Unavailable"
+        }
+    }
+
+    private func loadRecognitionStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let state = try await CatalogService(settings: settings).recognitionProviders()
+            let enabled = state.chain.filter(\.enabled).count
+            recognitionStatusText = "\(enabled)/\(state.chain.count) enabled"
+        } catch {
+            recognitionStatusText = "Unavailable"
         }
     }
 }
