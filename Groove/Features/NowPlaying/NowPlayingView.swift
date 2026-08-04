@@ -1,21 +1,32 @@
 import SwiftUI
 
+/// Presented as a `.sheet()` from the mini-bar or Home — the model is app-owned
+/// (started/stopped alongside the tab bar in `MainTabView`) so playback keeps
+/// polling for the mini-bar even while this sheet is dismissed.
 struct NowPlayingView: View {
     @Environment(AppSettings.self) private var settings
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var model = NowPlayingModel()
+    @Environment(NowPlayingModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             content
                 .navigationTitle("Now Playing")
+                .navigationBarTitleDisplayMode(.inline)
                 .grooveScreenBackground()
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Brand.muted)
+                        }
+                        .accessibilityLabel("Close")
+                    }
+                }
         }
-        .task { model.start(settings) }
-        .onDisappear { model.stop() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { model.start(settings) } else { model.stop() }
-        }
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder

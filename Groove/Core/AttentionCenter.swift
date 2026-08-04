@@ -9,6 +9,10 @@ import Observation
 @Observable
 final class AttentionCenter {
     private(set) var count = 0
+    /// 1 when the stylus has crossed its configured replacement-alert threshold, else 0 —
+    /// surfaced as the Rig tab badge. Not a general count (there's only one hardware
+    /// signal worth surfacing today); kept as an Int so the badge modifier stays simple.
+    private(set) var rigAttentionCount = 0
 
     private var pollTask: Task<Void, Never>?
     private var settings: AppSettings?
@@ -30,7 +34,7 @@ final class AttentionCenter {
     }
 
     func refresh() async {
-        guard let settings, settings.isConfigured else { count = 0; return }
+        guard let settings, settings.isConfigured else { count = 0; rigAttentionCount = 0; return }
         let service = CatalogService(settings: settings)
         do {
             async let assoc = service.pendingAssociations()
@@ -42,5 +46,19 @@ final class AttentionCenter {
         } catch {
             // Leave the last known count on a transient failure.
         }
+        await refreshRigAttention(service)
+    }
+
+    private func refreshRigAttention(_ service: CatalogService) async {
+        guard let stylus = try? await service.stylusState(), stylus.profile != nil else {
+            rigAttentionCount = 0
+            return
+        }
+        let defaults = UserDefaults.standard
+        let alertsEnabled = (defaults.object(forKey: "stylusAlertEnabled") as? Bool) ?? true
+        guard alertsEnabled else { rigAttentionCount = 0; return }
+        let threshold = (defaults.object(forKey: "stylusAlertThresholdLeftPercent") as? Int) ?? 15
+        let leftPercent = max(0, 100 - stylus.metrics.wearPercent)
+        rigAttentionCount = leftPercent <= Double(threshold) ? 1 : 0
     }
 }

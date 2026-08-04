@@ -10,9 +10,9 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
-    CODE_SIGNING_ALLOWED: "NO"
-    CODE_SIGN_IDENTITY: ""
     ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: VNTRG9Q6BU
 targets:
   Groove:
     type: application
@@ -43,6 +43,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
         NSLocalNetworkUsageDescription: Groove connects to your groove-catalog server on the local network to manage your library.
+        NSBonjourServices:
+          - _http._tcp
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
           NSAllowsLocalNetworking: true
