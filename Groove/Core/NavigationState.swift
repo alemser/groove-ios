@@ -8,7 +8,7 @@ import Observation
 @Observable
 final class NavigationState {
     enum Tab: String, Hashable {
-        case home, library, history, review, rig
+        case home, library, rig, settings
     }
 
     private let defaults = UserDefaults.standard

@@ -1,12 +1,14 @@
 import SwiftUI
 
 /// IR-controlled devices other than the amplifier (CD player, tape deck, …):
-/// register equipment, teach commands from the physical remote, and fire
-/// learned commands.
-struct EquipmentRemoteView: View {
-    @Environment(AppSettings.self) private var settings
-    @State private var model = EquipmentRemoteModel()
+/// register equipment and edit them. Live command teaching/firing lives in
+/// `EquipmentDetailView`; the Remote tab is where learned commands get fired
+/// day-to-day.
+struct AmplifierEquipmentTab: View {
+    let model: EquipmentRemoteModel
     @State private var showAddSheet = false
+    @State private var pendingDeleteOffsets: IndexSet?
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         Group {
@@ -19,10 +21,6 @@ struct EquipmentRemoteView: View {
                 content
             }
         }
-        .navigationTitle("Equipment & Remote")
-        .navigationBarTitleDisplayMode(.inline)
-        .grooveScreenBackground()
-        .task { model.configure(settings) }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -35,6 +33,24 @@ struct EquipmentRemoteView: View {
         }
         .sheet(isPresented: $showAddSheet) {
             AddEquipmentView(model: model)
+        }
+        .confirmationDialog(
+            "Remove this equipment?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                if let offsets = pendingDeleteOffsets {
+                    for index in offsets {
+                        let id = model.otherEquipment[index].id
+                        Task { await model.deleteEquipment(id: id) }
+                    }
+                }
+                pendingDeleteOffsets = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDeleteOffsets = nil }
+        } message: {
+            Text("Its learned remote commands are removed too — you'd have to re-teach them if you add it back.")
         }
     }
 
@@ -56,10 +72,8 @@ struct EquipmentRemoteView: View {
                     }
                 }
                 .onDelete { offsets in
-                    for index in offsets {
-                        let id = model.otherEquipment[index].id
-                        Task { await model.deleteEquipment(id: id) }
-                    }
+                    pendingDeleteOffsets = offsets
+                    showDeleteConfirm = true
                 }
             }
             .scrollContentBackground(.hidden)

@@ -7,12 +7,23 @@ struct EquipmentDetailView: View {
     let model: EquipmentRemoteModel
 
     @Environment(\.dismiss) private var dismiss
-    @State private var showLearnSheet = false
-    @State private var pendingAction = ""
+    @State private var learnTarget: LearnTarget?
     @State private var showDeleteConfirm = false
+    @State private var showEditSheet = false
 
     private var currentItem: RigEquipmentItem {
-        model.otherEquipment.first { $0.id == item.id } ?? item
+        model.equipment.first { $0.id == item.id } ?? item
+    }
+
+    /// Carries the action to teach atomically into `.sheet(item:)` — setting
+    /// a separate `@State` string and a `Bool` flag in two steps let the
+    /// sheet occasionally present with the *previous* action still in place
+    /// (SwiftUI can batch the flag flip ahead of the string update), which
+    /// sent an empty `action` to `/rig/sessions/learn` and the server
+    /// rejected it. A single identifiable value can't be "half updated".
+    private struct LearnTarget: Identifiable {
+        var id: String { action }
+        let action: String
     }
 
     var body: some View {
@@ -41,11 +52,13 @@ struct EquipmentDetailView: View {
                 }
             }
 
-            Section {
-                Button(role: .destructive) {
-                    showDeleteConfirm = true
-                } label: {
-                    Label("Delete Equipment", systemImage: "trash")
+            if currentItem.id != "amplifier" {
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete Equipment", systemImage: "trash")
+                    }
                 }
             }
         }
@@ -53,10 +66,18 @@ struct EquipmentDetailView: View {
         .grooveScreenBackground()
         .navigationTitle(currentItem.label)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showLearnSheet) {
-            LearnSessionSheet(targetId: currentItem.id, action: pendingAction) {
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Edit") { showEditSheet = true }
+            }
+        }
+        .sheet(item: $learnTarget) { target in
+            LearnSessionSheet(targetId: currentItem.id, action: target.action) {
                 Task { await model.load() }
             }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EquipmentEditForm(item: currentItem, model: model)
         }
         .confirmationDialog(
             "Delete \(currentItem.label)?",
@@ -119,7 +140,80 @@ struct EquipmentDetailView: View {
     }
 
     private func teach(_ action: String) {
-        pendingAction = action
-        showLearnSheet = true
+        learnTarget = LearnTarget(action: action)
+    }
+}
+
+/// Editable equipment attributes — label, role, physical format, and whether
+/// it's exposed on the Remote tab. Backend/actions/input wiring stay
+/// create-time-only for now, edited by re-adding the device if they need to
+/// change.
+struct EquipmentEditForm: View {
+    let item: RigEquipmentItem
+    let model: EquipmentRemoteModel
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var label = ""
+    @State private var role = "physical_media"
+    @State private var physicalFormat = "unspecified"
+    @State private var hasRemote = false
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Label", text: $label)
+                    Picker("Role", selection: $role) {
+                        Text("Physical Media").tag("physical_media")
+                        Text("Streaming").tag("streaming")
+                        Text("Other").tag("other")
+                    }
+                    Picker("Format", selection: $physicalFormat) {
+                        Text("Unspecified").tag("unspecified")
+                        Text("Vinyl").tag("vinyl")
+                        Text("CD").tag("cd")
+                        Text("Tape").tag("tape")
+                        Text("Mixed").tag("mixed")
+                    }
+                    Toggle("Show on Remote", isOn: $hasRemote)
+                }
+
+                if let error = model.actionError {
+                    Section { Text(error).foregroundStyle(Brand.err) }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .grooveScreenBackground()
+            .navigationTitle("Edit \(item.label)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
+                        .disabled(isSaving || label.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .onAppear {
+            label = item.label
+            role = item.role
+            physicalFormat = item.physicalFormat
+            hasRemote = item.hasRemote
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        let patch = RigEquipmentPatchRequest(
+            label: label.nonEmpty, backend: nil, actions: nil,
+            role: role, physicalFormat: physicalFormat, inputIds: nil, hasRemote: hasRemote
+        )
+        if await model.updateEquipment(id: item.id, patch) {
+            dismiss()
+        }
     }
 }

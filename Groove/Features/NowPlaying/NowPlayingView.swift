@@ -7,6 +7,7 @@ struct NowPlayingView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(NowPlayingModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var showInfo = false
 
     var body: some View {
         NavigationStack {
@@ -15,6 +16,17 @@ struct NowPlayingView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .grooveScreenBackground()
                 .toolbar {
+                    if let pb = model.status?.playback, pb.active {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                showInfo = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(Brand.muted)
+                            }
+                            .accessibilityLabel("Recognition info")
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             dismiss()
@@ -23,6 +35,11 @@ struct NowPlayingView: View {
                                 .foregroundStyle(Brand.muted)
                         }
                         .accessibilityLabel("Close")
+                    }
+                }
+                .sheet(isPresented: $showInfo) {
+                    if let pb = model.status?.playback {
+                        RecognitionInfoSheet(playback: pb)
                     }
                 }
         }
@@ -68,14 +85,9 @@ struct NowPlayingView: View {
                 .padding(.horizontal)
 
                 HStack(spacing: 8) {
-                    if let source = pb.source?.nonEmpty {
-                        Badge(text: SourceStyle.label(for: source), color: SourceStyle.color(for: source), filled: true)
-                    }
-                    if let media = Format.mediaFormat(pb.mediaFormat) {
-                        Badge(text: media, color: Brand.gold)
-                    }
-                    if let conf = Format.confidence(pb.confidence) {
-                        Badge(text: conf, color: Brand.muted)
+                    MediaFormatBadge(raw: pb.mediaFormat, labeled: true)
+                    if let position = Format.trackPosition(pb.trackPosition) {
+                        Badge(text: position, color: Brand.muted)
                     }
                 }
 

@@ -67,4 +67,57 @@ final class RecognitionProvidersModel {
             return false
         }
     }
+
+    @discardableResult
+    func saveChainSettings(chainMode: String, minConfidence: Double) async -> Bool {
+        guard let settings else { return false }
+        do {
+            state = try await CatalogService(settings: settings)
+                .patchRecognitionSettings(chainMode: chainMode, minConfidence: minConfidence)
+            actionError = nil
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func createCustomProvider(_ req: CustomProviderCreateRequest) async -> String? {
+        guard let settings else { return "Not connected." }
+        do {
+            state = try await CatalogService(settings: settings).createCustomProvider(req)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return nil
+        } catch {
+            return (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    func updateCustomProvider(slug: String, _ cp: CustomProviderConfig) async -> String? {
+        guard let settings else { return "Not connected." }
+        do {
+            state = try await CatalogService(settings: settings).updateCustomProvider(slug: slug, cp)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return nil
+        } catch {
+            return (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+
+    func deleteCustomProvider(slug: String) async {
+        guard let settings else { return }
+        do {
+            try await CatalogService(settings: settings).deleteCustomProvider(slug: slug)
+            await load()
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+
+    func parseSample(slug: String?, sampleJSON: Data) async throws -> ParseSampleResponse {
+        guard let settings else { throw APIError.notConfigured }
+        return try await CatalogService(settings: settings).parseSample(slug: slug, sampleJSON: sampleJSON)
+    }
 }

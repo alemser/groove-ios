@@ -5,11 +5,15 @@ import Observation
 @Observable
 final class ReleasesModel {
     var releases: [LibraryRelease] = []
+    var pending: [PendingReleaseTrack] = []
+    var associationsCount = 0
+    var actionError: String?
     var phase: Phase = .loading
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
     private var searchTask: Task<Void, Never>?
+    private var lastQuery = ""
 
     func configure(_ settings: AppSettings) {
         if self.settings == nil {
@@ -29,20 +33,45 @@ final class ReleasesModel {
 
     func load(query: String) async {
         guard let settings else { return }
-        if releases.isEmpty { phase = .loading }
+        lastQuery = query
+        if releases.isEmpty && pending.isEmpty { phase = .loading }
         do {
-            releases = try await CatalogService(settings: settings).releases(query: query)
+            let service = CatalogService(settings: settings)
+            async let releaseList = service.releases(query: query)
+            async let pendingList = service.pendingReleaseTracks()
+            async let associations = service.pendingAssociations()
+            releases = try await releaseList
+            pending = try await pendingList
+            associationsCount = try await associations.items.count
             phase = .loaded
         } catch {
             phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+        }
+    }
+
+    /// Attaches `trackId` to `release` by copying metadata from a track it already
+    /// owns — the primitive behind dragging a pending track onto an album card.
+    func attach(trackId: Int64, to release: LibraryRelease) async {
+        guard let settings, let fromId = release.sampleTrackId else { return }
+        do {
+            try await CatalogService(settings: settings).applyRelease(trackId: trackId, fromTrackId: fromId)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            await load(query: lastQuery)
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
         }
     }
 }
 
 struct ReleasesView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(NowPlayingModel.self) private var nowPlaying
+    @Environment(NavigationState.self) private var navigation
+    @Environment(AttentionCenter.self) private var attention
     @State private var model = ReleasesModel()
     @State private var search = ""
+    @State private var showAssociations = false
+    @State private var dropTargetReleaseId: String?
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -51,6 +80,27 @@ struct ReleasesView: View {
             .task { model.configure(settings) }
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search releases")
             .onChange(of: search) { _, q in model.search(q) }
+            // `AttentionCenter` polls independently of this screen, so the tab
+            // badge can go from 0 to N (a new pending track/association shows
+            // up server-side) while this grid keeps showing the stale,
+            // already-loaded list. Reload whenever the badge count changes, or
+            // whenever the user actually switches to this tab, so the badge
+            // and the "Needs Review" section it describes never drift apart.
+            .onChange(of: attention.count) { _, _ in Task { await model.load(query: search) } }
+            .onChange(of: navigation.selectedTab) { _, tab in
+                if tab == .library { Task { await model.load(query: search) } }
+            }
+            .sheet(isPresented: $showAssociations, onDismiss: { Task { await model.load(query: search) } }) {
+                AssociationReviewSheet()
+            }
+    }
+
+    private var filteredPending: [PendingReleaseTrack] {
+        guard !search.isEmpty else { return model.pending }
+        let q = search.lowercased()
+        return model.pending.filter {
+            $0.title.lowercased().contains(q) || $0.artist.lowercased().contains(q) || $0.album.lowercased().contains(q)
+        }
     }
 
     @ViewBuilder
@@ -61,9 +111,9 @@ struct ReleasesView: View {
         case let .error(message):
             ErrorStateView(message: message) { Task { await model.load(query: search) } }
         case .loaded:
-            if model.releases.isEmpty {
+            if model.releases.isEmpty && filteredPending.isEmpty {
                 EmptyStateView(icon: "square.stack", title: search.isEmpty ? "No releases" : "No matches",
-                               message: search.isEmpty ? "Confirm a release from the Review tab to build your collection." : nil)
+                               message: search.isEmpty ? "Recognized tracks land here once their release is confirmed." : nil)
             } else {
                 grid
             }
@@ -72,12 +122,46 @@ struct ReleasesView: View {
 
     private var grid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(model.releases) { release in
-                    NavigationLink(value: release) {
-                        ReleaseCardView(release: release)
+            VStack(alignment: .leading, spacing: 20) {
+                if let pb = nowPlaying.status?.playback, pb.active {
+                    nowPlayingBanner(pb)
+                }
+
+                if model.associationsCount > 0 {
+                    associationsBanner
+                }
+
+                if !filteredPending.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        SectionLabel(text: "Needs Review (\(filteredPending.count))")
+                        LazyVGrid(columns: columns, spacing: 16) {
+                            ForEach(filteredPending) { track in
+                                pendingCard(for: track)
+                            }
+                        }
                     }
-                    .buttonStyle(.plain)
+                }
+
+                if !model.releases.isEmpty {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(model.releases) { release in
+                            NavigationLink(value: release) {
+                                ReleaseCardView(release: release, isDropTarget: dropTargetReleaseId == release.id)
+                            }
+                            .buttonStyle(.plain)
+                            .dropDestination(for: String.self) { items, _ in
+                                guard let wire = items.first, let trackId = PendingTrackDropWire.decode(wire) else { return false }
+                                Task { await model.attach(trackId: trackId, to: release) }
+                                return true
+                            } isTargeted: { targeted in
+                                dropTargetReleaseId = targeted ? release.id : (dropTargetReleaseId == release.id ? nil : dropTargetReleaseId)
+                            }
+                        }
+                    }
+                }
+
+                if let err = model.actionError {
+                    Text(err).font(.caption).foregroundStyle(Brand.err)
                 }
             }
             .padding()
@@ -85,24 +169,129 @@ struct ReleasesView: View {
         .scrollContentBackground(.hidden)
         .refreshable { await model.load(query: search) }
     }
+
+    @ViewBuilder
+    private func pendingCard(for track: PendingReleaseTrack) -> some View {
+        let card = PendingTrackCardView(track: track)
+            .draggable(PendingTrackDropWire.encode(trackId: track.trackId)) {
+                Label(track.title.nonEmpty ?? "Track", systemImage: "arrow.up.and.down.and.arrow.left.and.right")
+            }
+        if let jobId = track.jobId {
+            NavigationLink(value: EnrichJob(
+                id: jobId, listenerEpoch: 0, trackId: track.trackId, isrc: nil,
+                artist: track.artist, title: track.title, album: track.album,
+                status: track.jobStatus ?? "pending", error: nil, createdAt: nil, updatedAt: nil
+            )) {
+                card
+            }
+            .buttonStyle(.plain)
+        } else {
+            card
+        }
+    }
+
+    /// Pinned at the top of the grid whenever something is actively playing —
+    /// mirrors `oceano-player-ios`'s `NowPlayingBannerView` (artwork + title/
+    /// artist + format badge + live-pulse dot, tappable into the full player)
+    /// rather than relying on scroll position to surface it.
+    private func nowPlayingBanner(_ pb: Playback) -> some View {
+        Button {
+            navigation.openNowPlaying()
+        } label: {
+            HStack(spacing: 12) {
+                Artwork(raw: pb.artworkUrl, cornerRadius: 10)
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(pb.title?.nonEmpty ?? "Now Playing")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.text)
+                        .lineLimit(1)
+                    Text([pb.artist?.nonEmpty, pb.album?.nonEmpty].compactMap { $0 }.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 6) {
+                    MediaFormatBadge(raw: pb.mediaFormat)
+                    Circle().fill(Brand.ok).frame(width: 6, height: 6)
+                }
+            }
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Brand.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Now playing: \(pb.title?.nonEmpty ?? "Unknown title"), \(pb.artist?.nonEmpty ?? "unknown artist")")
+    }
+
+    private var associationsBanner: some View {
+        Button {
+            showAssociations = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform.badge.exclamationmark")
+                    .font(.title3)
+                    .foregroundStyle(Brand.warn)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(model.associationsCount) play\(model.associationsCount == 1 ? "" : "s") need\(model.associationsCount == 1 ? "s" : "") association")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.text)
+                    Text("The recognizer couldn't confidently match these to a track.")
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Brand.muted)
+            }
+            .padding(12)
+            .background(Brand.warn.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Brand.warn.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Review plays needing association")
+    }
 }
+
+// MARK: - Drag wire
+
+/// String-encoded drag payload for moving a pending track onto an owned album card.
+enum PendingTrackDropWire {
+    private static let prefix = "groove-pending-track:"
+
+    static func encode(trackId: Int64) -> String { "\(prefix)\(trackId)" }
+
+    static func decode(_ value: String) -> Int64? {
+        guard value.hasPrefix(prefix) else { return nil }
+        return Int64(value.dropFirst(prefix.count))
+    }
+}
+
+// MARK: - Cards
 
 struct ReleaseCardView: View {
     let release: LibraryRelease
+    var isDropTarget = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Artwork(raw: release.artworkUrl, cornerRadius: 12)
                 .aspectRatio(1, contentMode: .fit)
-                .overlay(alignment: .topTrailing) {
-                    if release.owned {
-                        Image(systemName: "person.crop.circle.badge.checkmark")
-                            .font(.caption)
-                            .padding(6)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .padding(6)
+                .overlay {
+                    if isDropTarget {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Brand.accent, lineWidth: 2)
                     }
                 }
+                .animation(.easeInOut(duration: 0.15), value: isDropTarget)
             VStack(alignment: .leading, spacing: 2) {
                 Text(release.album)
                     .font(.subheadline.weight(.semibold))
@@ -116,13 +305,55 @@ struct ReleaseCardView: View {
                     if let year = release.year?.nonEmpty {
                         Text(year).font(.caption2).foregroundStyle(Brand.muted)
                     }
-                    if let media = Format.mediaFormat(release.releaseFormat) {
-                        Badge(text: media, color: Brand.gold)
-                    }
+                    MediaFormatBadge(raw: release.releaseFormat)
                 }
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(release.album), \(release.artist)\(release.owned ? ", owned" : "")")
+    }
+}
+
+struct PendingTrackCardView: View {
+    let track: PendingReleaseTrack
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Artwork(raw: track.artworkUrl, cornerRadius: 12)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Brand.border, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                )
+                .overlay(alignment: .topTrailing) {
+                    statusIcon
+                        .font(.caption)
+                        .padding(6)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .padding(6)
+                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.title.nonEmpty ?? "Untitled")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Brand.text)
+                    .lineLimit(1)
+                Text(track.artist.nonEmpty ?? "Unknown artist")
+                    .font(.caption)
+                    .foregroundStyle(Brand.muted)
+                    .lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(track.title), \(track.artist), needs review")
+    }
+
+    private var statusIcon: some View {
+        let (icon, color): (String, Color) = switch track.jobStatus {
+        case "complete": ("checkmark.seal.fill", Brand.gold)
+        case "enriching": ("arrow.triangle.2.circlepath", Brand.teal)
+        case "failed": ("exclamationmark.triangle.fill", Brand.err)
+        default: ("hourglass", Brand.warn)
+        }
+        return Image(systemName: icon).foregroundStyle(color)
     }
 }

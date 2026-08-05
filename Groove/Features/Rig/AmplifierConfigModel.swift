@@ -3,24 +3,17 @@ import Observation
 
 @MainActor
 @Observable
-final class EquipmentRemoteModel {
-    var equipment: [RigEquipmentItem] = []
-    var snapshot: RigSnapshot?
+final class AmplifierConfigModel {
+    var config: RigAmplifierConfig?
+    var profiles: [RigStoredAmplifierProfile] = []
+    var activeProfileId: String?
     var phase: Phase = .loading
     var actionError: String?
-    var isPerformingAction = false
+    var isSaving = false
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
-
-    /// The amplifier is registered as a target like any other, but it already
-    /// has its own screen — listing it again here would just be confusing.
-    var otherEquipment: [RigEquipmentItem] { equipment.filter { $0.id != "amplifier" } }
-
-    /// The amplifier's own entry — same target, same command-teaching flow,
-    /// surfaced from Amplifier → Configuration instead of the Equipment list.
-    var amplifierEquipment: RigEquipmentItem? { equipment.first { $0.id == "amplifier" } }
 
     func configure(_ settings: AppSettings) {
         if self.settings == nil {
@@ -31,41 +24,43 @@ final class EquipmentRemoteModel {
 
     func load() async {
         guard let settings else { return }
-        if equipment.isEmpty { phase = .loading }
+        if config == nil { phase = .loading }
         do {
             let service = CatalogService(settings: settings)
-            async let eq = service.rigEquipment()
-            async let snap = service.rigStatus()
-            equipment = try await eq
-            snapshot = try await snap
+            async let cfg = service.rigAmplifierConfig()
+            async let profs = service.rigAmplifierProfiles()
+            config = try await cfg
+            let profResp = try await profs
+            profiles = profResp.profiles
+            activeProfileId = profResp.activeProfileId
             phase = .loaded
         } catch {
-            if equipment.isEmpty {
+            if config == nil {
                 phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
             }
         }
     }
 
-    func isLearned(targetId: String, action: String) -> Bool {
-        snapshot?.targets.first { $0.id == targetId }?.actions[action]?.learned ?? false
-    }
-
-    func fire(targetId: String, action: String) async {
-        guard let settings, !isPerformingAction else { return }
-        isPerformingAction = true
-        defer { isPerformingAction = false }
+    @discardableResult
+    func save(_ patch: RigAmplifierConfig) async -> Bool {
+        guard let settings else { return false }
+        isSaving = true
+        defer { isSaving = false }
         do {
-            snapshot = try await CatalogService(settings: settings).rigAction(target: targetId, action: action)
+            config = try await CatalogService(settings: settings).rigPatchAmplifier(patch)
             actionError = nil
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return true
         } catch {
             actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
         }
     }
 
-    func unlearn(targetId: String, action: String) async {
+    func activate(profileId: String) async {
         guard let settings else { return }
         do {
-            try await CatalogService(settings: settings).rigUnlearn(target: targetId, action: action)
+            _ = try await CatalogService(settings: settings).rigActivateProfile(id: profileId)
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
@@ -74,10 +69,12 @@ final class EquipmentRemoteModel {
     }
 
     @discardableResult
-    func addEquipment(_ req: RigEquipmentSaveRequest) async -> Bool {
-        guard let settings else { return false }
+    func saveAsNewProfile(id: String, name: String) async -> Bool {
+        guard let settings, let config else { return false }
         do {
-            _ = try await CatalogService(settings: settings).rigCreateEquipment(req)
+            _ = try await CatalogService(settings: settings).rigSaveProfile(
+                RigStoredAmplifierProfile(id: id, name: name, origin: "custom", config: config)
+            )
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
@@ -87,21 +84,31 @@ final class EquipmentRemoteModel {
         }
     }
 
-    func deleteEquipment(id: String) async {
+    func deleteProfile(id: String) async {
         guard let settings else { return }
         do {
-            try await CatalogService(settings: settings).rigDeleteEquipment(id: id)
+            try await CatalogService(settings: settings).rigDeleteProfile(id: id)
             await load()
         } catch {
             actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
         }
     }
 
+    func exportProfile(id: String) async -> RigProfileExportDoc? {
+        guard let settings else { return nil }
+        do {
+            return try await CatalogService(settings: settings).rigExportProfile(id: id)
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return nil
+        }
+    }
+
     @discardableResult
-    func updateEquipment(id: String, _ patch: RigEquipmentPatchRequest) async -> Bool {
+    func importProfile(_ doc: RigProfileExportDoc) async -> Bool {
         guard let settings else { return false }
         do {
-            _ = try await CatalogService(settings: settings).rigPatchEquipment(id: id, patch)
+            _ = try await CatalogService(settings: settings).rigImportProfile(doc)
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Groove</string>
+	<string>Oceano</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,7 +34,7 @@
 		<string>_http._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Groove connects to your groove-catalog server on the local network to manage your library.</string>
+	<string>Oceano connects to your groove-catalog server on the local network to manage your library.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

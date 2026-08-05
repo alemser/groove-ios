@@ -22,8 +22,10 @@ struct BuiltinProviderView: Decodable {
 
 struct RecognitionProvidersState: Decodable {
     var chainMode: String
+    var minConfidence: Double
     var chain: [ProviderSlot]
     var builtins: [String: BuiltinProviderView]
+    var customProviders: [CustomProviderConfig]
 }
 
 struct ProviderEnabledRequest: Encodable {
@@ -38,4 +40,92 @@ struct ProviderCredentialsRequest: Encodable {
 
 struct ProviderOrderRequest: Encodable {
     var order: [String]
+}
+
+// MARK: - Custom recognition providers
+
+/// Auth mode values a custom provider can use (Oceano parity).
+enum CustomProviderAuthMode: String, CaseIterable, Identifiable {
+    case bearerToken = "bearer_token"
+    case headerToken = "header_token"
+    case headerKeySecret = "header_key_secret"
+    case formToken = "form_token"
+    case formKeySecret = "form_key_secret"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .bearerToken: return "Bearer token"
+        case .headerToken: return "Header token"
+        case .headerKeySecret: return "Header key + secret"
+        case .formToken: return "Form token"
+        case .formKeySecret: return "Form key + secret"
+        }
+    }
+}
+
+struct CustomProviderAuthConfig: Codable, Hashable {
+    var mode: String
+    var token: String?
+    var apiKey: String?
+    var apiSecret: String?
+    var tokenHeader: String?
+    var tokenField: String?
+    var keyField: String?
+    var secretField: String?
+    var keyHeader: String?
+    var secretHeader: String?
+}
+
+struct CustomProviderRequestConfig: Codable, Hashable {
+    var audioField: String?
+    var timeoutSecs: Int?
+}
+
+struct CustomProviderFieldMap: Codable, Hashable {
+    var title: String?
+    var artist: String?
+    var album: String?
+    var score: String?
+    var durationMs: String?
+    var matchOffsetMs: String?
+    var isrc: String?
+}
+
+struct CustomProviderResponseConfig: Codable, Hashable {
+    var matchPath: String?
+    var fields: CustomProviderFieldMap?
+}
+
+struct CustomProviderConfig: Codable, Identifiable, Hashable {
+    var id: String
+    var displayName: String
+    var endpointUrl: String
+    var auth: CustomProviderAuthConfig
+    var request: CustomProviderRequestConfig?
+    var response: CustomProviderResponseConfig?
+}
+
+/// Body shape for `POST /identity/recognition/custom-providers` — distinct from
+/// `CustomProviderConfig` (used for reads and `PUT` updates).
+struct CustomProviderCreateRequest: Encodable {
+    var id: String
+    var displayName: String
+    var endpointUrl: String
+    var auth: CustomProviderAuthConfig
+    var request: CustomProviderRequestConfig
+    var response: CustomProviderResponseConfig
+    var enabled: Bool?
+}
+
+struct ParseSampleRecommendation: Decodable {
+    var matchPath: String?
+    var fields: CustomProviderFieldMap?
+}
+
+struct ParseSampleResponse: Decodable {
+    var inferred: Bool
+    var recommended: ParseSampleRecommendation?
+    var message: String?
 }

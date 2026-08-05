@@ -82,9 +82,7 @@ struct ConnectView: View {
             } else {
                 RadarPulse()
             }
-            Text("Groove")
-                .font(.largeTitle.bold())
-                .foregroundStyle(Brand.text)
+            OceanoWordmark(fontSize: 34, weight: .bold)
             Text("Your library, in your pocket")
                 .font(.subheadline)
                 .foregroundStyle(Brand.muted)
@@ -97,7 +95,7 @@ struct ConnectView: View {
     private var searchingState: some View {
         VStack(spacing: 20) {
             VStack(spacing: 10) {
-                Text("Looking for your Groove…")
+                Text("Looking for your Oceano…")
                     .font(.headline)
                     .foregroundStyle(Brand.text)
                 Text("Make sure your phone and the groove-catalog server are on the same Wi-Fi.")
@@ -268,7 +266,7 @@ private struct RadarPulse: View {
         }
         .frame(width: 160, height: 120)
         .onAppear { animate = true }
-        .accessibilityLabel("Searching for your Groove server")
+        .accessibilityLabel("Searching for your Oceano server")
     }
 }
 

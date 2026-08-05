@@ -22,6 +22,43 @@ struct Badge: View {
     }
 }
 
+/// Same pill as `Badge`, but for a release/media format it shows the
+/// vinyl/CD vector mark instead of (or alongside, when `labeled`) the word —
+/// falls back to the plain text badge for formats with no dedicated icon
+/// (cassette, digital, …).
+struct MediaFormatBadge: View {
+    let raw: String?
+    var color: Color = Brand.gold
+    /// Icon-only by default (compact contexts: grids, lists). Set true on
+    /// screens with room to spare — e.g. Now Playing — so the format reads
+    /// at a glance instead of relying on the glyph alone.
+    var labeled = false
+
+    var body: some View {
+        if let text = Format.mediaFormat(raw) {
+            if let kind = MediaFormatIcon.kind(for: raw) {
+                HStack(spacing: 5) {
+                    MediaFormatIcon.mark(kind, size: 16, color: color)
+                    if labeled {
+                        Text(text)
+                            .font(.caption2.weight(.semibold))
+                            .textCase(.uppercase)
+                            .tracking(0.4)
+                            .foregroundStyle(color)
+                    }
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(color.opacity(0.14))
+                .clipShape(Capsule())
+                .accessibilityLabel(text)
+            } else {
+                Badge(text: text, color: color)
+            }
+        }
+    }
+}
+
 // MARK: - Section label
 
 struct SectionLabel: View {
@@ -53,6 +90,45 @@ struct InfoRow: View {
                 .foregroundStyle(Brand.text)
                 .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
+        }
+    }
+}
+
+// MARK: - Tracklist row
+
+/// Position / title / duration row shared by the release-candidate card
+/// (Review flow) and the confirmed album detail screen (Library flow).
+struct TracklistEntryRow: View {
+    let entry: TracklistEntry
+    var compact = true
+    /// True when this is the track currently playing on the rig — swaps the
+    /// position number for a waveform glyph and tints the title, mirroring
+    /// oceano-player-ios's album tracklist.
+    var isPlaying = false
+
+    var body: some View {
+        HStack {
+            if isPlaying {
+                Image(systemName: "waveform")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Brand.teal)
+                    .frame(width: 28, alignment: .leading)
+                    .symbolEffect(.variableColor.iterative, options: .repeating)
+            } else {
+                Text(entry.position ?? "\(entry.ordinal)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(Brand.muted)
+                    .frame(width: 28, alignment: .leading)
+            }
+            Text(entry.title?.nonEmpty ?? "—")
+                .font(compact ? .caption : .callout)
+                .fontWeight(isPlaying ? .semibold : .regular)
+                .foregroundStyle(isPlaying ? Brand.teal : Brand.text)
+                .lineLimit(1)
+            Spacer()
+            Text(Format.duration(entry.durationMs))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Brand.muted)
         }
     }
 }

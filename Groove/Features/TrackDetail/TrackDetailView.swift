@@ -6,6 +6,9 @@ struct TrackDetailView: View {
     @State private var model: TrackDetailModel
     @State private var editing = false
     @State private var showDeleteConfirm = false
+    @State private var showChangeRelease = false
+    @State private var rejectTarget: Play?
+    @State private var identifyTarget: Play?
 
     init(trackId: Int64) {
         _model = State(initialValue: TrackDetailModel(trackId: trackId))
@@ -26,6 +29,9 @@ struct TrackDetailView: View {
                                     Label("Reset to Provider", systemImage: "arrow.uturn.backward")
                                 }
                             }
+                            Button { showChangeRelease = true } label: {
+                                Label("Change Release", systemImage: "arrow.triangle.2.circlepath")
+                            }
                             Divider()
                             Button(role: .destructive) { showDeleteConfirm = true } label: {
                                 Label("Delete Track", systemImage: "trash")
@@ -43,6 +49,16 @@ struct TrackDetailView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showChangeRelease) {
+                if let track = model.track {
+                    ChangeReleaseSheet(
+                        trackId: track.id,
+                        seedArtist: track.displayArtist,
+                        seedTitle: track.displayTitle,
+                        seedAlbum: track.displayAlbum
+                    ) { Task { await model.load() } }
+                }
+            }
             .confirmationDialog("Delete this track from the catalog?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                 Button("Delete", role: .destructive) {
                     Task { if await model.delete() { dismiss() } }
@@ -50,6 +66,31 @@ struct TrackDetailView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Plays are detached and enrich jobs cleaned up. This can't be undone.")
+            }
+            .confirmationDialog(
+                "This isn't the right song?",
+                isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Search for the Correct Song") {
+                    identifyTarget = rejectTarget
+                    rejectTarget = nil
+                }
+                Button("Remove This Play", role: .destructive) {
+                    if let play = rejectTarget { Task { await model.rejectPlay(epoch: play.listenerEpoch) } }
+                    rejectTarget = nil
+                }
+                Button("Cancel", role: .cancel) { rejectTarget = nil }
+            } message: {
+                Text("Reject this recognition — either point it at the right song, or just remove the play.")
+            }
+            .sheet(item: $identifyTarget) { play in
+                ManualIdentifySheet(
+                    epoch: play.listenerEpoch,
+                    seedArtist: play.artist,
+                    seedTitle: play.title,
+                    seedAlbum: play.album
+                ) { Task { await model.load() } }
             }
     }
 
@@ -70,7 +111,7 @@ struct TrackDetailView: View {
     private func detail(_ track: Track) -> some View {
         ScrollView {
             VStack(spacing: 20) {
-                Artwork(raw: "/catalog/artwork/tracks/\(track.id)", cornerRadius: 18)
+                Artwork(raw: track.artworkUrl, cornerRadius: 18)
                     .frame(maxWidth: 240)
                     .aspectRatio(1, contentMode: .fit)
                     .shadow(color: .black.opacity(0.5), radius: 18, y: 8)
@@ -94,7 +135,7 @@ struct TrackDetailView: View {
                 HStack(spacing: 8) {
                     if track.hasDisplayOverride == true { Badge(text: "Edited", color: Brand.teal, filled: true) }
                     if track.releaseConfirmed == true { Badge(text: "Confirmed", color: Brand.gold, filled: true) }
-                    if let media = Format.mediaFormat(track.releaseFormat) { Badge(text: media, color: Brand.gold) }
+                    MediaFormatBadge(raw: track.releaseFormat)
                 }
 
                 metadataCard(track)
@@ -154,14 +195,22 @@ struct TrackDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Recent plays")
             ForEach(plays.prefix(6)) { play in
-                HStack {
-                    Circle().fill(SourceStyle.color(for: play.source ?? "")).frame(width: 6, height: 6)
-                    Text(Format.absolute(play.startedAt)).font(.caption).foregroundStyle(Brand.text)
-                    Spacer()
-                    if let source = play.source?.nonEmpty {
-                        Text(SourceStyle.label(for: source)).font(.caption2).foregroundStyle(Brand.muted)
+                Button {
+                    rejectTarget = play
+                } label: {
+                    HStack {
+                        Circle().fill(SourceStyle.color(for: play.source ?? "")).frame(width: 6, height: 6)
+                        Text(Format.absolute(play.startedAt)).font(.caption).foregroundStyle(Brand.text)
+                        Spacer()
+                        if let source = play.source?.nonEmpty {
+                            Text(SourceStyle.label(for: source)).font(.caption2).foregroundStyle(Brand.muted)
+                        }
+                        Image(systemName: "ellipsis.circle")
+                            .font(.caption2)
+                            .foregroundStyle(Brand.muted)
                     }
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(16)

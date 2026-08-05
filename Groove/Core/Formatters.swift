@@ -60,4 +60,16 @@ enum Format {
         default: return raw.capitalized
         }
     }
+
+    /// "Side A · Track 2" for a vinyl position like "A2", "Track 3" for a
+    /// plain numeric CD/digital position — nil when there's nothing to show.
+    static func trackPosition(_ raw: String?) -> String? {
+        guard let pos = raw?.nonEmpty else { return nil }
+        let letters = pos.prefix { $0.isLetter }
+        let rest = pos.dropFirst(letters.count)
+        if !letters.isEmpty, !rest.isEmpty, rest.allSatisfy(\.isNumber) {
+            return "Side \(letters.uppercased()) · Track \(rest)"
+        }
+        return "Track \(pos)"
+    }
 }

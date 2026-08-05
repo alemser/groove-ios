@@ -63,4 +63,22 @@ final class TrackDetailModel {
             return false
         }
     }
+
+    /// Rejects a wrongly-recognized play with no replacement — just removes
+    /// the listening record. Reloads so the track's recent-plays list and
+    /// counts stay in sync (this track itself may have had only this one
+    /// play, in which case it now shows zero).
+    @discardableResult
+    func rejectPlay(epoch: UInt64) async -> Bool {
+        guard let settings else { return false }
+        do {
+            try await CatalogService(settings: settings).deletePlay(epoch: epoch)
+            await load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
 }

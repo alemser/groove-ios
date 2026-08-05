@@ -9,11 +9,30 @@ struct HomeView: View {
     @Environment(NavigationState.self) private var navigation
     @Environment(NowPlayingModel.self) private var nowPlaying
 
+    @State private var ampModel = AmplifierModel()
+    @State private var equipmentModel = EquipmentRemoteModel()
+    @State private var showRemoteSheet = false
+    @State private var stylusState: StylusState?
+
+    private var remoteAvailable: Bool {
+        let ampLearned = ampModel.amplifierTarget?.actions.values.contains { $0.learned } ?? false
+        let equipmentHasRemote = equipmentModel.equipment.contains { $0.hasRemote }
+        return ampLearned || equipmentHasRemote
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                connectionSection
+                if let error = nowPlaying.errorMessage {
+                    connectionIssueSection(error)
+                }
                 nowPlayingSection
+                if remoteAvailable {
+                    remoteSection
+                }
+                if stylusState?.profile != nil {
+                    stylusSection
+                }
                 if attention.count > 0 {
                     attentionSection
                 }
@@ -21,28 +40,39 @@ struct HomeView: View {
             }
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
-            .navigationTitle("Groove")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    OceanoWordmark(fontSize: 26, weight: .bold)
+                }
+            }
         }
+        .task { ampModel.configure(settings) }
+        .task { equipmentModel.configure(settings) }
+        .task { await loadStylusState() }
+        .sheet(isPresented: $showRemoteSheet) {
+            RemoteQuickAccessSheet(model: ampModel, equipmentModel: equipmentModel)
+        }
+    }
+
+    private func loadStylusState() async {
+        guard settings.isConfigured else { return }
+        stylusState = try? await CatalogService(settings: settings).stylusState()
     }
 
     // MARK: - Connection
 
-    private var connectionSection: some View {
-        Section("Connection") {
-            if nowPlaying.hasLoadedOnce, nowPlaying.errorMessage == nil {
-                Label("Connected to \(settings.host)", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(Brand.ok)
-            } else if let error = nowPlaying.errorMessage {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Connection issue", systemImage: "wifi.exclamationmark")
-                        .foregroundStyle(Brand.warn)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(Brand.muted)
+    /// A working connection isn't worth a card — this only appears when
+    /// there's actually a problem to act on.
+    private func connectionIssueSection(_ error: String) -> some View {
+        Section {
+            HStack(spacing: 8) {
+                Image(systemName: "wifi.exclamationmark")
+                    .foregroundStyle(Brand.warn)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Connection issue").font(.subheadline).foregroundStyle(Brand.text)
+                    Text(error).font(.caption).foregroundStyle(Brand.muted)
                 }
-            } else {
-                Label("Connecting…", systemImage: "hourglass")
-                    .foregroundStyle(Brand.muted)
             }
         }
     }
@@ -83,12 +113,64 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Remote
+
+    private var remoteSection: some View {
+        Section("Remote") {
+            Button {
+                showRemoteSheet = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "appletvremote.gen4")
+                        .foregroundStyle(Brand.accent)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Remote Control").foregroundStyle(Brand.text)
+                        Text("Power, input, volume, and IR devices").font(.caption).foregroundStyle(Brand.muted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Brand.muted)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the remote control")
+        }
+    }
+
+    // MARK: - Stylus
+
+    private var stylusSection: some View {
+        Section("Stylus") {
+            NavigationLink {
+                StylusView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "gauge.with.dots.needle.33percent")
+                        .foregroundStyle(Brand.gold)
+                        .frame(width: 24)
+                    if let profile = stylusState?.profile {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(profile.brand) \(profile.model)").foregroundStyle(Brand.text)
+                            Text("\(Int((stylusState?.metrics.wearPercent ?? 0).rounded()))% worn")
+                                .font(.caption)
+                                .foregroundStyle(attention.rigAttentionCount > 0 ? Brand.warn : Brand.muted)
+                        }
+                    }
+                    Spacer()
+                }
+            }
+            .accessibilityHint("Opens stylus tracking")
+        }
+    }
+
     // MARK: - Attention
 
     private var attentionSection: some View {
         Section {
             Button {
-                navigation.selectedTab = .review
+                navigation.selectedTab = .library
             } label: {
                 HStack {
                     Label(
@@ -110,14 +192,14 @@ struct HomeView: View {
 
     private var quickLinksSection: some View {
         Section("Quick Links") {
-            quickLink(title: "Library", subtitle: "Browse releases and tracks", icon: "square.stack") {
+            quickLink(title: "Library", subtitle: "Browse your albums", icon: "square.stack") {
                 navigation.selectedTab = .library
             }
-            quickLink(title: "History", subtitle: "Recent recognitions", icon: "clock.arrow.circlepath") {
-                navigation.selectedTab = .history
-            }
-            quickLink(title: "Rig", subtitle: "Catalog server, stylus, enrichers, health", icon: "hifispeaker.and.homepod") {
+            quickLink(title: "Rig", subtitle: "Stylus and amplifier", icon: "hifispeaker.and.homepod") {
                 navigation.selectedTab = .rig
+            }
+            quickLink(title: "Settings", subtitle: "Catalog server, recognition & enrichers, stack health", icon: "gearshape") {
+                navigation.selectedTab = .settings
             }
         }
     }

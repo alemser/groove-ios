@@ -2,9 +2,9 @@ import SwiftUI
 import Observation
 
 /// Tracks how many items need the user's attention (pending associations plus
-/// enrich jobs with candidates awaiting confirmation), so the Review tab and the
-/// app icon can carry a live badge. Polls lightly and refreshes on demand after
-/// the user acts.
+/// tracks still awaiting a confirmed release), so the Library tab can carry a
+/// live badge that matches what its "Needs Review" section actually shows.
+/// Polls lightly and refreshes on demand after the user acts.
 @MainActor
 @Observable
 final class AttentionCenter {
@@ -37,12 +37,15 @@ final class AttentionCenter {
         guard let settings, settings.isConfigured else { count = 0; rigAttentionCount = 0; return }
         let service = CatalogService(settings: settings)
         do {
+            // Same sources that drive the Library grid's banner + "Needs Review"
+            // section, so the badge can never disagree with what's actually shown
+            // there (an enrich job can sit at status "complete" long after its
+            // track was confirmed some other way, so job status alone overcounts).
             async let assoc = service.pendingAssociations()
-            async let jobs = service.enrichJobs(status: nil)
+            async let pending = service.pendingReleaseTracks()
             let associations = try await assoc.items.count
-            // "complete" jobs are the ones carrying release candidates to confirm.
-            let actionableJobs = try await jobs.filter { $0.status == "complete" }.count
-            count = associations + actionableJobs
+            let pendingTracks = try await pending.count
+            count = associations + pendingTracks
         } catch {
             // Leave the last known count on a transient failure.
         }

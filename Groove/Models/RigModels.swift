@@ -84,6 +84,84 @@ struct RigEquipmentSaveRequest: Encodable {
     var hasRemote: Bool?
 }
 
+/// Edits an existing piece of equipment. Distinct from `RigEquipmentSaveRequest`
+/// (create): `backend` here can be sent as `""` to explicitly clear it, so it's
+/// not `omitempty`-collapsible the same way — omit the property (nil) to leave
+/// a field untouched, matching the server's partial-merge semantics.
+struct RigEquipmentPatchRequest: Encodable {
+    var label: String?
+    var backend: String?
+    var actions: [String]?
+    var role: String?
+    var physicalFormat: String?
+    var inputIds: [String]?
+    var hasRemote: Bool?
+}
+
+// MARK: - Amplifier configuration (editable) and profiles
+
+struct RigCycleConfig: Codable, Hashable {
+    var armingSettleMs: Int?
+    var stepNextWaitMs: Int?
+    var stepPrevWaitMs: Int?
+    var selectionActiveWindowMs: Int?
+}
+
+struct RigInputConfig: Codable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var visible: Bool
+    var recognitionPolicy: String?
+}
+
+/// The amplifier's own config (maker/model/timing/inputs) — distinct from
+/// `RigAmplifierStatus`, which is a live runtime projection missing these
+/// config-only fields. Must be fetched fresh before a `PATCH` since the
+/// server merges by field-presence: an omitted field is left untouched, but
+/// this struct has no way to represent "I never saw this field" once decoded,
+/// so always round-trip a freshly-loaded value rather than a stale cached one.
+struct RigAmplifierConfig: Codable, Hashable {
+    var profileId: String?
+    var maker: String?
+    var model: String?
+    var inputMode: String?
+    var warmUpSecs: Int?
+    var standbyTimeoutMins: Int?
+    var cycle: RigCycleConfig?
+    var inputs: [RigInputConfig]?
+}
+
+struct RigStoredAmplifierProfile: Codable, Identifiable, Hashable {
+    var id: String
+    var name: String
+    var origin: String?
+    var config: RigAmplifierConfig
+}
+
+struct RigAmplifierProfilesResponse: Decodable {
+    var activeProfileId: String
+    var profiles: [RigStoredAmplifierProfile]
+}
+
+struct RigProfileExportDoc: Codable {
+    var schemaVersion: String
+    var profile: RigStoredAmplifierProfile
+}
+
+struct RigProfileActivateRequest: Encodable {
+    var profileId: String
+}
+
+/// Generic ack shape shared by the profile mutation endpoints (upsert/delete/
+/// activate/import) — each returns a small `{"ok": true, ...}` payload with a
+/// different mix of extra keys, all optional here.
+struct RigOkResponse: Decodable {
+    var ok: Bool
+    var profileId: String?
+    var activeProfileId: String?
+    var updated: Bool?
+}
+
 // MARK: - Rig sessions (IR learn / pair)
 
 struct RigSessionSummary: Decodable, Identifiable {

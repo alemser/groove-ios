@@ -37,21 +37,17 @@ struct MainTabView: View {
 
                 LibraryView()
                     .tabItem { Label("Library", systemImage: "square.stack") }
-                    .tag(NavigationState.Tab.library)
-
-                PlaysView()
-                    .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
-                    .tag(NavigationState.Tab.history)
-
-                ReviewView()
-                    .tabItem { Label("Review", systemImage: "checkmark.seal") }
                     .badge(attention.count)
-                    .tag(NavigationState.Tab.review)
+                    .tag(NavigationState.Tab.library)
 
                 RigView()
                     .tabItem { Label("Rig", systemImage: "hifispeaker.and.homepod") }
                     .badge(attention.rigAttentionCount)
                     .tag(NavigationState.Tab.rig)
+
+                SettingsView()
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
+                    .tag(NavigationState.Tab.settings)
             }
             .tint(Brand.accent)
 

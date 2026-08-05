@@ -18,13 +18,6 @@ struct CatalogService {
 
     // MARK: Tracks
 
-    func tracks(page: Int, limit: Int = 50) async throws -> Page<Track> {
-        try await api.get("/catalog/tracks", query: [
-            .init(name: "page", value: String(page)),
-            .init(name: "limit", value: String(limit)),
-        ])
-    }
-
     func track(id: Int64) async throws -> Track {
         try await api.get("/catalog/tracks/\(id)")
     }
@@ -46,18 +39,26 @@ struct CatalogService {
         try await api.get("/catalog/tracks/\(id)/enrich-job")
     }
 
-    // MARK: Plays
-
-    func plays(page: Int, limit: Int = 50, includeFailed: Bool) async throws -> Page<Play> {
-        try await api.get("/catalog/plays", query: [
-            .init(name: "page", value: String(page)),
+    func pendingReleaseTracks(limit: Int = 200) async throws -> [PendingReleaseTrack] {
+        try await api.get("/catalog/tracks/pending-release", query: [
             .init(name: "limit", value: String(limit)),
-            .init(name: "include_failed", value: includeFailed ? "true" : "false"),
-        ])
+        ], as: PendingReleaseTracksResponse.self).items
     }
 
-    func deletePlay(epoch: UInt64) async throws {
-        try await api.delete("/catalog/plays/\(epoch)")
+    /// Attaches the release that `fromTrackId`'s track already has onto `trackId` —
+    /// the primitive behind dragging an unconfirmed track onto an owned album card.
+    func applyRelease(trackId: Int64, fromTrackId: Int64) async throws {
+        struct Body: Encodable { let fromTrackId: Int64 }
+        _ = try await api.post("/catalog/tracks/\(trackId)/apply-release", body: Body(fromTrackId: fromTrackId), as: EmptyResponse.self)
+    }
+
+    /// Re-matches `trackId` to a different release candidate entirely — e.g.
+    /// swapping a wrongly-picked digital match for the vinyl edition actually
+    /// owned. Distinct from the draft-edit flow, which only edits fields of
+    /// whichever release is already confirmed rather than picking a new one.
+    @discardableResult
+    func applyReleaseFromSearch(trackId: Int64, hit: IdentifySearchHit) async throws -> ApplyReleaseResult {
+        try await api.post("/catalog/tracks/\(trackId)/apply-release-from-search", body: hit, as: ApplyReleaseResult.self)
     }
 
     // MARK: Library releases
@@ -75,25 +76,73 @@ struct CatalogService {
         try await api.delete("/catalog/library/releases/\(s)/\(r)")
     }
 
-    // MARK: Enrich / review
-
-    func enrichJobs(status: String?) async throws -> [EnrichJob] {
-        var items: [URLQueryItem] = []
-        if let status, !status.isEmpty { items.append(.init(name: "status", value: status)) }
-        return try await api.get("/catalog/enrich/jobs", query: items)
+    func confirmedEdition(source: String, releaseId: String) async throws -> PendingRelease {
+        try await api.get("/catalog/releases/confirmed/edition", query: [
+            .init(name: "source", value: source),
+            .init(name: "release_id", value: releaseId),
+        ], as: ConfirmedEditionResponse.self).edition
     }
+
+    func detachLibraryEditionTracks(source: String, releaseId: String) async throws {
+        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
+        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        _ = try await api.post("/catalog/library/releases/\(s)/\(r)/detach-tracks", body: Empty(), as: EmptyResponse.self)
+    }
+
+    func releaseTracks(source: String, releaseId: String) async throws -> [Track] {
+        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
+        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        return try await api.get("/catalog/library/releases/\(s)/\(r)/tracks", as: TrackListResponse.self).items
+    }
+
+    // MARK: Enrich / review
 
     func enrichJob(id: Int64) async throws -> EnrichJobDetail {
         try await api.get("/catalog/enrich/jobs/\(id)")
     }
 
     @discardableResult
-    func confirmRelease(id: Int64) async throws -> PendingRelease {
-        try await api.post("/catalog/enrich/releases/\(id)/confirm", body: Empty())
+    func confirmRelease(id: Int64, force: Bool = false) async throws -> PendingRelease {
+        var items: [URLQueryItem] = []
+        if force { items.append(.init(name: "force", value: "1")) }
+        return try await api.post("/catalog/enrich/releases/\(id)/confirm", query: items, body: Empty(), as: PendingRelease.self)
     }
 
     func discardRelease(id: Int64) async throws {
         try await api.postNoContent("/catalog/enrich/releases/\(id)/discard")
+    }
+
+    // MARK: User release editing (draft/confirm cycle for an owned release)
+
+    /// The confirmed-in-place edit path: only reachable when the release has
+    /// a `catalog_job_id` (`LibraryRelease.catalogJobId`).
+    func userReleaseDraft(jobId: Int64) async throws -> UserReleaseEditionResponse {
+        try await api.get("/catalog/enrich/jobs/\(jobId)/user-release/draft")
+    }
+
+    /// Fallback when `userReleaseDraft` 404s (no draft persisted yet) — primes one.
+    @discardableResult
+    func reviseUserRelease(jobId: Int64) async throws -> UserReleaseEditionResponse {
+        try await api.post("/catalog/enrich/jobs/\(jobId)/user-release/revise", body: Empty())
+    }
+
+    @discardableResult
+    func saveUserReleaseDraft(jobId: Int64, _ patch: UserReleaseDraftPatch) async throws -> UserReleaseDraftResponse {
+        try await api.put("/catalog/enrich/jobs/\(jobId)/user-release/draft", body: patch)
+    }
+
+    /// Always creates a *new* `user`-sourced copy — the only path available when
+    /// the release has no `catalog_job_id` to edit in place through.
+    @discardableResult
+    func forkUserReleaseFromLibrary(source: String, releaseId: String) async throws -> LibraryForkResponse {
+        try await api.post("/catalog/user-releases/fork-from-library", body: LibraryForkRequest(source: source, releaseId: releaseId))
+    }
+
+    func uploadUserReleaseArtwork(jobId: Int64, imageData: Data, filename: String, mimeType: String) async throws -> UserReleaseArtworkResponse {
+        try await api.postMultipart(
+            "/catalog/enrich/jobs/\(jobId)/user-release/artwork",
+            fieldName: "artwork", filename: filename, mimeType: mimeType, data: imageData
+        )
     }
 
     // MARK: Pending associations
@@ -109,6 +158,41 @@ struct CatalogService {
 
     func dismissPendingAssociation(epoch: UInt64) async throws {
         _ = try await api.post("/catalog/plays/\(epoch)/dismiss-pending-association", body: Empty(), as: EmptyResponse.self)
+    }
+
+    /// Removes a play record outright — for rejecting an already-confirmed but
+    /// wrong recognition when there's nothing worth re-identifying it as.
+    func deletePlay(epoch: UInt64) async throws {
+        try await api.delete("/catalog/plays/\(epoch)")
+    }
+
+    /// Free-text search across the library and enabled providers (MusicBrainz/Discogs/
+    /// iTunes) for manually identifying a play — the "never heard before" recovery path.
+    func identifySearch(query: String, limit: Int = 25) async throws -> [IdentifySearchHit] {
+        try await api.get("/catalog/identify/search", query: [
+            .init(name: "q", value: query),
+            .init(name: "limit", value: String(limit)),
+        ], as: IdentifySearchResponse.self).items
+    }
+
+    /// Identifies a play from scratch — creates the track, records the play, and queues
+    /// enrichment — either from a picked search hit or fully typed-in metadata.
+    @discardableResult
+    func manualIdentify(epoch: UInt64, artist: String, title: String, album: String? = nil, hit: IdentifySearchHit? = nil) async throws -> ManualIdentifyResponse {
+        struct Body: Encodable {
+            let artist: String
+            let title: String
+            let album: String?
+            let isrc: String?
+            let source: String?
+            let recordingId: String?
+            let releaseId: String?
+        }
+        let body = Body(
+            artist: artist, title: title, album: album?.nonEmpty ?? hit?.album,
+            isrc: hit?.isrc, source: hit?.source, recordingId: hit?.recordingId, releaseId: hit?.releaseId
+        )
+        return try await api.post("/catalog/plays/\(epoch)/identify", body: body)
     }
 
     // MARK: Enricher providers (settings)
@@ -198,6 +282,54 @@ struct CatalogService {
         try await api.delete("/rig/equipment/\(id)")
     }
 
+    @discardableResult
+    func rigPatchEquipment(id: String, _ patch: RigEquipmentPatchRequest) async throws -> RigEquipmentItem {
+        try await api.patch("/rig/equipment/\(id)", body: patch)
+    }
+
+    // MARK: Rig amplifier configuration & profiles
+
+    /// Must be called fresh right before building a `rigPatchAmplifier` body —
+    /// the endpoint merges by field presence, so patching from a stale/partial
+    /// value silently zeroes whatever it doesn't include.
+    func rigAmplifierConfig() async throws -> RigAmplifierConfig {
+        try await api.get("/rig/amplifier")
+    }
+
+    @discardableResult
+    func rigPatchAmplifier(_ patch: RigAmplifierConfig) async throws -> RigAmplifierConfig {
+        try await api.patch("/rig/amplifier", body: patch)
+    }
+
+    func rigAmplifierProfiles() async throws -> RigAmplifierProfilesResponse {
+        try await api.get("/rig/amplifier/profiles")
+    }
+
+    @discardableResult
+    func rigSaveProfile(_ profile: RigStoredAmplifierProfile) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles", body: profile)
+    }
+
+    func rigDeleteProfile(id: String) async throws {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        try await api.delete("/rig/amplifier/profiles?profile_id=\(encoded)")
+    }
+
+    @discardableResult
+    func rigActivateProfile(id: String) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles/activate", body: RigProfileActivateRequest(profileId: id))
+    }
+
+    func rigExportProfile(id: String) async throws -> RigProfileExportDoc {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return try await api.get("/rig/amplifier/profiles/export?profile_id=\(encoded)")
+    }
+
+    @discardableResult
+    func rigImportProfile(_ doc: RigProfileExportDoc) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles/import", body: doc)
+    }
+
     // MARK: Rig sessions (IR learn / pair)
 
     @discardableResult
@@ -243,5 +375,58 @@ struct CatalogService {
     @discardableResult
     func reorderRecognitionProviders(order: [String]) async throws -> RecognitionProvidersState {
         try await api.put("/identity/recognition/providers/order", body: ProviderOrderRequest(order: order))
+    }
+
+    @discardableResult
+    func patchRecognitionSettings(chainMode: String?, minConfidence: Double?) async throws -> RecognitionProvidersState {
+        struct Body: Encodable { let chainMode: String?; let minConfidence: Double? }
+        return try await api.patch("/identity/recognition/settings", body: Body(chainMode: chainMode, minConfidence: minConfidence))
+    }
+
+    @discardableResult
+    func createCustomProvider(_ req: CustomProviderCreateRequest) async throws -> RecognitionProvidersState {
+        try await api.post("/identity/recognition/custom-providers", body: req)
+    }
+
+    @discardableResult
+    func updateCustomProvider(slug: String, _ cp: CustomProviderConfig) async throws -> RecognitionProvidersState {
+        try await api.put("/identity/recognition/custom-providers/\(slug)", body: cp)
+    }
+
+    func deleteCustomProvider(slug: String) async throws {
+        try await api.delete("/identity/recognition/custom-providers/\(slug)")
+    }
+
+    /// `sampleJSON` is the raw bytes of a JSON value pasted by the user (a sample
+    /// provider response) — parsed and re-wrapped as `{"sample": <value>}` since the
+    /// server expects it inline, not as a JSON-encoded string.
+    func parseSample(slug: String?, sampleJSON: Data) async throws -> ParseSampleResponse {
+        let parsed: Any
+        do {
+            parsed = try JSONSerialization.jsonObject(with: sampleJSON)
+        } catch {
+            throw APIError.decoding("That doesn't look like valid JSON.")
+        }
+        let body: Data
+        do {
+            body = try JSONSerialization.data(withJSONObject: ["sample": parsed])
+        } catch {
+            throw APIError.decoding("Couldn't re-encode the sample.")
+        }
+        let path = slug.map { "/identity/recognition/custom-providers/\($0)/parse-sample" } ?? "/identity/recognition/parse-sample"
+        return try await api.postRawJSON(path, jsonBody: body)
+    }
+
+    // MARK: Metadata enrichers
+
+    @discardableResult
+    func reorderEnrichers(order: [String]) async throws -> EnrichersView {
+        try await api.put("/enrich/providers/order", body: ProviderOrderRequest(order: order))
+    }
+
+    @discardableResult
+    func setEnricherCredentials(id: String, apiKey: String?, params: [String: String]?) async throws -> EnrichersView {
+        struct Body: Encodable { let name: String; let apiKey: String?; let params: [String: String]? }
+        return try await api.put("/enrich/providers/\(id)/credentials", body: Body(name: id, apiKey: apiKey, params: params))
     }
 }
