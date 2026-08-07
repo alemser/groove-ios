@@ -136,6 +136,11 @@ struct AssociationRowView: View {
                             .foregroundStyle(Brand.teal)
                     }
                     Spacer()
+                    if let count = item.playCount, count > 1 {
+                        Text("Seen \(count)×")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Brand.muted)
+                    }
                     Text(Format.relative(item.startedAt)).font(.caption).foregroundStyle(Brand.muted)
                 }
                 Text(item.suggestedTitle?.nonEmpty ?? "Unidentified play")

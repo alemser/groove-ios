@@ -262,6 +262,10 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
     var suggestion: IdentificationSuggestion?
     var fingerprintHash: String?
     var createdAt: String?
+    /// Repeat plays of this same unresolved recording coalesce onto one row
+    /// (groove-catalog#32b) instead of a duplicate queue entry per play.
+    var playCount: Int?
+    var lastSeenAt: String?
 
     var id: UInt64 { listenerEpoch }
 }
