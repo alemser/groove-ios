@@ -21,6 +21,11 @@ struct BuiltinProviderView: Decodable {
 }
 
 struct RecognitionProvidersState: Decodable {
+    /// When true, groove-identity never enters this chain at all — only the
+    /// local fingerprint index runs. A miss is routed to the pending-
+    /// association flow ("Needs Association" in Library) instead of retrying
+    /// through these providers.
+    var autonomous: Bool
     var chainMode: String
     var minConfidence: Double
     var chain: [ProviderSlot]

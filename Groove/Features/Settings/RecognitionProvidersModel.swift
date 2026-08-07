@@ -69,6 +69,20 @@ final class RecognitionProvidersModel {
     }
 
     @discardableResult
+    func setAutonomous(_ enabled: Bool) async -> Bool {
+        guard let settings else { return false }
+        do {
+            state = try await CatalogService(settings: settings).setRecognitionAutonomous(enabled)
+            actionError = nil
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            await load()
+            return false
+        }
+    }
+
+    @discardableResult
     func saveChainSettings(chainMode: String, minConfidence: Double) async -> Bool {
         guard let settings else { return false }
         do {

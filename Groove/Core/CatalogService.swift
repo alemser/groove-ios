@@ -384,6 +384,12 @@ struct CatalogService {
     }
 
     @discardableResult
+    func setRecognitionAutonomous(_ autonomous: Bool) async throws -> RecognitionProvidersState {
+        struct Body: Encodable { let autonomous: Bool }
+        return try await api.patch("/identity/recognition/settings", body: Body(autonomous: autonomous))
+    }
+
+    @discardableResult
     func createCustomProvider(_ req: CustomProviderCreateRequest) async throws -> RecognitionProvidersState {
         try await api.post("/identity/recognition/custom-providers", body: req)
     }

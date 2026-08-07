@@ -58,13 +58,30 @@ struct RecognitionProvidersScreen: View {
         }
     }
 
+    private var isAutonomous: Bool { model.state?.autonomous ?? false }
+
     private var content: some View {
         List {
+            Section {
+                Toggle(
+                    "Autonomous Mode",
+                    isOn: Binding(
+                        get: { isAutonomous },
+                        set: { newValue in Task { await model.setAutonomous(newValue) } }
+                    )
+                )
+                .tint(Brand.accent)
+            } footer: {
+                Text("Never contact ACRCloud, AudD, or any custom provider — only the local fingerprint index runs. A track it doesn't recognize shows up in Library → Needs Association for you to pick a release; once picked, Groove learns it and recognizes it offline from then on.")
+                    .foregroundStyle(Brand.muted)
+            }
+
             Section {
                 Picker("Chain Mode", selection: $chainMode) {
                     Text("First Success").tag("first_success")
                     Text("Best Score").tag("best_score")
                 }
+                .disabled(isAutonomous)
                 .onChange(of: chainMode) { _, new in Task { await model.saveChainSettings(chainMode: new, minConfidence: minConfidence) } }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -74,9 +91,14 @@ struct RecognitionProvidersScreen: View {
                         if !editing { Task { await model.saveChainSettings(chainMode: chainMode, minConfidence: minConfidence) } }
                     }
                     .tint(Brand.accent)
+                    .disabled(isAutonomous)
                 }
             } header: {
                 Text("Chain Settings")
+            } footer: {
+                if isAutonomous {
+                    Text("Inactive while Autonomous Mode is on.").foregroundStyle(Brand.muted)
+                }
             }
 
             Section {
@@ -91,7 +113,9 @@ struct RecognitionProvidersScreen: View {
             } header: {
                 Text("Chain Order")
             } footer: {
-                Text("Tried top to bottom until one identifies the track. Drag to reorder; tap a provider to edit its credentials.")
+                Text(isAutonomous
+                     ? "Inactive while Autonomous Mode is on — providers here are never contacted."
+                     : "Tried top to bottom until one identifies the track. Drag to reorder; tap a provider to edit its credentials.")
                     .foregroundStyle(Brand.muted)
             }
 
