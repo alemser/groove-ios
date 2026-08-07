@@ -83,6 +83,29 @@ struct CatalogService {
         ], as: ConfirmedEditionResponse.self).edition
     }
 
+    /// Library-scoped release search for the "needs association" picker — works fully
+    /// offline (no enrichers required), unlike identifySearch(). Reuses the same store
+    /// this repo's own confirmed-library browsing already searches.
+    func searchLibraryReleases(query: String, limit: Int = 20) async throws -> [LibraryReleaseSearchHit] {
+        try await api.get("/catalog/releases/confirmed/search", query: [
+            .init(name: "q", value: query),
+            .init(name: "limit", value: String(limit)),
+        ], as: LibraryReleaseSearchResponse.self).items
+    }
+
+    /// Resolves a pending association against a picked release + tracklist position
+    /// rather than an already-known track_id — the track may never have existed
+    /// before (groove-identity#32 autonomous mode's first-ever play of that position).
+    @discardableResult
+    func associatePlayToReleaseRow(epoch: UInt64, source: String, releaseId: String, ordinal: Int) async throws -> EmptyResponse {
+        struct Body: Encodable { let source: String; let releaseId: String; let ordinal: Int }
+        return try await api.post(
+            "/catalog/plays/\(epoch)/associate-release",
+            body: Body(source: source, releaseId: releaseId, ordinal: ordinal),
+            as: EmptyResponse.self
+        )
+    }
+
     func detachLibraryEditionTracks(source: String, releaseId: String) async throws {
         let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
         let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId

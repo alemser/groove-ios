@@ -6,6 +6,10 @@ import Observation
 final class ManualIdentifyModel {
     var results: [IdentifySearchHit] = []
     var phase: Phase = .idle
+    /// Library search runs independently of the enricher search above: it needs no
+    /// enrichers configured, so it must not be blocked or hidden by an enricher error
+    /// (very common for autonomous-mode users with none configured at all).
+    var libraryResults: [LibraryReleaseSearchHit] = []
     var busyId: String?
     var actionError: String?
 
@@ -21,12 +25,19 @@ final class ManualIdentifyModel {
     func search(_ text: String) {
         searchTask?.cancel()
         let q = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { phase = .idle; results = []; return }
+        guard !q.isEmpty else { phase = .idle; results = []; libraryResults = []; return }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            await runSearch(q)
+            async let library: () = runLibrarySearch(q)
+            async let external: () = runSearch(q)
+            _ = await (library, external)
         }
+    }
+
+    private func runLibrarySearch(_ q: String) async {
+        guard let settings else { return }
+        libraryResults = (try? await CatalogService(settings: settings).searchLibraryReleases(query: q)) ?? []
     }
 
     private func runSearch(_ q: String) async {
@@ -89,6 +100,7 @@ struct ManualIdentifySheet: View {
     @State private var model = ManualIdentifyModel()
     @State private var query: String
     @State private var showManualEntry = false
+    @State private var pickingRelease: LibraryReleaseSearchHit?
 
     init(
         epoch: UInt64,
@@ -108,7 +120,31 @@ struct ManualIdentifySheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                resultsArea
+                List {
+                    if !model.libraryResults.isEmpty {
+                        Section("Your Library") {
+                            ForEach(model.libraryResults) { hit in
+                                Button {
+                                    pickingRelease = hit
+                                } label: {
+                                    LibraryReleaseHitRow(hit: hit)
+                                }
+                                .buttonStyle(.plain)
+                                .listRowBackground(Brand.surface)
+                            }
+                        }
+                    }
+                    Section(model.libraryResults.isEmpty ? "" : "Enrichers") {
+                        resultsRows
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if model.libraryResults.isEmpty && query.trimmingCharacters(in: .whitespaces).isEmpty {
+                        EmptyStateView(icon: "magnifyingglass", title: "Search to identify", message: "Look up the record by artist, album, or track title.")
+                    }
+                }
                 Divider().overlay(Brand.border)
                 manualEntryButton
             }
@@ -120,6 +156,14 @@ struct ManualIdentifySheet: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Artist, album, or track")
             .onChange(of: query) { _, q in model.search(q) }
             .grooveScreenBackground()
+            .sheet(item: $pickingRelease) { hit in
+                ReleaseTracklistPickerSheet(epoch: epoch, hit: hit) {
+                    pickingRelease = nil
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    onResolved()
+                    dismiss()
+                }
+            }
         }
         .task {
             model.configure(settings)
@@ -132,37 +176,44 @@ struct ManualIdentifySheet: View {
         }
     }
 
+    /// Enricher-search rows only — no List wrapper, no idle/empty state (the parent
+    /// List and its overlay own those, since library results share the same screen
+    /// and must not be hidden behind an enricher-only switch).
     @ViewBuilder
-    private var resultsArea: some View {
+    private var resultsRows: some View {
         switch model.phase {
         case .idle:
-            EmptyStateView(icon: "magnifyingglass", title: "Search to identify", message: "Look up the record by artist, album, or track title.")
+            EmptyView()
         case .loading:
-            LoadingView()
+            if model.libraryResults.isEmpty {
+                LoadingView()
+            }
         case let .error(message):
-            ErrorStateView(message: message) { model.search(query) }
+            if model.libraryResults.isEmpty {
+                ErrorStateView(message: message) { model.search(query) }
+            } else {
+                Text("Enrichers: \(message)").font(.caption).foregroundStyle(Brand.muted)
+            }
         case .loaded:
             if model.results.isEmpty {
-                EmptyStateView(icon: "questionmark.circle", title: "No matches", message: "Try a different search, or add it manually below.")
-            } else {
-                List {
-                    ForEach(model.results) { hit in
-                        Button {
-                            Task { await submit(hit: hit) }
-                        } label: {
-                            IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(model.busyId != nil)
-                        .listRowBackground(Brand.surface)
-                    }
-                    if let err = model.actionError {
-                        Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
-                    }
+                if model.libraryResults.isEmpty {
+                    EmptyStateView(icon: "questionmark.circle", title: "No matches", message: "Try a different search, or add it manually below.")
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+            } else {
+                ForEach(model.results) { hit in
+                    Button {
+                        Task { await submit(hit: hit) }
+                    } label: {
+                        IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(model.busyId != nil)
+                    .listRowBackground(Brand.surface)
+                }
             }
+        }
+        if let err = model.actionError {
+            Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
         }
     }
 
@@ -299,3 +350,124 @@ struct ManualEntryForm: View {
         }
     }
 }
+
+struct LibraryReleaseHitRow: View {
+    let hit: LibraryReleaseSearchHit
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(raw: hit.artworkUrl, cornerRadius: 8)
+                .frame(width: 52, height: 52)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(hit.album)
+                    .font(.body.weight(.medium)).foregroundStyle(Brand.text).lineLimit(1)
+                Text(hit.artist)
+                    .font(.subheadline).foregroundStyle(Brand.muted).lineLimit(1)
+                if let year = hit.year?.nonEmpty {
+                    Text(year).font(.caption2).foregroundStyle(Brand.muted)
+                }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Brand.muted)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(hit.album), \(hit.artist)")
+    }
+}
+
+/// Which track on a picked library release — the position may never have had a
+/// track row before (autonomous mode's first-ever play of it); the backend
+/// creates it the same way first acoustic recognition would.
+struct ReleaseTracklistPickerSheet: View {
+    let epoch: UInt64
+    let hit: LibraryReleaseSearchHit
+    let onResolved: () -> Void
+
+    @Environment(AppSettings.self) private var settings
+    @Environment(\.dismiss) private var dismiss
+    @State private var edition: PendingRelease?
+    @State private var loadError: String?
+    @State private var submittingOrdinal: Int?
+    @State private var submitError: String?
+
+    var body: some View {
+        NavigationStack {
+            content
+                .navigationTitle(hit.album)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                }
+                .grooveScreenBackground()
+        }
+        .task { await load() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let loadError {
+            ErrorStateView(message: loadError) { Task { await load() } }
+        } else if let edition {
+            let tracks = (edition.tracklist ?? []).sorted { $0.ordinal < $1.ordinal }
+            if tracks.isEmpty {
+                EmptyStateView(icon: "list.bullet", title: "No tracklist", message: "This release has no tracklist to pick a position from yet.")
+            } else {
+                List {
+                    if let submitError {
+                        Text(submitError).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
+                    }
+                    ForEach(tracks) { entry in
+                        Button {
+                            Task { await submit(ordinal: entry.ordinal) }
+                        } label: {
+                            HStack {
+                                TracklistEntryRow(entry: entry, compact: false)
+                                if submittingOrdinal == entry.ordinal {
+                                    ProgressView().tint(Brand.muted)
+                                } else {
+                                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Brand.muted)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(submittingOrdinal != nil)
+                        .listRowBackground(Brand.surface)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+        } else {
+            LoadingView()
+        }
+    }
+
+    private func load() async {
+        guard let source = hit.source, let releaseId = hit.releaseId else {
+            loadError = "This release has no source to look up a tracklist from."
+            return
+        }
+        loadError = nil
+        do {
+            edition = try await CatalogService(settings: settings).confirmedEdition(source: source, releaseId: releaseId)
+        } catch {
+            loadError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+
+    private func submit(ordinal: Int) async {
+        guard let source = hit.source, let releaseId = hit.releaseId else { return }
+        submittingOrdinal = ordinal
+        submitError = nil
+        do {
+            try await CatalogService(settings: settings).associatePlayToReleaseRow(epoch: epoch, source: source, releaseId: releaseId, ordinal: ordinal)
+            submittingOrdinal = nil
+            onResolved()
+        } catch {
+            submittingOrdinal = nil
+            submitError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+}
+

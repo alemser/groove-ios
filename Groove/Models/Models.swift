@@ -316,6 +316,29 @@ struct ManualIdentifyResponse: Decodable {
     var fingerprintLearned: Bool
 }
 
+// MARK: - Library release picker (autonomous mode / groove-identity#32)
+
+/// A release already in the user's own library — the picker's primary search
+/// surface, works fully offline (no enrichers required). Tracklist fetch and
+/// its model already exist: CatalogService.confirmedEdition(source:releaseId:)
+/// returns PendingRelease.tracklist ([TracklistEntry]).
+struct LibraryReleaseSearchHit: Decodable, Identifiable, Hashable {
+    var trackId: Int64?
+    var jobId: Int64?
+    var source: String?
+    var releaseId: String?
+    var artist: String
+    var album: String
+    var year: String?
+    var artworkUrl: String?
+
+    var id: String { "\(source ?? "")|\(releaseId ?? "")|\(artist)|\(album)" }
+}
+
+struct LibraryReleaseSearchResponse: Decodable {
+    var items: [LibraryReleaseSearchHit]
+}
+
 /// Result of re-matching a track to a different release entirely (not the
 /// same as editing fields of the currently-confirmed release).
 struct ApplyReleaseResult: Decodable {
