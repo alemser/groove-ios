@@ -61,6 +61,20 @@ final class ReleasesModel {
             actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
         }
     }
+
+    /// Deletes several pending tracks in one go — the bulk counterpart to the
+    /// one-at-a-time delete on `TrackDetailView`/`EnrichJobDetailView`, for
+    /// clearing out a batch of junk recognitions at once.
+    func deleteTracks(ids: Set<Int64>) async {
+        guard let settings else { return }
+        let service = CatalogService(settings: settings)
+        await withTaskGroup(of: Void.self) { group in
+            for id in ids {
+                group.addTask { try? await service.deleteTrack(id: id) }
+            }
+        }
+        await load(query: lastQuery)
+    }
 }
 
 struct ReleasesView: View {
@@ -72,6 +86,9 @@ struct ReleasesView: View {
     @State private var search = ""
     @State private var showAssociations = false
     @State private var dropTargetReleaseId: String?
+    @State private var selectMode = false
+    @State private var selectedTrackIds: Set<Int64> = []
+    @State private var showBulkDeleteConfirm = false
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -92,6 +109,33 @@ struct ReleasesView: View {
             }
             .sheet(isPresented: $showAssociations, onDismiss: { Task { await model.load(query: search) } }) {
                 AssociationReviewSheet()
+            }
+            .toolbar {
+                if !filteredPending.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(selectMode ? "Cancel" : "Select") {
+                            selectMode.toggle()
+                            if !selectMode { selectedTrackIds.removeAll() }
+                        }
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Delete \(selectedTrackIds.count) track\(selectedTrackIds.count == 1 ? "" : "s")?",
+                isPresented: $showBulkDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    let ids = selectedTrackIds
+                    Task {
+                        await model.deleteTracks(ids: ids)
+                        selectedTrackIds.removeAll()
+                        selectMode = false
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Plays are detached and enrich jobs cleaned up. This can't be undone.")
             }
     }
 
@@ -133,11 +177,38 @@ struct ReleasesView: View {
 
                 if !filteredPending.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        SectionLabel(text: "Needs Review (\(filteredPending.count))")
+                        HStack {
+                            SectionLabel(text: "Needs Review (\(filteredPending.count))")
+                            Spacer()
+                            if selectMode {
+                                Button(selectedTrackIds.count == filteredPending.count ? "Deselect All" : "Select All") {
+                                    if selectedTrackIds.count == filteredPending.count {
+                                        selectedTrackIds.removeAll()
+                                    } else {
+                                        selectedTrackIds = Set(filteredPending.map(\.trackId))
+                                    }
+                                }
+                                .font(.caption.weight(.semibold))
+                            }
+                        }
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(filteredPending) { track in
                                 pendingCard(for: track)
                             }
+                        }
+                        if selectMode && !selectedTrackIds.isEmpty {
+                            Button(role: .destructive) {
+                                showBulkDeleteConfirm = true
+                            } label: {
+                                Label(
+                                    "Delete \(selectedTrackIds.count) Track\(selectedTrackIds.count == 1 ? "" : "s")",
+                                    systemImage: "trash"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Brand.err)
                         }
                     }
                 }
@@ -172,11 +243,32 @@ struct ReleasesView: View {
 
     @ViewBuilder
     private func pendingCard(for track: PendingReleaseTrack) -> some View {
+        let isSelected = selectedTrackIds.contains(track.trackId)
         let card = PendingTrackCardView(track: track)
             .draggable(PendingTrackDropWire.encode(trackId: track.trackId)) {
                 Label(track.title.nonEmpty ?? "Track", systemImage: "arrow.up.and.down.and.arrow.left.and.right")
             }
-        if let jobId = track.jobId {
+            .overlay(alignment: .topLeading) {
+                if selectMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, isSelected ? Brand.accent : Brand.muted)
+                        .padding(6)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .padding(6)
+                }
+            }
+            .opacity(selectMode && !isSelected ? 0.6 : 1)
+
+        if selectMode {
+            Button {
+                if isSelected { selectedTrackIds.remove(track.trackId) } else { selectedTrackIds.insert(track.trackId) }
+            } label: {
+                card
+            }
+            .buttonStyle(.plain)
+        } else if let jobId = track.jobId {
             NavigationLink(value: EnrichJob(
                 id: jobId, listenerEpoch: 0, trackId: track.trackId, isrc: nil,
                 artist: track.artist, title: track.title, album: track.album,
@@ -186,7 +278,13 @@ struct ReleasesView: View {
             }
             .buttonStyle(.plain)
         } else {
-            card
+            // No enrich job yet — route into the track detail screen instead,
+            // whose ellipsis menu already offers Change Release (associate)
+            // and Delete Track for exactly this unconfirmed state.
+            NavigationLink(value: track.trackId) {
+                card
+            }
+            .buttonStyle(.plain)
         }
     }
 

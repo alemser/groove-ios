@@ -12,9 +12,13 @@ final class EnrichJobDetailModel {
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     let jobId: Int64
+    let trackId: Int64?
     private var settings: AppSettings?
 
-    init(jobId: Int64) { self.jobId = jobId }
+    init(jobId: Int64, trackId: Int64?) {
+        self.jobId = jobId
+        self.trackId = trackId
+    }
 
     func configure(_ settings: AppSettings) {
         if self.settings == nil { self.settings = settings; Task { await load() } }
@@ -55,16 +59,32 @@ final class EnrichJobDetailModel {
         }
         busyReleaseId = nil
     }
+
+    /// Deletes the underlying track outright — for when none of the
+    /// candidates (or lack thereof) are worth keeping around.
+    func deleteTrack() async -> Bool {
+        guard let settings, let trackId else { return false }
+        do {
+            try await CatalogService(settings: settings).deleteTrack(id: trackId)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
 }
 
 struct EnrichJobDetailView: View {
     let job: EnrichJob
     @Environment(AppSettings.self) private var settings
+    @Environment(\.dismiss) private var dismiss
     @State private var model: EnrichJobDetailModel
+    @State private var showDeleteConfirm = false
 
     init(job: EnrichJob) {
         self.job = job
-        _model = State(initialValue: EnrichJobDetailModel(jobId: job.id))
+        _model = State(initialValue: EnrichJobDetailModel(jobId: job.id, trackId: job.trackId))
     }
 
     var body: some View {
@@ -72,6 +92,24 @@ struct EnrichJobDetailView: View {
             .grooveScreenBackground()
             .navigationTitle("Release Candidates")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if model.trackId != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(role: .destructive) { showDeleteConfirm = true } label: {
+                            Image(systemName: "trash")
+                        }
+                        .accessibilityLabel("Delete track")
+                    }
+                }
+            }
+            .confirmationDialog("Delete this track from the catalog?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) {
+                    Task { if await model.deleteTrack() { dismiss() } }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Plays are detached and enrich jobs cleaned up. This can't be undone.")
+            }
             .task { model.configure(settings) }
     }
 
