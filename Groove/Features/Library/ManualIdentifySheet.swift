@@ -390,6 +390,8 @@ struct ReleaseTracklistPickerSheet: View {
     @State private var loadError: String?
     @State private var submittingOrdinal: Int?
     @State private var submitError: String?
+    @State private var showSessionPrompt = false
+    @State private var confirmingSession = false
 
     var body: some View {
         NavigationStack {
@@ -406,7 +408,9 @@ struct ReleaseTracklistPickerSheet: View {
 
     @ViewBuilder
     private var content: some View {
-        if let loadError {
+        if showSessionPrompt {
+            sessionPromptView
+        } else if let loadError {
             ErrorStateView(message: loadError) { Task { await load() } }
         } else if let edition {
             let tracks = (edition.tracklist ?? []).sorted { $0.ordinal < $1.ordinal }
@@ -463,11 +467,53 @@ struct ReleaseTracklistPickerSheet: View {
         do {
             try await CatalogService(settings: settings).associatePlayToReleaseRow(epoch: epoch, source: source, releaseId: releaseId, ordinal: ordinal)
             submittingOrdinal = nil
-            onResolved()
+            // A multi-track release is worth asking about — turning the session
+            // user-confirmed here lets autonomous mode assign the rest of the
+            // tracklist automatically for the rest of this sitting, with no more
+            // prompts. A single-track pick has nothing to auto-advance into.
+            if (edition?.tracklist?.count ?? 0) >= 2 {
+                showSessionPrompt = true
+            } else {
+                onResolved()
+            }
         } catch {
             submittingOrdinal = nil
             submitError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
         }
+    }
+
+    private func confirmSession(wholeAlbum: Bool) async {
+        if wholeAlbum {
+            confirmingSession = true
+            try? await CatalogService(settings: settings).confirmAlbumProgrammeSession()
+            confirmingSession = false
+        }
+        onResolved()
+    }
+
+    private var sessionPromptView: some View {
+        VStack(spacing: 16) {
+            Text("Listening to the whole album?")
+                .font(.headline)
+                .foregroundStyle(Brand.text)
+            Text("If yes, the next tracks are assigned automatically from the tracklist as the record plays — no more prompts for this sitting.")
+                .font(.subheadline)
+                .foregroundStyle(Brand.muted)
+                .multilineTextAlignment(.center)
+            if confirmingSession {
+                ProgressView()
+            } else {
+                HStack(spacing: 12) {
+                    Button("No, just this track") { Task { await confirmSession(wholeAlbum: false) } }
+                        .buttonStyle(.bordered)
+                    Button("Yes — whole album") { Task { await confirmSession(wholeAlbum: true) } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Brand.accent)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
     }
 }
 

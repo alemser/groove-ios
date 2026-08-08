@@ -40,7 +40,12 @@ final class ReleasesModel {
             async let releaseList = service.releases(query: query)
             async let pendingList = service.pendingReleaseTracks()
             async let associations = service.pendingAssociations()
-            releases = try await releaseList
+            // Zero-track releases are legitimate on the web "Releases" management
+            // page (where they're kept around specifically so the user can Remove
+            // them), but here they're just phantom albums cluttering the library —
+            // and their confirmed_at can be more recent than a real release's last
+            // play, which threw off the "most recently played first" ordering too.
+            releases = try await releaseList.filter { $0.catalogTracks > 0 }
             pending = try await pendingList
             associationsCount = try await associations.items.count
             phase = .loaded

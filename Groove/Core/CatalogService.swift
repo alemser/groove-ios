@@ -135,6 +135,13 @@ struct CatalogService {
         try await api.postNoContent("/catalog/enrich/releases/\(id)/discard")
     }
 
+    /// Turns an armed album-programme session user-confirmed so autonomous mode
+    /// assigns subsequent tracks from the tracklist automatically for the rest of
+    /// this sitting. Best-effort: a 409 just means no session was armed.
+    func confirmAlbumProgrammeSession() async throws {
+        try await api.postNoContent("/identity/album-programme/confirm-session")
+    }
+
     // MARK: User release editing (draft/confirm cycle for an owned release)
 
     /// The confirmed-in-place edit path: only reachable when the release has
