@@ -4,9 +4,14 @@ import PhotosUI
 /// Full metadata editor for an owned release — device attributes, tracklist,
 /// and artwork — mirroring the web studio's release editor. Edits in place
 /// when the release has a `catalog_job_id`; otherwise the only backend path
-/// is a fresh editable copy, which this screen discloses up front.
+/// is a fresh editable copy, which this screen discloses up front. Also
+/// doubles as the second half of "Add Release" (`AddReleaseView`), opened via
+/// `init(jobId:draft:)` once a scratch release has been created.
 struct EditReleaseView: View {
-    let release: LibraryRelease
+    /// `nil` when editing a release just created from scratch through the
+    /// standalone "Add Release" flow — nothing to detach tracks from, and no
+    /// "editing creates a copy" caveat applies.
+    let release: LibraryRelease?
     var onSaved: () -> Void = {}
 
     @Environment(AppSettings.self) private var settings
@@ -36,6 +41,14 @@ struct EditReleaseView: View {
         _model = State(initialValue: EditReleaseModel(release: release))
     }
 
+    /// Opens straight into a release just created from scratch — the "cadastro"
+    /// path from `AddReleaseView`, which already has a draft + jobId in hand.
+    init(jobId: Int64, draft: PendingRelease, onSaved: @escaping () -> Void = {}) {
+        self.release = nil
+        self.onSaved = onSaved
+        _model = State(initialValue: EditReleaseModel(jobId: jobId, draft: draft))
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -49,7 +62,7 @@ struct EditReleaseView: View {
                 }
             }
             .grooveScreenBackground()
-            .navigationTitle("Edit Release")
+            .navigationTitle(release == nil ? "New Release" : "Edit Release")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -125,11 +138,13 @@ struct EditReleaseView: View {
                 }
             }
 
-            Section {
-                Button("Detach All Tracks", role: .destructive) { showDetachConfirm = true }
-            } footer: {
-                Text("Unlinks every catalog track from this edition. The edition and its tracklist stay in your library so you can rebuild it later.")
-                    .foregroundStyle(Brand.muted)
+            if release != nil {
+                Section {
+                    Button("Detach All Tracks", role: .destructive) { showDetachConfirm = true }
+                } footer: {
+                    Text("Unlinks every catalog track from this edition. The edition and its tracklist stay in your library so you can rebuild it later.")
+                        .foregroundStyle(Brand.muted)
+                }
             }
         }
         .scrollContentBackground(.hidden)

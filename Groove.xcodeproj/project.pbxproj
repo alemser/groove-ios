@@ -36,6 +36,7 @@
 		A1DAB00DDD0B4D9FBA632AB7 /* AmplifierRemoteTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA773915FBAF4749838D47E3 /* AmplifierRemoteTab.swift */; };
 		2825A3ABBD4843F5AE1274B9 /* AssociationReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F0B21E9D214AE08CB7CE39 /* AssociationReviewSheet.swift */; };
 		D98A6BBD752343F4A8F50AD6 /* ManualIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC26CA8883D14EB3BDC559F7 /* ManualIdentifySheet.swift */; };
+		627B4ABE7FC7C5B6FFC907D4 /* AddReleaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76212E2B1E2C71EF80A8A501 /* AddReleaseView.swift */; };
 		876122F7EBCEB0E576914734 /* GrooveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 599238D9601A338235548EB9 /* GrooveApp.swift */; };
 		8AFA2827FA2D749E75845928 /* RecognitionProvidersModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E17EF21211B766AC0E2CA8 /* RecognitionProvidersModel.swift */; };
 		675F41F59142498C8B6B0CCD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA15ED7592144AEAA47B7F9 /* SettingsView.swift */; };
@@ -79,6 +80,7 @@
 		0E83562951C9D7BD7A48EAE5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C8F0B21E9D214AE08CB7CE39 /* AssociationReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssociationReviewSheet.swift; sourceTree = "<group>"; };
 		CC26CA8883D14EB3BDC559F7 /* ManualIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualIdentifySheet.swift; sourceTree = "<group>"; };
+		76212E2B1E2C71EF80A8A501 /* AddReleaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReleaseView.swift; sourceTree = "<group>"; };
 		1419E86CA4A3D1E5BD3CBEC2 /* EquipmentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentDetailView.swift; sourceTree = "<group>"; };
 		27254E509C0A5183FE8A30CB /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		27ED92912FF018764F1314A9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -277,6 +279,7 @@
 			isa = PBXGroup;
 			children = (
 				C8F0B21E9D214AE08CB7CE39 /* AssociationReviewSheet.swift */,
+				76212E2B1E2C71EF80A8A501 /* AddReleaseView.swift */,
 				DB9253360D61A0BC5E0BE49D /* LibraryView.swift */,
 				CC26CA8883D14EB3BDC559F7 /* ManualIdentifySheet.swift */,
 				C9D14EECF13D2E7740D76994 /* ReleaseDetailView.swift */,
@@ -431,6 +434,7 @@
 				CAC5831843B67710D826D6F8 /* LearnSessionSheet.swift in Sources */,
 				4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */,
 				2825A3ABBD4843F5AE1274B9 /* AssociationReviewSheet.swift in Sources */,
+				627B4ABE7FC7C5B6FFC907D4 /* AddReleaseView.swift in Sources */,
 				D98A6BBD752343F4A8F50AD6 /* ManualIdentifySheet.swift in Sources */,
 				AC56F500A15DAB4B209720C2 /* Models.swift in Sources */,
 				F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */,

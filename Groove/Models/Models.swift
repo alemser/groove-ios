@@ -248,6 +248,20 @@ struct UserReleaseArtworkResponse: Decodable {
     var tracksUpdated: Int
 }
 
+/// Body for `POST /catalog/user-releases` — creates a scratch release from
+/// nothing, the "cadastro" entry point mirroring the web studio's blank
+/// "New release" form.
+struct StandaloneUserReleaseRequest: Encodable {
+    var artist: String
+    var album: String
+}
+
+struct StandaloneUserReleaseResponse: Decodable {
+    var draft: PendingRelease
+    var job: EnrichJob
+    var trackId: Int64
+}
+
 // MARK: - Pending associations (review queue)
 
 struct PendingAssociation: Decodable, Identifiable, Hashable {

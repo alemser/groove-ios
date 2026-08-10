@@ -90,6 +90,7 @@ struct ReleasesView: View {
     @State private var model = ReleasesModel()
     @State private var search = ""
     @State private var showAssociations = false
+    @State private var showAddRelease = false
     @State private var dropTargetReleaseId: String?
     @State private var selectMode = false
     @State private var selectedTrackIds: Set<Int64> = []
@@ -115,7 +116,18 @@ struct ReleasesView: View {
             .sheet(isPresented: $showAssociations, onDismiss: { Task { await model.load(query: search) } }) {
                 AssociationReviewSheet()
             }
+            .sheet(isPresented: $showAddRelease, onDismiss: { Task { await model.load(query: search) } }) {
+                AddReleaseView {}
+            }
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddRelease = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add Release")
+                }
                 if !filteredPending.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(selectMode ? "Cancel" : "Select") {
