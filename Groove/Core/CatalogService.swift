@@ -145,6 +145,21 @@ struct CatalogService {
         )
     }
 
+    /// The "cadastro" entry point — creates a release from nothing but a typed
+    /// artist/album, ready to be filled out through the same draft/publish cycle
+    /// as any other user release.
+    func createStandaloneUserRelease(artist: String, album: String) async throws -> StandaloneUserReleaseResponse {
+        try await api.post("/catalog/user-releases", body: StandaloneUserReleaseRequest(artist: artist, album: album))
+    }
+
+    /// Creates a release prefilled from a picked enricher search hit — the
+    /// autofilled counterpart to `createStandaloneUserRelease(artist:album:)`,
+    /// mirroring the web studio's "Lookup using enrichers" pick-to-create flow.
+    @discardableResult
+    func createStandaloneUserRelease(from hit: IdentifySearchHit) async throws -> LibraryForkResponse {
+        try await api.post("/catalog/user-releases/fork-from-search", body: hit)
+    }
+
     // MARK: Pending associations
 
     func pendingAssociations() async throws -> PendingAssociationsResponse {

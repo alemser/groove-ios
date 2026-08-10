@@ -17,17 +17,29 @@ final class EditReleaseModel {
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
-    private let release: LibraryRelease
+    private let release: LibraryRelease?
     private var settings: AppSettings?
 
     init(release: LibraryRelease) { self.release = release }
 
+    /// Editing a release created moments ago via the standalone "Add Release"
+    /// flow — draft + jobId already in hand from the create call, no library
+    /// release to load from or detach tracks from.
+    init(jobId: Int64, draft: PendingRelease) {
+        self.release = nil
+        self.jobId = jobId
+        self.draft = draft
+        self.phase = .loaded
+    }
+
     func configure(_ settings: AppSettings) {
-        if self.settings == nil { self.settings = settings; Task { await load() } }
+        guard self.settings == nil else { return }
+        self.settings = settings
+        if release != nil { Task { await load() } }
     }
 
     func load() async {
-        guard let settings else { return }
+        guard let settings, let release else { return }
         phase = .loading
         let service = CatalogService(settings: settings)
         do {
@@ -110,7 +122,7 @@ final class EditReleaseModel {
 
     @discardableResult
     func detachTracks() async -> Bool {
-        guard let settings else { return false }
+        guard let settings, let release else { return false }
         do {
             try await CatalogService(settings: settings).detachLibraryEditionTracks(source: release.source, releaseId: release.releaseId)
             UINotificationFeedbackGenerator().notificationOccurred(.success)

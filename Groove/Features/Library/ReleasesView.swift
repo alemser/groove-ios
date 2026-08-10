@@ -71,6 +71,7 @@ struct ReleasesView: View {
     @State private var model = ReleasesModel()
     @State private var search = ""
     @State private var showAssociations = false
+    @State private var showAddRelease = false
     @State private var dropTargetReleaseId: String?
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
@@ -92,6 +93,19 @@ struct ReleasesView: View {
             }
             .sheet(isPresented: $showAssociations, onDismiss: { Task { await model.load(query: search) } }) {
                 AssociationReviewSheet()
+            }
+            .sheet(isPresented: $showAddRelease, onDismiss: { Task { await model.load(query: search) } }) {
+                AddReleaseView {}
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddRelease = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add Release")
+                }
             }
     }
 
