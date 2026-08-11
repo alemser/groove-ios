@@ -97,11 +97,16 @@ struct AmplifierRemoteTab: View {
     // Most amplifier remotes have a single physical power button — one
     // `power_toggle` IR code — not discrete on/off buttons. Mirrors the web
     // remote's single Power button rather than modeling hardware that
-    // mostly doesn't exist.
+    // mostly doesn't exist. Icon-only: the "Power" section label above
+    // already says what this is, and power.state is a software inference
+    // with no hardware feedback (can be confidently wrong after a physical
+    // remote/button press), so the button deliberately never claims
+    // "Turn On"/"Turn Off" — it doesn't know which way it's about to switch.
     private var powerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Power")
-            stateButton("Power", systemImage: "power", isActive: isOn) { Task { await model.togglePower() } }
+            stateButton("Power", systemImage: "power", isActive: isOn, iconOnly: true) { Task { await model.togglePower() } }
+                .accessibilityLabel("Power")
         }
         .padding(14)
         .grooveCard()
@@ -206,13 +211,23 @@ struct AmplifierRemoteTab: View {
         _ title: String,
         systemImage: String,
         isActive: Bool,
+        iconOnly: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
+            Group {
+                if iconOnly {
+                    Label(title, systemImage: systemImage)
+                        .labelStyle(.iconOnly)
+                        .font(.title3.weight(.semibold))
+                } else {
+                    Label(title, systemImage: systemImage)
+                        .labelStyle(.titleAndIcon)
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
                 .background(isActive ? Brand.ok.opacity(0.15) : Brand.cardElevated)
                 .foregroundStyle(isActive ? Brand.ok : Brand.text)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
