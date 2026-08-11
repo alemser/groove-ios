@@ -114,7 +114,16 @@ struct EditReleaseView: View {
                 TextField("Country", text: $country)
                 TextField("Release Date (YYYY-MM-DD)", text: $releaseDate)
                     .keyboardType(.numbersAndPunctuation)
-                TextField("Release Type (e.g. studio, compilation)", text: $releaseType)
+                Picker("Type", selection: $releaseType) {
+                    Text("—").tag("")
+                    Text("Studio album").tag("studio")
+                    Text("Live").tag("live")
+                    Text("Compilation").tag("compilation")
+                    Text("Single").tag("single")
+                    Text("EP").tag("ep")
+                    Text("Soundtrack").tag("soundtrack")
+                    Text("Other").tag("other")
+                }
                 Picker("Format", selection: $releaseFormat) {
                     Text("Vinyl").tag("vinyl")
                     Text("CD").tag("cd")
