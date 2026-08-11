@@ -94,20 +94,20 @@ struct AmplifierRemoteTab: View {
 
     // MARK: - Power
 
+    // Most amplifier remotes have a single physical power button — one
+    // `power_toggle` IR code — not discrete on/off buttons. Mirrors the web
+    // remote's single Power button rather than modeling hardware that
+    // mostly doesn't exist.
     private var powerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Power")
-            HStack(spacing: 10) {
-                stateButton("ON", systemImage: "power", isActive: isOn) { Task { await model.powerOn() } }
-                stateButton("OFF", systemImage: "power", isActive: isOff) { Task { await model.powerOff() } }
-            }
+            stateButton("Power", systemImage: "power", isActive: isOn) { Task { await model.togglePower() } }
         }
         .padding(14)
         .grooveCard()
     }
 
     private var isOn: Bool { powerState == "on" || powerState == "warming_up" }
-    private var isOff: Bool { powerState == "off" || powerState == "standby" }
 
     // MARK: - Input
 

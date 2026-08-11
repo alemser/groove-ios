@@ -69,6 +69,25 @@ final class AmplifierModel {
         }
     }
 
+    /// Most amplifier remotes have a single physical power button (one
+    /// `power_toggle` IR code), not discrete on/off — mirrors the web
+    /// remote's single Power button. Picks on vs. off from the currently
+    /// displayed state; the server resolves that intent to whatever's
+    /// actually learned (`power_toggle` preferred) either way, so this is
+    /// just which single button the UI shows, not a behavior change.
+    var isPowerOn: Bool {
+        let state = amplifier?.power?.state ?? "unknown"
+        return state == "on" || state == "warming_up"
+    }
+
+    func togglePower() async {
+        if isPowerOn {
+            await powerOff()
+        } else {
+            await powerOn()
+        }
+    }
+
     func volume(direction: String) async {
         guard let settings else { return }
         await perform {
