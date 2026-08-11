@@ -145,6 +145,10 @@ struct RecognitionProvidersScreen: View {
                     .foregroundStyle(Brand.muted)
             }
 
+            if let usage = model.usage {
+                usageSection(usage)
+            }
+
             if let error = model.actionError {
                 Section {
                     Text(error).foregroundStyle(Brand.err)
@@ -152,6 +156,33 @@ struct RecognitionProvidersScreen: View {
             }
         }
         .scrollContentBackground(.hidden)
+    }
+
+    /// "Local index & warm map" usage panel — the same telemetry as the web
+    /// providers page's collapsible KPI section, sourced from
+    /// `GET /identity/observability/providers`.
+    private func usageSection(_ usage: ProviderUsageRollup) -> some View {
+        Section {
+            InfoRow(label: "Index probes", value: "\(usage.local.index.hits + usage.local.index.misses + usage.local.index.errors)")
+            InfoRow(label: "Index hits", value: "\(usage.local.index.hits)")
+            InfoRow(label: "Hit rate", value: String(format: "%.0f%%", usage.local.index.hitRate * 100))
+            InfoRow(label: "Hit rate (fingerprinted)", value: String(format: "%.0f%%", usage.local.index.hitRateWhenFingerprint * 100))
+            InfoRow(label: "Captures won locally", value: "\(usage.local.index.capturesWonByLocal)")
+            InfoRow(label: "Fingerprinted captures", value: "\(usage.local.index.fingerprintedCaptures)")
+
+            ForEach(usage.providers) { row in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.provider.capitalized).foregroundStyle(Brand.text)
+                    Text("\(row.calls) calls · \(row.matched) matched · \(row.used) used · \(row.errors) errors · avg \(row.avgLatencyMs)ms")
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                }
+            }
+        } header: {
+            Text("Local Index & Providers Usage")
+        } footer: {
+            Text("Last \(usage.periodDays) days.").foregroundStyle(Brand.muted)
+        }
     }
 
     private func customProviderRow(_ cp: CustomProviderConfig) -> some View {

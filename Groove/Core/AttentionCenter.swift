@@ -13,6 +13,11 @@ final class AttentionCenter {
     /// surfaced as the Rig tab badge. Not a general count (there's only one hardware
     /// signal worth surfacing today); kept as an Int so the badge modifier stays simple.
     private(set) var rigAttentionCount = 0
+    /// Mirrors `RecognitionProvidersState.autonomous` app-wide so screens that
+    /// only make sense in autonomous mode (Catalog Session) can gate their
+    /// entry point the same way the web nav hides/shows "Catalog session" vs
+    /// "Release matching" — reuses this poller instead of adding a second one.
+    private(set) var autonomous = false
 
     private var pollTask: Task<Void, Never>?
     private var settings: AppSettings?
@@ -34,7 +39,7 @@ final class AttentionCenter {
     }
 
     func refresh() async {
-        guard let settings, settings.isConfigured else { count = 0; rigAttentionCount = 0; return }
+        guard let settings, settings.isConfigured else { count = 0; rigAttentionCount = 0; autonomous = false; return }
         let service = CatalogService(settings: settings)
         do {
             // Same sources that drive the Library grid's banner + "Needs Review"
@@ -49,6 +54,7 @@ final class AttentionCenter {
         } catch {
             // Leave the last known count on a transient failure.
         }
+        autonomous = (try? await service.recognitionProviders().autonomous) ?? autonomous
         await refreshRigAttention(service)
     }
 

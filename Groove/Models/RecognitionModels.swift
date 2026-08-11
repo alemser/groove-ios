@@ -134,3 +134,43 @@ struct ParseSampleResponse: Decodable {
     var recommended: ParseSampleRecommendation?
     var message: String?
 }
+
+// MARK: - Recognition provider usage / observability
+
+/// Per-provider recognition telemetry for the "Local index & providers usage"
+/// panel — mirrors `internal/observability/query_providers.go`'s `ProviderUsageRow`.
+struct ProviderUsageRow: Decodable, Identifiable {
+    var provider: String
+    var calls: Int
+    var matched: Int
+    var used: Int
+    var noMatch: Int
+    var belowConfidence: Int
+    var rateLimited: Int
+    var errors: Int
+    var avgLatencyMs: Int
+    var cloud: Bool
+
+    var id: String { provider }
+}
+
+/// Local fingerprint-index recognition stats — mirrors `LocalIndexStats`.
+struct LocalIndexStats: Decodable {
+    var hits: Int
+    var misses: Int
+    var errors: Int
+    var hitRate: Double
+    var hitRateWhenFingerprint: Double
+    var fingerprintedCaptures: Int
+    var capturesWonByLocal: Int
+}
+
+struct LocalUsageSummary: Decodable {
+    var index: LocalIndexStats
+}
+
+struct ProviderUsageRollup: Decodable {
+    var periodDays: Int
+    var providers: [ProviderUsageRow]
+    var local: LocalUsageSummary
+}

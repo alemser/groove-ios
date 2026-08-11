@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class RecognitionProvidersModel {
     var state: RecognitionProvidersState?
+    var usage: ProviderUsageRollup?
     var phase: Phase = .loading
     var actionError: String?
 
@@ -30,6 +31,7 @@ final class RecognitionProvidersModel {
                 phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
             }
         }
+        usage = try? await CatalogService(settings: settings).recognitionObservability()
     }
 
     func setEnabled(id: String, enabled: Bool) async {

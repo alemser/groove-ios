@@ -1,15 +1,53 @@
 import SwiftUI
 import Observation
 
+/// One release-shaped bucket of pending items — the iOS counterpart to the web
+/// pending panel's `findGroupForPending`/orphan-group split. `key` is stable
+/// across reloads so `List` diffing doesn't reshuffle rows on every poll.
+struct PendingAssociationGroup: Identifiable {
+    let key: String
+    let title: String
+    let subtitle: String?
+    var items: [PendingAssociation]
+    var id: String { key }
+
+    var confirmableItems: [PendingAssociation] { items.filter { ($0.suggestedTrackId ?? 0) > 0 } }
+}
+
+private let orphanGroupKey = "__unlinked__"
+
 @MainActor
 @Observable
 final class AssociationReviewModel {
     var associations: [PendingAssociation] = []
     var phase: Phase = .loading
+    var bulkBusy = false
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+
+    /// Grouped by suggested release, with everything lacking a suggestion
+    /// bucketed into "Unlinked plays" — mirrors `catalog-studio.html`'s
+    /// `findGroupForPending`/`buildOrphanPendingGroup`.
+    var groups: [PendingAssociationGroup] {
+        var order: [String] = []
+        var buckets: [String: PendingAssociationGroup] = [:]
+        for item in associations {
+            let hasSuggestion = (item.suggestedTrackId ?? 0) > 0
+            let key = hasSuggestion ? "\(item.suggestedArtist ?? "")|\(item.suggestedAlbum ?? "")" : orphanGroupKey
+            if buckets[key] == nil {
+                order.append(key)
+                let title = hasSuggestion ? (item.suggestedAlbum?.nonEmpty ?? item.suggestedArtist?.nonEmpty ?? "Suggested match") : "Unlinked plays"
+                let subtitle = hasSuggestion ? item.suggestedArtist?.nonEmpty : nil
+                buckets[key] = PendingAssociationGroup(key: key, title: title, subtitle: subtitle, items: [])
+            }
+            buckets[key]?.items.append(item)
+        }
+        return order.compactMap { buckets[$0] }
+    }
+
+    var confirmableCount: Int { associations.filter { ($0.suggestedTrackId ?? 0) > 0 }.count }
 
     func configure(_ settings: AppSettings) {
         if self.settings == nil {
@@ -35,7 +73,7 @@ final class AssociationReviewModel {
         guard let settings, let trackId = item.suggestedTrackId, trackId > 0 else { return }
         associations.removeAll { $0.id == item.id }
         do {
-            try await CatalogService(settings: settings).associatePlay(epoch: item.listenerEpoch, trackId: trackId)
+            try await CatalogService(settings: settings).confirmProgrammeSuggestion(epoch: item.listenerEpoch)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
             await load()
@@ -50,6 +88,38 @@ final class AssociationReviewModel {
         } catch {
             await load()
         }
+    }
+
+    /// "Confirm All" for a group or the whole queue — only items carrying a
+    /// suggestion can be confirmed (no bulk endpoint server-side, web loops
+    /// client-side the same way).
+    func confirmAll(_ items: [PendingAssociation]) async {
+        guard let settings else { return }
+        let suggested = items.filter { ($0.suggestedTrackId ?? 0) > 0 }
+        guard !suggested.isEmpty else { return }
+        bulkBusy = true
+        associations.removeAll { item in suggested.contains { $0.id == item.id } }
+        let service = CatalogService(settings: settings)
+        await withTaskGroup(of: Void.self) { group in
+            for item in suggested {
+                group.addTask { try? await service.confirmProgrammeSuggestion(epoch: item.listenerEpoch) }
+            }
+        }
+        bulkBusy = false
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    func dismissAll(_ items: [PendingAssociation]) async {
+        guard let settings, !items.isEmpty else { return }
+        bulkBusy = true
+        associations.removeAll { item in items.contains { $0.id == item.id } }
+        let service = CatalogService(settings: settings)
+        await withTaskGroup(of: Void.self) { group in
+            for item in items {
+                group.addTask { try? await service.dismissPendingAssociation(epoch: item.listenerEpoch) }
+            }
+        }
+        bulkBusy = false
     }
 }
 
@@ -98,20 +168,83 @@ struct AssociationReviewSheet: View {
                     .task { dismiss() }
             } else {
                 List {
-                    ForEach(model.associations) { item in
-                        AssociationRowView(
-                            item: item,
-                            onAccept: { Task { await model.acceptSuggestion(item) } },
-                            onIdentify: { identifying = item },
-                            onDismiss: { Task { await model.dismiss(item) } }
-                        )
-                        .listRowBackground(Brand.surface)
+                    if model.associations.count > 1 {
+                        Section {
+                            bulkBar(
+                                count: model.associations.count,
+                                confirmableCount: model.confirmableCount,
+                                onConfirmAll: { Task { await model.confirmAll(model.associations) } },
+                                onDismissAll: { Task { await model.dismissAll(model.associations) } }
+                            )
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+                    }
+                    ForEach(model.groups) { group in
+                        Section {
+                            ForEach(group.items) { item in
+                                AssociationRowView(
+                                    item: item,
+                                    onAccept: { Task { await model.acceptSuggestion(item) } },
+                                    onIdentify: { identifying = item },
+                                    onDismiss: { Task { await model.dismiss(item) } }
+                                )
+                                .listRowBackground(Brand.surface)
+                            }
+                        } header: {
+                            groupHeader(group)
+                        }
                     }
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .refreshable { await model.load() }
+                .disabled(model.bulkBusy)
             }
+        }
+    }
+
+    private func bulkBar(count: Int, confirmableCount: Int, onConfirmAll: @escaping () -> Void, onDismissAll: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Text("\(count) waiting").font(.subheadline.weight(.semibold)).foregroundStyle(Brand.text)
+            Spacer()
+            if confirmableCount > 0 {
+                Button("Confirm All (\(confirmableCount))", action: onConfirmAll)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(Brand.ok)
+            }
+            Button("Dismiss All", role: .destructive, action: onDismissAll)
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
+                .tint(Brand.muted)
+        }
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func groupHeader(_ group: PendingAssociationGroup) -> some View {
+        if group.items.count > 1 {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(group.title)
+                    if let subtitle = group.subtitle {
+                        Text(subtitle).textCase(nil)
+                    }
+                }
+                Spacer()
+                if !group.confirmableItems.isEmpty {
+                    Button("Confirm All") { Task { await model.confirmAll(group.items) } }
+                        .font(.caption2.weight(.semibold))
+                        .buttonStyle(.borderless)
+                }
+                Button("Dismiss All") { Task { await model.dismissAll(group.items) } }
+                    .font(.caption2.weight(.semibold))
+                    .buttonStyle(.borderless)
+                    .tint(Brand.muted)
+            }
+        } else {
+            Text(group.title)
         }
     }
 }

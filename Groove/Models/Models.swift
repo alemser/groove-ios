@@ -116,6 +116,7 @@ struct LibraryReleasesResponse: Decodable {
 
 struct ConfirmedEditionResponse: Decodable {
     var edition: PendingRelease
+    var job: EnrichJob?
 }
 
 // MARK: - Pending-release tracks (unconfirmed, awaiting review)

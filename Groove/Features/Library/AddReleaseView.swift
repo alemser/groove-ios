@@ -7,36 +7,32 @@ final class AddReleaseModel {
     var results: [IdentifySearchHit] = []
     var phase: Phase = .idle
     var busyId: String?
+    var creating = false
     var actionError: String?
 
     enum Phase: Equatable { case idle, loading, loaded, error(String) }
 
     private var settings: AppSettings?
-    private var searchTask: Task<Void, Never>?
 
     func configure(_ settings: AppSettings) {
         self.settings = settings
     }
 
-    func search(_ text: String) {
-        searchTask?.cancel()
-        let q = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { phase = .idle; results = []; return }
-        searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            await runSearch(q)
-        }
-    }
-
-    private func runSearch(_ q: String) async {
-        guard let settings else { return }
-        phase = .loading
-        do {
-            results = try await CatalogService(settings: settings).identifySearch(query: q)
-            phase = .loaded
-        } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+    /// Explicit lookup, fired only when the user taps Search (or submits a
+    /// field) — not per keystroke. Mirrors the web studio's "Lookup using
+    /// enrichers": separate Artist/Album fields, one deliberate search.
+    func search(artist: String, album: String) {
+        let artist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let album = album.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !artist.isEmpty || !album.isEmpty, let settings else { phase = .idle; results = []; return }
+        Task {
+            phase = .loading
+            do {
+                results = try await CatalogService(settings: settings).identifySearch(artist: artist, album: album)
+                phase = .loaded
+            } catch {
+                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            }
         }
     }
 
@@ -55,10 +51,12 @@ final class AddReleaseModel {
         }
     }
 
-    /// Creates a blank release from just a typed artist/album.
+    /// Creates a blank release from just the typed artist/album, skipping the lookup.
     func create(artist: String, album: String) async -> (jobId: Int64, draft: PendingRelease)? {
         guard let settings else { return nil }
+        creating = true
         actionError = nil
+        defer { creating = false }
         do {
             let resp = try await CatalogService(settings: settings).createStandaloneUserRelease(artist: artist, album: album)
             return (resp.job.id, resp.draft)
@@ -69,46 +67,88 @@ final class AddReleaseModel {
     }
 }
 
-/// The "cadastro" entry point — search first, manual fallback, mirroring
-/// `ManualIdentifySheet`'s established pattern for the symmetric case (that
-/// screen already documents itself as mirroring "the web studio's search +
-/// 'Create release' pattern" for identifying a play; this reuses the same UX
-/// for creating a release directly). A pick or a manual save hands off into
-/// `EditReleaseView` to fill in format, tracklist, and artwork before publish.
+/// The "cadastro" entry point: Artist + Album fields up front, mirroring the
+/// web studio's "New release" dialog — Search looks the pair up against
+/// enrichers (only on an explicit tap, never per keystroke), or Save creates
+/// directly from what's typed. Either path hands off into `EditReleaseView`
+/// to fill in format, tracklist, and artwork before publish.
 struct AddReleaseView: View {
     let onCreated: () -> Void
 
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: Field?
     @State private var model = AddReleaseModel()
-    @State private var query = ""
-    @State private var showManualEntry = false
+    @State private var artist = ""
+    @State private var album = ""
     @State private var created: CreatedDraft?
+
+    private enum Field { case artist, album }
+
+    private var hasQuery: Bool {
+        !artist.trimmingCharacters(in: .whitespaces).isEmpty || !album.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+    private var canCreate: Bool {
+        !artist.trimmingCharacters(in: .whitespaces).isEmpty && !album.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                List {
-                    resultsRows
+            Form {
+                Section {
+                    TextField("Artist", text: $artist)
+                        .focused($focusedField, equals: .artist)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .album }
+                    TextField("Album", text: $album)
+                        .focused($focusedField, equals: .album)
+                        .submitLabel(.search)
+                        .onSubmit { search() }
+                    Button {
+                        search()
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if model.phase == .loading { ProgressView() }
+                            Text("Search")
+                            Spacer()
+                        }
+                    }
+                    .disabled(!hasQuery || model.phase == .loading)
+                } footer: {
+                    Text("Search looks up artist and album against your enrichers to prefill format, tracklist, and artwork.")
+                        .foregroundStyle(Brand.muted)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .overlay {
-                    if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                        EmptyStateView(icon: "magnifyingglass", title: "Search to add a release", message: "Look it up by artist or album, or add it manually below.")
+
+                resultsSection
+
+                Section {
+                    Button {
+                        Task { await createManual() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if model.creating { ProgressView() }
+                            Text("Save Without Searching")
+                            Spacer()
+                        }
+                    }
+                    .disabled(!canCreate || model.creating)
+                }
+
+                if let err = model.actionError {
+                    Section {
+                        Text(err).foregroundStyle(Brand.err)
                     }
                 }
-                Divider().overlay(Brand.border)
-                manualEntryButton
             }
+            .scrollContentBackground(.hidden)
+            .grooveScreenBackground()
             .navigationTitle("Add Release")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Artist or album")
-            .onChange(of: query) { _, q in model.search(q) }
-            .grooveScreenBackground()
             .sheet(item: $created) { item in
                 EditReleaseView(jobId: item.jobId, draft: item.draft) {
                     onCreated()
@@ -117,54 +157,45 @@ struct AddReleaseView: View {
             }
         }
         .task { model.configure(settings) }
-        .sheet(isPresented: $showManualEntry) {
-            AddReleaseManualForm { artist, album in
-                await createManual(artist: artist, album: album)
-            }
-        }
+        .onAppear { focusedField = .artist }
     }
 
     @ViewBuilder
-    private var resultsRows: some View {
+    private var resultsSection: some View {
         switch model.phase {
         case .idle:
             EmptyView()
         case .loading:
-            LoadingView()
+            Section { LoadingView() }.listRowBackground(Color.clear)
         case let .error(message):
-            ErrorStateView(message: message) { model.search(query) }
+            Section { ErrorStateView(message: message) { search() } }
         case .loaded:
             if model.results.isEmpty {
-                EmptyStateView(icon: "questionmark.circle", title: "No matches", message: "Try a different search, or add it manually below.")
+                Section {
+                    Text("No matches. You can still save with just artist and album below.")
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                }
             } else {
-                ForEach(model.results) { hit in
-                    Button {
-                        Task { await createFromHit(hit) }
-                    } label: {
-                        IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
+                Section("Results") {
+                    ForEach(model.results) { hit in
+                        Button {
+                            Task { await createFromHit(hit) }
+                        } label: {
+                            IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.busyId != nil)
+                        .listRowBackground(Brand.surface)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(model.busyId != nil)
-                    .listRowBackground(Brand.surface)
                 }
             }
         }
-        if let err = model.actionError {
-            Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
-        }
     }
 
-    private var manualEntryButton: some View {
-        Button {
-            showManualEntry = true
-        } label: {
-            Label("Can't find it? Add manually", systemImage: "square.and.pencil")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .buttonStyle(.bordered)
-        .tint(Brand.accent)
-        .padding()
+    private func search() {
+        focusedField = nil
+        model.search(artist: artist, album: album)
     }
 
     private func createFromHit(_ hit: IdentifySearchHit) async {
@@ -172,12 +203,9 @@ struct AddReleaseView: View {
         created = CreatedDraft(jobId: result.jobId, draft: result.draft)
     }
 
-    private func createManual(artist: String, album: String) async -> String? {
-        guard let result = await model.create(artist: artist, album: album) else {
-            return model.actionError ?? "Could not create this release."
-        }
+    private func createManual() async {
+        guard let result = await model.create(artist: artist, album: album) else { return }
         created = CreatedDraft(jobId: result.jobId, draft: result.draft)
-        return nil
     }
 }
 
@@ -185,60 +213,4 @@ private struct CreatedDraft: Identifiable {
     let jobId: Int64
     let draft: PendingRelease
     var id: Int64 { jobId }
-}
-
-private struct AddReleaseManualForm: View {
-    let onSave: (String, String) async -> String?
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var artist = ""
-    @State private var album = ""
-    @State private var saving = false
-    @State private var error: String?
-
-    private var canSave: Bool {
-        !artist.trimmingCharacters(in: .whitespaces).isEmpty && !album.trimmingCharacters(in: .whitespaces).isEmpty && !saving
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Artist", text: $artist)
-                    TextField("Album", text: $album)
-                } footer: {
-                    if let error {
-                        Text(error).foregroundStyle(Brand.err)
-                    } else {
-                        Text("You can fill in format, tracklist, and artwork on the next screen.")
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .grooveScreenBackground()
-            .navigationTitle("Add Manually")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Saving…" : "Save") {
-                        Task {
-                            saving = true
-                            let result = await onSave(
-                                artist.trimmingCharacters(in: .whitespaces),
-                                album.trimmingCharacters(in: .whitespaces)
-                            )
-                            saving = false
-                            if let result {
-                                error = result
-                            } else {
-                                dismiss()
-                            }
-                        }
-                    }
-                    .disabled(!canSave)
-                }
-            }
-        }
-    }
 }

@@ -79,6 +79,10 @@ struct EditReleaseView: View {
             }
         }
         .task { model.configure(settings) }
+        // `init(jobId:draft:)` starts with `model.draft` already set — no
+        // transition ever happens for `onChange` below to catch, so the form
+        // would stay blank without this explicit first pass.
+        .task { seed(from: model.draft) }
         .onChange(of: model.draft) { _, new in seed(from: new) }
         .onChange(of: artworkItem) { _, item in
             guard let item else { return }

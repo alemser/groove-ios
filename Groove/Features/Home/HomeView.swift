@@ -27,6 +27,9 @@ struct HomeView: View {
                     connectionIssueSection(error)
                 }
                 nowPlayingSection
+                if attention.autonomous {
+                    sessionSection
+                }
                 if remoteAvailable {
                     remoteSection
                 }
@@ -110,6 +113,31 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens the full Now Playing screen")
+        }
+    }
+
+    // MARK: - Catalog session
+
+    /// Only shown once autonomous mode is on — mirrors the web nav's
+    /// `studio-nav.js` gating (hides "Release matching", shows "Catalog
+    /// session" once `GET /identity/recognition/providers` reports autonomous).
+    private var sessionSection: some View {
+        Section {
+            NavigationLink {
+                CatalogSessionView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform.circle")
+                        .foregroundStyle(Brand.teal)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Catalog Session").foregroundStyle(Brand.text)
+                        Text("Live view of this listening sitting").font(.caption).foregroundStyle(Brand.muted)
+                    }
+                    Spacer()
+                }
+            }
+            .accessibilityHint("Opens the live catalog session dashboard")
         }
     }
 

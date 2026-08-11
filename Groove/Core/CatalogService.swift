@@ -83,6 +83,15 @@ struct CatalogService {
         ], as: ConfirmedEditionResponse.self).edition
     }
 
+    /// Tracklist + owning job for the release currently playing a given track —
+    /// what the Catalog Session screen uses to highlight the live tracklist and
+    /// build its "Edit release" deep link.
+    func confirmedEdition(trackId: Int64) async throws -> ConfirmedEditionResponse {
+        try await api.get("/catalog/releases/confirmed/edition", query: [
+            .init(name: "track_id", value: String(trackId)),
+        ])
+    }
+
     /// Library-scoped release search for the "needs association" picker — works fully
     /// offline (no enrichers required), unlike identifySearch(). Reuses the same store
     /// this repo's own confirmed-library browsing already searches.
@@ -201,6 +210,14 @@ struct CatalogService {
         _ = try await api.post("/catalog/plays/\(epoch)/associate", body: Body(trackId: trackId), as: EmptyResponse.self)
     }
 
+    /// Accepts a server-suggested pending item, tagging the resolution `source`
+    /// as `album_programme` rather than `manual` — distinct from `associatePlay`,
+    /// which the identity backend always tags manual regardless of whether a
+    /// suggestion existed.
+    func confirmProgrammeSuggestion(epoch: UInt64) async throws {
+        _ = try await api.post("/catalog/plays/\(epoch)/confirm-programme-suggestion", body: Empty(), as: EmptyResponse.self)
+    }
+
     func dismissPendingAssociation(epoch: UInt64) async throws {
         _ = try await api.post("/catalog/plays/\(epoch)/dismiss-pending-association", body: Empty(), as: EmptyResponse.self)
     }
@@ -216,6 +233,17 @@ struct CatalogService {
     func identifySearch(query: String, limit: Int = 25) async throws -> [IdentifySearchHit] {
         try await api.get("/catalog/identify/search", query: [
             .init(name: "q", value: query),
+            .init(name: "limit", value: String(limit)),
+        ], as: IdentifySearchResponse.self).items
+    }
+
+    /// Explicit artist/album lookup — the "Add Release" screen's search, matching
+    /// the web studio's "Lookup using enrichers" (separate fields, not a single
+    /// free-text query, and only fired on an explicit search rather than per keystroke).
+    func identifySearch(artist: String, album: String, limit: Int = 25) async throws -> [IdentifySearchHit] {
+        try await api.get("/catalog/identify/search", query: [
+            .init(name: "artist", value: artist),
+            .init(name: "album", value: album),
             .init(name: "limit", value: String(limit)),
         ], as: IdentifySearchResponse.self).items
     }
@@ -397,6 +425,12 @@ struct CatalogService {
 
     func recognitionProviders() async throws -> RecognitionProvidersState {
         try await api.get("/identity/recognition/providers")
+    }
+
+    /// Per-provider call/match/error telemetry plus local-index hit-rate KPIs —
+    /// the web providers page's "Local index & warm map" usage panel.
+    func recognitionObservability(days: Int = 30) async throws -> ProviderUsageRollup {
+        try await api.get("/identity/observability/providers", query: [.init(name: "days", value: String(days))])
     }
 
     @discardableResult
