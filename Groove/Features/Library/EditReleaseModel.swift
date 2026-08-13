@@ -14,6 +14,16 @@ final class EditReleaseModel {
     var isSaving = false
     var isPublishing = false
     var isUploadingArtwork = false
+    var isDetaching = false
+    var detachMessage: String?
+
+    /// The actual catalog tracks pinned to this release (real IDs) — separate
+    /// from the draft's tracklist, which is provider reference data
+    /// (position/title/isrc) with no track ID of its own. Matched to
+    /// tracklist entries by ISRC/title in `trackId(for:)`, mirroring
+    /// `ReleaseDetailModel`. Empty for the from-scratch creation flow (no
+    /// `release` to load real tracks from yet).
+    var catalogTracks: [Track] = []
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
@@ -63,10 +73,27 @@ final class EditReleaseModel {
                 draft = resp.draft
                 isCopy = true
             }
+            catalogTracks = (try? await service.releaseTracks(source: release.source, releaseId: release.releaseId)) ?? []
             phase = .loaded
         } catch {
             phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
         }
+    }
+
+    /// Best-effort match from a draft tracklist entry to a real catalog track
+    /// — mirrors `ReleaseDetailModel.trackId(for:)`. Returns nil when nothing
+    /// has been recognized into this position yet, or (for the from-scratch
+    /// flow) there's no release to match against at all.
+    func trackId(for entry: TracklistEntry) -> Int64? {
+        if let isrc = entry.isrc?.nonEmpty {
+            if let match = catalogTracks.first(where: { $0.isrc?.nonEmpty == isrc }) {
+                return match.id
+            }
+        }
+        guard let title = entry.title?.nonEmpty?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+            return nil
+        }
+        return catalogTracks.first { ($0.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == title }?.id
     }
 
     @discardableResult
@@ -120,11 +147,62 @@ final class EditReleaseModel {
         }
     }
 
+    /// Detaches every catalog track from this edition. Unlike the per-track
+    /// actions below, there's no single row to update afterward — the caller
+    /// needs `detachMessage` (shown inline) since a haptic alone gives no
+    /// visible confirmation that ~N tracks actually disappeared.
     @discardableResult
     func detachTracks() async -> Bool {
         guard let settings, let release else { return false }
+        isDetaching = true
+        actionError = nil
+        detachMessage = nil
+        defer { isDetaching = false }
         do {
             try await CatalogService(settings: settings).detachLibraryEditionTracks(source: release.source, releaseId: release.releaseId)
+            let removed = catalogTracks.count
+            catalogTracks = []
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            detachMessage = removed > 0
+                ? "Detached \(removed) track\(removed == 1 ? "" : "s") — the tracklist stays, ready to re-recognize."
+                : "No linked tracks to detach."
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
+    /// Deletes ONE catalog track outright (fingerprints, enrich jobs, play
+    /// history) — destructive, and (unlike detach) also drops this track's
+    /// tracklist position, so the caller must remove `entry` from the local
+    /// draft tracklist on success.
+    @discardableResult
+    func deleteTrack(_ track: Track) async -> Bool {
+        guard let settings else { return false }
+        actionError = nil
+        do {
+            try await CatalogService(settings: settings).deleteTrack(id: track.id)
+            catalogTracks.removeAll { $0.id == track.id }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
+    /// Detaches ONE catalog track from this edition — the tracklist position
+    /// survives, so the caller should leave the draft tracklist entry alone.
+    @discardableResult
+    func detachTrack(_ track: Track) async -> Bool {
+        guard let settings, let release else { return false }
+        actionError = nil
+        do {
+            try await CatalogService(settings: settings).detachLibraryEditionTrack(
+                source: release.source, releaseId: release.releaseId, trackId: track.id
+            )
+            catalogTracks.removeAll { $0.id == track.id }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {

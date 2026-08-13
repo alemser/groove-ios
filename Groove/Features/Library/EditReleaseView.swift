@@ -35,6 +35,19 @@ struct EditReleaseView: View {
     @State private var showForcePublish = false
     @State private var didSeed = false
 
+    private enum PendingTrackAction: Identifiable {
+        case delete(entry: TracklistEntry, track: Track)
+        case detach(entry: TracklistEntry, track: Track)
+
+        var id: String {
+            switch self {
+            case let .delete(entry, _): return "delete-\(entry.id)"
+            case let .detach(entry, _): return "detach-\(entry.id)"
+            }
+        }
+    }
+    @State private var pendingTrackAction: PendingTrackAction?
+
     init(release: LibraryRelease, onSaved: @escaping () -> Void = {}) {
         self.release = release
         self.onSaved = onSaved
@@ -68,13 +81,26 @@ struct EditReleaseView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(model.isSaving ? "Saving…" : "Save Draft") { Task { await saveDraft() } }
-                        .disabled(model.isSaving || model.isPublishing)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(model.isPublishing ? "Publishing…" : "Publish") { Task { await publish() } }
-                        .disabled(model.isSaving || model.isPublishing)
+                if release != nil {
+                    // Editing an existing release: it's already definitive,
+                    // there's no draft state worth exposing — one action
+                    // saves the fields and commits them together (`publish`
+                    // already does save-then-confirm internally).
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(model.isSaving || model.isPublishing ? "Saving…" : "Save") { Task { await publish() } }
+                            .disabled(model.isSaving || model.isPublishing)
+                    }
+                } else {
+                    // From-scratch creation: genuinely provisional until the
+                    // first confirm, so the two-step stays.
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(model.isSaving ? "Saving…" : "Save Draft") { Task { await saveDraft() } }
+                            .disabled(model.isSaving || model.isPublishing)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(model.isPublishing ? "Publishing…" : "Publish") { Task { await publish() } }
+                            .disabled(model.isSaving || model.isPublishing)
+                    }
                 }
             }
         }
@@ -153,7 +179,13 @@ struct EditReleaseView: View {
 
             if release != nil {
                 Section {
-                    Button("Detach All Tracks", role: .destructive) { showDetachConfirm = true }
+                    if let message = model.detachMessage {
+                        Text(message).foregroundStyle(Brand.ok)
+                    }
+                    Button(model.isDetaching ? "Detaching…" : "Detach All Tracks", role: .destructive) {
+                        showDetachConfirm = true
+                    }
+                    .disabled(model.isDetaching)
                 } footer: {
                     Text("Unlinks every catalog track from this edition. The edition and its tracklist stay in your library so you can rebuild it later.")
                         .foregroundStyle(Brand.muted)
@@ -168,6 +200,53 @@ struct EditReleaseView: View {
         ) {
             Button("Detach", role: .destructive) { Task { await model.detachTracks() } }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Fingerprints, enrich jobs, and play history for every track are deleted. The tracklist and edition stay, ready to re-recognize.")
+        }
+        .confirmationDialog(
+            pendingTrackActionTitle,
+            isPresented: Binding(get: { pendingTrackAction != nil }, set: { if !$0 { pendingTrackAction = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let action = pendingTrackAction {
+                switch action {
+                case let .delete(entry, track):
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            if await model.deleteTrack(track) {
+                                tracklist.removeAll { $0.id == entry.id }
+                                renumber()
+                            }
+                            pendingTrackAction = nil
+                        }
+                    }
+                case .detach(_, let track):
+                    Button("Detach") {
+                        Task {
+                            _ = await model.detachTrack(track)
+                            pendingTrackAction = nil
+                        }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingTrackAction = nil }
+        } message: {
+            switch pendingTrackAction {
+            case .delete:
+                Text("Fingerprints, enrich jobs, and play history for this track are deleted, and it drops off the tracklist. This can't be undone.")
+            case .detach:
+                Text("Fingerprints, enrich jobs, and play history for this track are deleted, but its spot on the tracklist stays — you can re-recognize it later.")
+            case nil:
+                EmptyView()
+            }
+        }
+    }
+
+    private var pendingTrackActionTitle: String {
+        guard let pendingTrackAction else { return "" }
+        switch pendingTrackAction {
+        case let .delete(entry, _): return "Delete \"\(entry.title ?? "this track")\"?"
+        case let .detach(entry, _): return "Detach \"\(entry.title ?? "this track")\"?"
         }
     }
 
@@ -199,6 +278,7 @@ struct EditReleaseView: View {
     private var tracklistSection: some View {
         Section {
             ForEach($tracklist) { $entry in
+                let linkedTrack = model.trackId(for: entry).flatMap { id in model.catalogTracks.first { $0.id == id } }
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         TextField("Pos", text: Binding(get: { entry.position ?? "" }, set: { entry.position = $0.nonEmpty }))
@@ -214,15 +294,44 @@ struct EditReleaseView: View {
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
                     }
+                    if linkedTrack != nil {
+                        Label("Recognized", systemImage: "checkmark.circle")
+                            .font(.caption2)
+                            .foregroundStyle(Brand.ok)
+                    }
                 }
                 .padding(.vertical, 4)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if let linkedTrack {
+                        // A real catalog track is linked to this position —
+                        // offer both destructive removal and non-destructive
+                        // detach, distinctly, so the two aren't confused.
+                        Button(role: .destructive) {
+                            pendingTrackAction = .delete(entry: entry, track: linkedTrack)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        Button {
+                            pendingTrackAction = .detach(entry: entry, track: linkedTrack)
+                        } label: {
+                            Label("Detach", systemImage: "link.slash")
+                        }
+                        .tint(Brand.teal)
+                    } else {
+                        // Nothing recognized here yet — this only edits the
+                        // draft's tracklist metadata, no catalog track to
+                        // affect, so a plain local removal is honest.
+                        Button(role: .destructive) {
+                            tracklist.removeAll { $0.id == entry.id }
+                            renumber()
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                }
             }
             .onMove { indices, newOffset in
                 tracklist.move(fromOffsets: indices, toOffset: newOffset)
-                renumber()
-            }
-            .onDelete { offsets in
-                tracklist.remove(atOffsets: offsets)
                 renumber()
             }
 

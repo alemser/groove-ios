@@ -121,6 +121,15 @@ struct CatalogService {
         _ = try await api.post("/catalog/library/releases/\(s)/\(r)/detach-tracks", body: Empty(), as: EmptyResponse.self)
     }
 
+    /// Unlinks ONE catalog track from an edition (fingerprints/plays/enrich
+    /// jobs for just that track are dropped) while keeping its tracklist
+    /// position — the release shape survives, unlike `deleteTrack`.
+    func detachLibraryEditionTrack(source: String, releaseId: String, trackId: Int64) async throws {
+        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
+        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        _ = try await api.post("/catalog/library/releases/\(s)/\(r)/tracks/\(trackId)/detach", body: Empty(), as: EmptyResponse.self)
+    }
+
     func releaseTracks(source: String, releaseId: String) async throws -> [Track] {
         let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
         let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
