@@ -23,12 +23,19 @@ struct Track: Decodable, Identifiable, Hashable {
     var durationMs: Int64?
     var artworkUrl: String?
     var providerName: String?
+    /// Timestamp of the most recent real play, nil if this track has never
+    /// actually been heard. NOT the same as `providerName == "album_programme"`:
+    /// that field only records how the row was first materialized and is
+    /// never overwritten by a later real recognition, so a genuinely-played
+    /// track (schedule-advanced into existence, then actually heard many
+    /// times since) still reads "album_programme" forever. `lastPlayAt` is
+    /// the reliable signal — groove-catalog only sets it from real plays.
+    var lastPlayAt: String?
 
-    /// `album_programme` marks a placeholder row groove-catalog materializes
-    /// for every confirmed tracklist position so schedule-advance has
-    /// something to resolve — NOT a real play. Distinguishes an actually
-    /// recognized track from a stub with the right title sitting in for it.
-    var isPlaceholderStub: Bool { providerName == "album_programme" }
+    /// True only for a placeholder row groove-catalog materializes for every
+    /// confirmed tracklist position (so schedule-advance has something to
+    /// resolve against) that has never actually been heard.
+    var isPlaceholderStub: Bool { lastPlayAt == nil }
 
     var displayTitle: String { title?.nonEmpty ?? "Untitled" }
     var displayArtist: String { artist?.nonEmpty ?? "Unknown artist" }
