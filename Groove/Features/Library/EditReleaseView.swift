@@ -294,10 +294,19 @@ struct EditReleaseView: View {
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
                     }
-                    if linkedTrack != nil {
+                    if let linkedTrack, !linkedTrack.isPlaceholderStub {
                         Label("Recognized", systemImage: "checkmark.circle")
                             .font(.caption2)
                             .foregroundStyle(Brand.ok)
+                    } else if linkedTrack != nil {
+                        // groove-catalog materializes a placeholder row for
+                        // every confirmed tracklist position (so autonomous
+                        // mode has something to schedule against) — it looks
+                        // like a normal track but nothing was ever actually
+                        // played/recognized here yet.
+                        Label("Not yet recognized", systemImage: "questionmark.circle")
+                            .font(.caption2)
+                            .foregroundStyle(Brand.muted)
                     }
                 }
                 .padding(.vertical, 4)

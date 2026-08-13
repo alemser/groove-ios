@@ -22,6 +22,13 @@ struct Track: Decodable, Identifiable, Hashable {
     var releaseConfirmed: Bool?
     var durationMs: Int64?
     var artworkUrl: String?
+    var providerName: String?
+
+    /// `album_programme` marks a placeholder row groove-catalog materializes
+    /// for every confirmed tracklist position so schedule-advance has
+    /// something to resolve — NOT a real play. Distinguishes an actually
+    /// recognized track from a stub with the right title sitting in for it.
+    var isPlaceholderStub: Bool { providerName == "album_programme" }
 
     var displayTitle: String { title?.nonEmpty ?? "Untitled" }
     var displayArtist: String { artist?.nonEmpty ?? "Unknown artist" }
