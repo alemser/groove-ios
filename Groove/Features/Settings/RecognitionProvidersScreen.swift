@@ -38,17 +38,15 @@ struct RecognitionProvidersScreen: View {
         .grooveScreenBackground()
         .task { model.configure(settings) }
         .toolbar {
-            if !isAutonomous {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        customProviderTarget = CustomProviderTarget(id: "new", existing: nil)
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Add Custom Provider")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    customProviderTarget = CustomProviderTarget(id: "new", existing: nil)
+                } label: {
+                    Image(systemName: "plus")
                 }
-                ToolbarItem(placement: .topBarTrailing) { EditButton() }
+                .accessibilityLabel("Add Custom Provider")
             }
+            ToolbarItem(placement: .topBarTrailing) { EditButton() }
         }
         .onChange(of: model.state?.chainMode) { _, new in if let new { chainMode = new } }
         .onChange(of: model.state?.minConfidence) { _, new in if let new { minConfidence = new } }
@@ -79,57 +77,50 @@ struct RecognitionProvidersScreen: View {
             }
 
             Section {
-                if isAutonomous {
-                    Text("Hidden while Autonomous Mode is on — the cloud chain never runs.")
-                        .foregroundStyle(Brand.muted)
-                } else {
-                    Picker("Chain Mode", selection: $chainMode) {
-                        Text("First Success").tag("first_success")
-                        Text("Best Score").tag("best_score")
-                    }
-                    .onChange(of: chainMode) { _, new in Task { await model.saveChainSettings(chainMode: new, minConfidence: minConfidence) } }
+                Picker("Chain Mode", selection: $chainMode) {
+                    Text("First Success").tag("first_success")
+                    Text("Best Score").tag("best_score")
+                }
+                .disabled(isAutonomous)
+                .onChange(of: chainMode) { _, new in Task { await model.saveChainSettings(chainMode: new, minConfidence: minConfidence) } }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Minimum Confidence: \(String(format: "%.0f%%", minConfidence * 100))")
-                            .foregroundStyle(Brand.text)
-                        Slider(value: $minConfidence, in: 0...1, step: 0.05) { editing in
-                            if !editing { Task { await model.saveChainSettings(chainMode: chainMode, minConfidence: minConfidence) } }
-                        }
-                        .tint(Brand.accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Minimum Confidence: \(String(format: "%.0f%%", minConfidence * 100))")
+                        .foregroundStyle(Brand.text)
+                    Slider(value: $minConfidence, in: 0...1, step: 0.05) { editing in
+                        if !editing { Task { await model.saveChainSettings(chainMode: chainMode, minConfidence: minConfidence) } }
                     }
+                    .tint(Brand.accent)
+                    .disabled(isAutonomous)
                 }
             } header: {
                 Text("Chain Settings")
+            } footer: {
+                if isAutonomous {
+                    Text("Inactive while Autonomous Mode is on.").foregroundStyle(Brand.muted)
+                }
             }
 
             Section {
-                if isAutonomous {
-                    Text("Hidden while Autonomous Mode is on — only the local fingerprint index runs, shown below.")
-                        .foregroundStyle(Brand.muted)
-                } else {
-                    ForEach(model.state?.chain ?? []) { slot in
-                        row(slot)
-                    }
-                    .onMove { indices, newOffset in
-                        guard var ids = model.state?.chain.map(\.id) else { return }
-                        ids.move(fromOffsets: indices, toOffset: newOffset)
-                        Task { await model.reorder(ids) }
-                    }
+                ForEach(model.state?.chain ?? []) { slot in
+                    row(slot)
+                }
+                .onMove { indices, newOffset in
+                    guard var ids = model.state?.chain.map(\.id) else { return }
+                    ids.move(fromOffsets: indices, toOffset: newOffset)
+                    Task { await model.reorder(ids) }
                 }
             } header: {
                 Text("Chain Order")
             } footer: {
-                if !isAutonomous {
-                    Text("Tried top to bottom until one identifies the track. Drag to reorder; tap a provider to edit its credentials.")
-                        .foregroundStyle(Brand.muted)
-                }
+                Text(isAutonomous
+                     ? "Inactive while Autonomous Mode is on — providers here are never contacted."
+                     : "Tried top to bottom until one identifies the track. Drag to reorder; tap a provider to edit its credentials.")
+                    .foregroundStyle(Brand.muted)
             }
 
             Section {
-                if isAutonomous {
-                    Text("Hidden while Autonomous Mode is on — custom providers are never contacted.")
-                        .foregroundStyle(Brand.muted)
-                } else if let customs = model.state?.customProviders, !customs.isEmpty {
+                if let customs = model.state?.customProviders, !customs.isEmpty {
                     ForEach(customs) { cp in
                         Button {
                             customProviderTarget = CustomProviderTarget(id: cp.id, existing: cp)
@@ -150,10 +141,8 @@ struct RecognitionProvidersScreen: View {
             } header: {
                 Text("Custom Providers")
             } footer: {
-                if !isAutonomous {
-                    Text("Any HTTP recognition service that returns JSON — tap + to add one.")
-                        .foregroundStyle(Brand.muted)
-                }
+                Text("Any HTTP recognition service that returns JSON — tap + to add one.")
+                    .foregroundStyle(Brand.muted)
             }
 
             if let usage = model.usage {
