@@ -52,9 +52,31 @@ struct NowPlayingView: View {
             LoadingView(label: "Connecting…")
         } else if let pb = model.status?.playback, pb.active {
             playing(pb)
+        } else if model.isLikelyTransitioning() {
+            recognizing
         } else {
             idle
         }
+    }
+
+    /// Between tracks: `playback.active` just went false but was true
+    /// moments ago (`NowPlayingModel.isLikelyTransitioning`). Same spinning
+    /// glyph as the in-track recognizing state, no progress bar since there's
+    /// no live position data for a track that hasn't been identified yet.
+    private var recognizing: some View {
+        VStack(spacing: 16) {
+            Artwork(raw: nil, cornerRadius: 60, isRecognizing: true)
+                .frame(width: 120, height: 120)
+            Text("Recognizing…")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Brand.text)
+            Text("Matching the record — a few seconds")
+                .font(.subheadline)
+                .foregroundStyle(Brand.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func playing(_ pb: Playback) -> some View {

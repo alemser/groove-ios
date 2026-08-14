@@ -11,19 +11,24 @@ struct NowPlayingMiniBar: View {
     /// trusts that gate rather than re-checking it.
     var body: some View {
         if let pb = nowPlaying.status?.playback {
+            // Between tracks `active` can read false for a few seconds while
+            // still counting as "recognizing" (NowPlayingModel's grace window)
+            // — without this the bar would show stale "Unknown artist" copy
+            // right as RootView keeps it on screen through the same gap.
+            let recognizing = pb.isRecognizing || nowPlaying.isLikelyTransitioning()
             Button {
                 navigation.openNowPlaying()
             } label: {
                 HStack(spacing: 10) {
-                    Artwork(raw: pb.artworkUrl, cornerRadius: 8, isRecognizing: pb.isRecognizing)
+                    Artwork(raw: pb.artworkUrl, cornerRadius: 8, isRecognizing: recognizing)
                         .frame(width: 40, height: 40)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(pb.title?.nonEmpty ?? (pb.isRecognizing ? "Recognizing…" : "Now Playing"))
+                        Text(pb.title?.nonEmpty ?? (recognizing ? "Recognizing…" : "Now Playing"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Brand.text)
                             .lineLimit(1)
-                        Text(pb.artist?.nonEmpty ?? (pb.isRecognizing ? "Listening…" : "Unknown artist"))
+                        Text(pb.artist?.nonEmpty ?? (recognizing ? "Listening…" : "Unknown artist"))
                             .font(.caption)
                             .foregroundStyle(Brand.muted)
                             .lineLimit(1)

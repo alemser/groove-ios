@@ -51,7 +51,8 @@ struct MainTabView: View {
             }
             .tint(Brand.accent)
 
-            if !navigation.isNowPlayingSheetPresented, nowPlaying.status?.playback.active == true {
+            if !navigation.isNowPlayingSheetPresented,
+               nowPlaying.status?.playback.active == true || nowPlaying.isLikelyTransitioning() {
                 NowPlayingMiniBar()
                     .padding(.horizontal, 12)
                     .padding(.bottom, 57)
