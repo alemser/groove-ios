@@ -419,6 +419,12 @@ struct Playback: Decodable {
     var identifyAttempt: Int?
     var captureSampleOffsetMs: Int64?
     var listenerStartedAt: String?
+
+    /// Audio is playing but nothing's matched yet — the ~10-15s, two-pass
+    /// fingerprint window right after a new record/track starts. Without this,
+    /// the UI showed "Unknown title" indistinguishable from a real recognition
+    /// failure, reading as broken rather than still working.
+    var isRecognizing: Bool { active && title?.nonEmpty == nil }
 }
 
 // MARK: - Enricher providers (settings)

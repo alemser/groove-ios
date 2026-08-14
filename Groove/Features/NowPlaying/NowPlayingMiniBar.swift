@@ -15,15 +15,15 @@ struct NowPlayingMiniBar: View {
                 navigation.openNowPlaying()
             } label: {
                 HStack(spacing: 10) {
-                    Artwork(raw: pb.artworkUrl, cornerRadius: 8)
+                    Artwork(raw: pb.artworkUrl, cornerRadius: 8, isRecognizing: pb.isRecognizing)
                         .frame(width: 40, height: 40)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(pb.title?.nonEmpty ?? "Now Playing")
+                        Text(pb.title?.nonEmpty ?? (pb.isRecognizing ? "Recognizing…" : "Now Playing"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Brand.text)
                             .lineLimit(1)
-                        Text(pb.artist?.nonEmpty ?? "Unknown artist")
+                        Text(pb.artist?.nonEmpty ?? (pb.isRecognizing ? "Listening…" : "Unknown artist"))
                             .font(.caption)
                             .foregroundStyle(Brand.muted)
                             .lineLimit(1)

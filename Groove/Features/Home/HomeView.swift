@@ -89,14 +89,14 @@ struct HomeView: View {
             } label: {
                 if let pb = nowPlaying.status?.playback, pb.active {
                     HStack(spacing: 12) {
-                        Artwork(raw: pb.artworkUrl, cornerRadius: 8)
+                        Artwork(raw: pb.artworkUrl, cornerRadius: 8, isRecognizing: pb.isRecognizing)
                             .frame(width: 48, height: 48)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(pb.title?.nonEmpty ?? "Now Playing")
+                            Text(pb.title?.nonEmpty ?? (pb.isRecognizing ? "Recognizing…" : "Now Playing"))
                                 .font(.headline)
                                 .foregroundStyle(Brand.text)
                                 .lineLimit(1)
-                            Text(pb.artist?.nonEmpty ?? "Unknown artist")
+                            Text(pb.artist?.nonEmpty ?? (pb.isRecognizing ? "Listening…" : "Unknown artist"))
                                 .font(.subheadline)
                                 .foregroundStyle(Brand.muted)
                                 .lineLimit(1)

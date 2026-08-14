@@ -60,18 +60,18 @@ struct NowPlayingView: View {
     private func playing(_ pb: Playback) -> some View {
         ScrollView {
             VStack(spacing: 18) {
-                Artwork(raw: pb.artworkUrl, cornerRadius: 20, label: artworkLabel(pb))
+                Artwork(raw: pb.artworkUrl, cornerRadius: 20, label: artworkLabel(pb), isRecognizing: pb.isRecognizing)
                     .frame(maxWidth: 300, maxHeight: 300)
                     .aspectRatio(1, contentMode: .fit)
                     .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
                     .padding(.top, 4)
 
                 VStack(spacing: 6) {
-                    Text(pb.title?.nonEmpty ?? "Unknown title")
+                    Text(pb.title?.nonEmpty ?? (pb.isRecognizing ? "Recognizing…" : "Unknown title"))
                         .font(.title2.bold())
                         .multilineTextAlignment(.center)
                         .foregroundStyle(Brand.text)
-                    Text(pb.artist?.nonEmpty ?? "Unknown artist")
+                    Text(pb.artist?.nonEmpty ?? (pb.isRecognizing ? "Matching the record — a few seconds" : "Unknown artist"))
                         .font(.title3)
                         .foregroundStyle(Brand.teal)
                         .multilineTextAlignment(.center)
