@@ -291,6 +291,7 @@ struct EditReleaseView: View {
                         Spacer()
                         TextField("m:ss", text: durationBinding(for: entry))
                             .font(.caption.monospacedDigit())
+                            .keyboardType(.numbersAndPunctuation)
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
                     }
@@ -360,7 +361,7 @@ struct EditReleaseView: View {
 
     private func durationBinding(for entry: TracklistEntry) -> Binding<String> {
         Binding(
-            get: { Format.duration(entry.durationMs) },
+            get: { entry.durationMs.map { Format.duration($0) } ?? "" },
             set: { newValue in
                 guard let index = tracklist.firstIndex(where: { $0.ordinal == entry.ordinal }) else { return }
                 tracklist[index].durationMs = parseDuration(newValue)
@@ -369,7 +370,8 @@ struct EditReleaseView: View {
     }
 
     private func parseDuration(_ text: String) -> Int64? {
-        let parts = text.split(separator: ":")
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let parts = trimmed.split(separator: ":")
         guard parts.count == 2, let m = Int(parts[0]), let s = Int(parts[1]) else { return nil }
         return Int64((m * 60 + s) * 1000)
     }
