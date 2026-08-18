@@ -98,7 +98,7 @@ struct ConnectView: View {
                 Text("Looking for your Oceano…")
                     .font(.headline)
                     .foregroundStyle(Brand.text)
-                Text("Make sure your phone and the groove-catalog server are on the same Wi-Fi.")
+                Text("Make sure your phone and the Oceano server are on the same Wi-Fi.")
                     .font(.subheadline)
                     .foregroundStyle(Brand.muted)
                     .multilineTextAlignment(.center)

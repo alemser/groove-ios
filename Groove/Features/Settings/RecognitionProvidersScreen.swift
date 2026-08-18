@@ -72,77 +72,71 @@ struct RecognitionProvidersScreen: View {
                 )
                 .tint(Brand.accent)
             } footer: {
-                Text("Never contact ACRCloud, AudD, or any custom provider — only the local fingerprint index runs. A track it doesn't recognize shows up in Library → Needs Association for you to pick a release; once picked, Groove learns it and recognizes it offline from then on.")
+                Text("Never contact ACRCloud, AudD, or any custom provider — only the local fingerprint index runs. A track it doesn't recognize shows up in Library → Needs Association for you to pick a release; once picked, Oceano learns it and recognizes it offline from then on.")
                     .foregroundStyle(Brand.muted)
             }
 
-            Section {
-                Picker("Chain Mode", selection: $chainMode) {
-                    Text("First Success").tag("first_success")
-                    Text("Best Score").tag("best_score")
-                }
-                .disabled(isAutonomous)
-                .onChange(of: chainMode) { _, new in Task { await model.saveChainSettings(chainMode: new, minConfidence: minConfidence) } }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Minimum Confidence: \(String(format: "%.0f%%", minConfidence * 100))")
-                        .foregroundStyle(Brand.text)
-                    Slider(value: $minConfidence, in: 0...1, step: 0.05) { editing in
-                        if !editing { Task { await model.saveChainSettings(chainMode: chainMode, minConfidence: minConfidence) } }
+            if !isAutonomous {
+                Section {
+                    Picker("Chain Mode", selection: $chainMode) {
+                        Text("First Success").tag("first_success")
+                        Text("Best Score").tag("best_score")
                     }
-                    .tint(Brand.accent)
-                    .disabled(isAutonomous)
-                }
-            } header: {
-                Text("Chain Settings")
-            } footer: {
-                if isAutonomous {
-                    Text("Inactive while Autonomous Mode is on.").foregroundStyle(Brand.muted)
-                }
-            }
+                    .onChange(of: chainMode) { _, new in Task { await model.saveChainSettings(chainMode: new, minConfidence: minConfidence) } }
 
-            Section {
-                ForEach(model.state?.chain ?? []) { slot in
-                    row(slot)
-                }
-                .onMove { indices, newOffset in
-                    guard var ids = model.state?.chain.map(\.id) else { return }
-                    ids.move(fromOffsets: indices, toOffset: newOffset)
-                    Task { await model.reorder(ids) }
-                }
-            } header: {
-                Text("Chain Order")
-            } footer: {
-                Text(isAutonomous
-                     ? "Inactive while Autonomous Mode is on — providers here are never contacted."
-                     : "Tried top to bottom until one identifies the track. Drag to reorder; tap a provider to edit its credentials.")
-                    .foregroundStyle(Brand.muted)
-            }
-
-            Section {
-                if let customs = model.state?.customProviders, !customs.isEmpty {
-                    ForEach(customs) { cp in
-                        Button {
-                            customProviderTarget = CustomProviderTarget(id: cp.id, existing: cp)
-                        } label: {
-                            customProviderRow(cp)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Minimum Confidence: \(String(format: "%.0f%%", minConfidence * 100))")
+                            .foregroundStyle(Brand.text)
+                        Slider(value: $minConfidence, in: 0...1, step: 0.05) { editing in
+                            if !editing { Task { await model.saveChainSettings(chainMode: chainMode, minConfidence: minConfidence) } }
                         }
-                        .buttonStyle(.plain)
+                        .tint(Brand.accent)
                     }
-                    .onDelete { offsets in
-                        guard let customs = model.state?.customProviders else { return }
-                        for index in offsets {
-                            Task { await model.deleteCustomProvider(slug: customs[index].id) }
-                        }
-                    }
-                } else {
-                    Text("No custom providers yet.").font(.footnote).foregroundStyle(Brand.muted)
+                } header: {
+                    Text("Chain Settings")
                 }
-            } header: {
-                Text("Custom Providers")
-            } footer: {
-                Text("Any HTTP recognition service that returns JSON — tap + to add one.")
-                    .foregroundStyle(Brand.muted)
+
+                Section {
+                    ForEach(model.state?.chain ?? []) { slot in
+                        row(slot)
+                    }
+                    .onMove { indices, newOffset in
+                        guard var ids = model.state?.chain.map(\.id) else { return }
+                        ids.move(fromOffsets: indices, toOffset: newOffset)
+                        Task { await model.reorder(ids) }
+                    }
+                } header: {
+                    Text("Chain Order")
+                } footer: {
+                    Text("Tried top to bottom until one identifies the track. Drag to reorder; tap a provider to edit its credentials.")
+                        .foregroundStyle(Brand.muted)
+                }
+
+                Section {
+                    if let customs = model.state?.customProviders, !customs.isEmpty {
+                        ForEach(customs) { cp in
+                            Button {
+                                customProviderTarget = CustomProviderTarget(id: cp.id, existing: cp)
+                            } label: {
+                                customProviderRow(cp)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .onDelete { offsets in
+                            guard let customs = model.state?.customProviders else { return }
+                            for index in offsets {
+                                Task { await model.deleteCustomProvider(slug: customs[index].id) }
+                            }
+                        }
+                    } else {
+                        Text("No custom providers yet.").font(.footnote).foregroundStyle(Brand.muted)
+                    }
+                } header: {
+                    Text("Custom Providers")
+                } footer: {
+                    Text("Any HTTP recognition service that returns JSON — tap + to add one.")
+                        .foregroundStyle(Brand.muted)
+                }
             }
 
             if let usage = model.usage {

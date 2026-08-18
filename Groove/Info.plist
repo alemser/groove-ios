@@ -34,7 +34,7 @@
 		<string>_http._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Oceano connects to your groove-catalog server on the local network to manage your library.</string>
+	<string>Oceano connects to your Oceano server on the local network to manage your library.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
