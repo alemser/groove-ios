@@ -20,5 +20,14 @@ struct RemoteQuickAccessSheet: View {
                     }
                 }
         }
+        // `model`/`equipmentModel` are shared with HomeView and only load
+        // once (configure()'s guard) — a profile switched elsewhere (the
+        // Rig tab's Configuration screen, another client) wouldn't show up
+        // here otherwise. A sheet's content view is freshly created each
+        // time it's presented, so `.task` reliably re-runs on every open.
+        .task {
+            await model.load()
+            await equipmentModel.load()
+        }
     }
 }

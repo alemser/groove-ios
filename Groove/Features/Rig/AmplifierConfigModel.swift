@@ -10,6 +10,16 @@ final class AmplifierConfigModel {
     var phase: Phase = .loading
     var actionError: String?
     var isSaving = false
+    /// Set when the server refuses `activate` (409) because the live config
+    /// has unsaved local edits on top of the currently active profile —
+    /// switching would silently discard them. The view shows a confirm
+    /// alert; confirming retries with `force: true`.
+    var pendingForceActivate: (profileId: String, message: String)?
+    /// Set right after a forced activate that had to back up diverged
+    /// local edits — names the new profile they landed in, so the view can
+    /// tell the user where their previous setup went instead of leaving
+    /// them to wonder whether "Discard and Activate" really discarded it.
+    var lastBackupProfileId: String?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
@@ -57,15 +67,32 @@ final class AmplifierConfigModel {
         }
     }
 
-    func activate(profileId: String) async {
+    func activate(profileId: String, force: Bool = false) async {
         guard let settings else { return }
         do {
-            _ = try await CatalogService(settings: settings).rigActivateProfile(id: profileId)
+            let res = try await CatalogService(settings: settings).rigActivateProfile(id: profileId, force: force)
+            lastBackupProfileId = res.backupProfileId
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch let error as APIError {
+            if case let .http(status, body) = error, status == 409 {
+                pendingForceActivate = (profileId, Self.extractServerMessage(from: body) ?? error.localizedDescription)
+            } else {
+                actionError = error.localizedDescription
+            }
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedDescription
         }
+    }
+
+    /// Pulls `{"error": "..."}` out of a raw HTTP error body, matching the
+    /// shape groove-rig's `writeError` sends — falls back to nil (caller
+    /// shows the generic `APIError.http` description instead) for anything
+    /// that isn't that shape.
+    private static func extractServerMessage(from body: String) -> String? {
+        guard let data = body.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return obj["error"] as? String
     }
 
     @discardableResult

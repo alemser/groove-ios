@@ -12,6 +12,7 @@ struct AmplifierView: View {
     }
 
     @Environment(AppSettings.self) private var settings
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = AmplifierModel()
     @State private var equipmentModel = EquipmentRemoteModel()
     @State private var section: Section = .configuration
@@ -52,6 +53,22 @@ struct AmplifierView: View {
         .task { equipmentModel.configure(settings) }
         .onChange(of: remoteAvailable) { _, available in
             if !available, section == .remote { section = .configuration }
+        }
+        // Each `Section` case has its own model instance, loaded once via
+        // `configure()` — activating a profile in Configuration (a separate
+        // AmplifierConfigModel) doesn't touch `model`/`equipmentModel` here,
+        // so the Remote segment kept showing whatever was live at first
+        // load. Refresh on every segment switch and app-foreground instead
+        // of relying on some other screen's action to happen to reload
+        // these.
+        .onChange(of: section) { _, _ in
+            Task { await model.load() }
+            Task { await equipmentModel.load() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await model.load() }
+            Task { await equipmentModel.load() }
         }
     }
 }

@@ -63,6 +63,24 @@ struct AmplifierConfigView: View {
             }
         }
         .sheet(isPresented: $showSaveProfileSheet) { saveProfileSheet }
+        .alert(
+            "Unsaved Changes",
+            isPresented: Binding(
+                get: { model.pendingForceActivate != nil },
+                set: { if !$0 { model.pendingForceActivate = nil } }
+            ),
+            presenting: model.pendingForceActivate
+        ) { pending in
+            // The server auto-saves the diverged live config as its own
+            // profile before switching (see AmplifierConfigModel.activate),
+            // so this is never a true, unrecoverable discard.
+            Button("Back Up and Activate", role: .destructive) {
+                Task { await model.activate(profileId: pending.profileId, force: true) }
+            }
+            Button("Cancel", role: .cancel) { model.pendingForceActivate = nil }
+        } message: { pending in
+            Text(pending.message)
+        }
         .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .json, defaultFilename: "amplifier-profile") { _ in }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
             Task { await handleImport(result) }
@@ -71,6 +89,20 @@ struct AmplifierConfigView: View {
 
     private var content: some View {
         Form {
+            if let backupId = model.lastBackupProfileId {
+                Section {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.ok)
+                        Text("Your previous setup was saved as profile \"\(backupId)\".")
+                            .font(.footnote)
+                            .foregroundStyle(Brand.muted)
+                        Spacer()
+                        Button("Dismiss") { model.lastBackupProfileId = nil }
+                            .font(.footnote)
+                    }
+                }
+            }
+
             profileSection
 
             commandsSection
@@ -131,7 +163,7 @@ struct AmplifierConfigView: View {
         if let amp = equipmentModel.amplifierEquipment {
             Section {
                 NavigationLink {
-                    EquipmentDetailView(item: amp, model: equipmentModel)
+                    AmplifierCommandsView(item: amp, ampConfig: model.config, model: equipmentModel)
                 } label: {
                     let learned = (amp.actions ?? []).filter { equipmentModel.isLearned(targetId: amp.id, action: $0) }.count
                     let total = (amp.actions ?? []).count

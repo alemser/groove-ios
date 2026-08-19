@@ -116,11 +116,20 @@ struct AmplifierRemoteTab: View {
 
     // MARK: - Input
 
+    /// Prev/Next only make sense for a cycle-mode amp (one relative
+    /// next/prev-input IR code, stepped repeatedly) — a direct-mode amp like
+    /// the Denon PMA-600NE has no such button on its remote at all, so
+    /// showing these (even disabled) would be offering a control that can
+    /// never mean anything. Mirrors remote.html's same check.
+    private var cycleMode: Bool { (model.amplifier?.inputMode ?? "cycle") != "direct" }
+
     private var inputCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Input")
             HStack(spacing: 10) {
-                navButton("chevron.left", accessibilityLabel: "Previous input") { Task { await model.prevInput() } }
+                if cycleMode {
+                    navButton("chevron.left", accessibilityLabel: "Previous input") { Task { await model.prevInput() } }
+                }
                 Menu {
                     ForEach(model.visibleInputs) { input in
                         Button(input.label) { Task { await model.selectInput(id: input.id) } }
@@ -137,7 +146,9 @@ struct AmplifierRemoteTab: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .disabled(model.isPerformingAction || model.visibleInputs.isEmpty)
-                navButton("chevron.right", accessibilityLabel: "Next input") { Task { await model.nextInput() } }
+                if cycleMode {
+                    navButton("chevron.right", accessibilityLabel: "Next input") { Task { await model.nextInput() } }
+                }
             }
 
             Button {

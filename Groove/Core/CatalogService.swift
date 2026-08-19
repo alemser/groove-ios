@@ -398,8 +398,8 @@ struct CatalogService {
     }
 
     @discardableResult
-    func rigActivateProfile(id: String) async throws -> RigOkResponse {
-        try await api.post("/rig/amplifier/profiles/activate", body: RigProfileActivateRequest(profileId: id))
+    func rigActivateProfile(id: String, force: Bool = false) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles/activate", body: RigProfileActivateRequest(profileId: id, force: force))
     }
 
     func rigExportProfile(id: String) async throws -> RigProfileExportDoc {

@@ -97,6 +97,23 @@ final class EquipmentRemoteModel {
         }
     }
 
+    /// Registers `action` into `targetId`'s actions list if it isn't there
+    /// yet. Learning writes to the codebook regardless of the target's
+    /// configured actions, but `GET /status` only reports "learned" for
+    /// actions actually listed there — mirrors studio.html's
+    /// `ensureActionRegistered`. Used for the amplifier's per-input
+    /// `select_<id>` direct-mode actions, which (unlike the fixed transport
+    /// actions on other equipment) aren't known ahead of time.
+    func ensureActionRegistered(targetId: String, action: String) async {
+        guard let item = equipment.first(where: { $0.id == targetId }) else { return }
+        var actions = item.actions ?? []
+        guard !actions.contains(action) else { return }
+        actions.append(action)
+        await updateEquipment(id: targetId, RigEquipmentPatchRequest(
+            label: nil, backend: nil, actions: actions, role: nil, physicalFormat: nil, inputIds: nil, hasRemote: nil
+        ))
+    }
+
     @discardableResult
     func updateEquipment(id: String, _ patch: RigEquipmentPatchRequest) async -> Bool {
         guard let settings else { return false }
