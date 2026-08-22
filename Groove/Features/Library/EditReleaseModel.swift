@@ -192,6 +192,29 @@ final class EditReleaseModel {
         }
     }
 
+    /// Toggles a playback hint (`TrackHint.Key.boundarySensitive` /
+    /// `.liveTrack`) on one catalog track and updates `catalogTracks` in
+    /// place so the row's checkbox reflects the server's actual state
+    /// (including any other hint an auto-learn pass may have added
+    /// concurrently). groove-catalog rejects this unless `track.durationMs`
+    /// is already set — callers gate the control on that, same as the web
+    /// studio's "Set track duration first" tooltip.
+    @discardableResult
+    func setTrackHint(_ track: Track, key: String, enabled: Bool) async -> Bool {
+        guard let settings else { return false }
+        actionError = nil
+        do {
+            let hints = try await CatalogService(settings: settings).patchTrackHint(id: track.id, key: key, enabled: enabled)
+            if let idx = catalogTracks.firstIndex(where: { $0.id == track.id }) {
+                catalogTracks[idx].hints = hints
+            }
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
     /// Detaches ONE catalog track from this edition — the tracklist position
     /// survives, so the caller should leave the draft tracklist entry alone.
     @discardableResult

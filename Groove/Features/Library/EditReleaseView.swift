@@ -309,6 +309,9 @@ struct EditReleaseView: View {
                             .font(.caption2)
                             .foregroundStyle(Brand.muted)
                     }
+                    if let linkedTrack {
+                        hintToggleRow(track: linkedTrack)
+                    }
                 }
                 .padding(.vertical, 4)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -357,6 +360,35 @@ struct EditReleaseView: View {
             Text("Drag to reorder; the play order is saved alongside position labels like \"A1\".")
                 .foregroundStyle(Brand.muted)
         }
+    }
+
+    /// Pauses/Live toggles for one linked catalog track — a recognized row
+    /// only, matching groove-catalog's own rule that a hint needs a real
+    /// `duration_ms` before it's accepted (`ErrHintRequiresDuration`).
+    @ViewBuilder
+    private func hintToggleRow(track: Track) -> some View {
+        let hasDuration = (track.durationMs ?? 0) > 0
+        HStack(spacing: 14) {
+            hintToggle(track: track, key: TrackHint.Key.boundarySensitive, label: "Pauses", hasDuration: hasDuration)
+            hintToggle(track: track, key: TrackHint.Key.liveTrack, label: "Live", hasDuration: hasDuration)
+            if !hasDuration {
+                Text("Set duration to enable").foregroundStyle(Brand.muted)
+            }
+        }
+        .font(.caption2)
+    }
+
+    @ViewBuilder
+    private func hintToggle(track: Track, key: String, label: String, hasDuration: Bool) -> some View {
+        let on = track.hasHint(key)
+        Button {
+            Task { await model.setTrackHint(track, key: key, enabled: !on) }
+        } label: {
+            Label(label, systemImage: on ? "checkmark.square.fill" : "square")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(hasDuration ? (on ? Brand.teal : Brand.muted) : Brand.muted.opacity(0.5))
+        .disabled(!hasDuration)
     }
 
     private func durationBinding(for entry: TracklistEntry) -> Binding<String> {

@@ -23,6 +23,10 @@ struct Track: Decodable, Identifiable, Hashable {
     var durationMs: Int64?
     var artworkUrl: String?
     var providerName: String?
+    /// Catalog playback hints (`boundary_sensitive` / `live_track`) — requires
+    /// `durationMs` to be set before groove-catalog will accept one. See
+    /// `TrackHint.Key`.
+    var hints: [TrackHint]?
     /// Timestamp of the most recent real play, nil if this track has never
     /// actually been heard. NOT the same as `providerName == "album_programme"`:
     /// that field only records how the row was first materialized and is
@@ -41,6 +45,8 @@ struct Track: Decodable, Identifiable, Hashable {
     var displayArtist: String { artist?.nonEmpty ?? "Unknown artist" }
     var displayAlbum: String? { album?.nonEmpty }
 
+    func hasHint(_ key: String) -> Bool { (hints ?? []).contains { $0.key == key } }
+
     static func == (lhs: Track, rhs: Track) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
@@ -51,6 +57,37 @@ struct TrackDisplayPatch: Encodable {
     var displayAlbum: String?
     var releaseFormat: String?
     var reset: Bool?
+}
+
+// MARK: - Track hints
+
+/// A catalog playback hint on one track — mirrors groove-catalog's
+/// `hints.Entry` (`internal/hints/vocabulary.go`). `source` is `"manual"`
+/// when an operator set it directly, `"auto"` when groove-identity
+/// self-learned it after a live continuity miss.
+struct TrackHint: Decodable, Hashable {
+    var key: String
+    var source: String
+    var confidence: Double?
+
+    /// The two track-scoped keys groove-catalog's vocabulary defines today
+    /// (a third, `gapless`, is release-scoped — see `ReleaseHint`).
+    enum Key {
+        static let boundarySensitive = "boundary_sensitive"
+        static let liveTrack = "live_track"
+    }
+}
+
+/// Body for `PATCH /catalog/tracks/{id}/hints` — mirrors groove-catalog's
+/// `store.HintPatch`. Add and remove are independent; a key present in
+/// neither is left untouched.
+struct TrackHintPatch: Encodable {
+    var add: [String] = []
+    var remove: [String] = []
+}
+
+struct TrackHintsResponse: Decodable {
+    var hints: [TrackHint]
 }
 
 struct TrackProfile: Decodable {
