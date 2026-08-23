@@ -90,6 +90,13 @@ struct TrackHintsResponse: Decodable {
     var hints: [TrackHint]
 }
 
+/// Response for `PATCH /catalog/releases/{source}/{release_id}/tracklist/{ordinal}/hints`.
+/// Unlike TrackHintsResponse, these are plain keys (no source/confidence) —
+/// release-tracklist-level hints have no "auto-learned" provenance today.
+struct TracklistHintsResponse: Decodable {
+    var hints: [String]
+}
+
 struct TrackProfile: Decodable {
     var track: Track
     var fingerprints: [Fingerprint]?
@@ -248,8 +255,16 @@ struct TracklistEntry: Codable, Identifiable, Hashable {
     var isrc: String?
     var title: String?
     var durationMs: Int64?
+    /// Release-tracklist-level playback hints (boundary_sensitive, live_track)
+    /// — set on this ordinal directly (release_tracklists.hints), independent
+    /// of whether a catalog Track is linked to it. See EditReleaseModel.setTracklistHint.
+    var hints: [String]?
 
     var id: Int { ordinal }
+
+    func hasHint(_ key: String) -> Bool {
+        (hints ?? []).contains(key)
+    }
 }
 
 // MARK: - User release editing (draft/confirm cycle)

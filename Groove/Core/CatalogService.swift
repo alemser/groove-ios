@@ -41,6 +41,17 @@ struct CatalogService {
         return try await api.patch("/catalog/tracks/\(id)/hints", body: patch, as: TrackHintsResponse.self).hints
     }
 
+    /// Sets boundary_sensitive/live_track on a release-tracklist ordinal
+    /// directly (release_tracklists.hints) — unlike patchTrackHint, this
+    /// needs no catalog Track to exist for the slot, so it works even when
+    /// nothing has been recognized/linked for that position yet.
+    func patchTracklistHint(source: String, releaseId: String, ordinal: Int, key: String, enabled: Bool) async throws -> [String] {
+        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
+        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        let patch = enabled ? TrackHintPatch(add: [key]) : TrackHintPatch(remove: [key])
+        return try await api.patch("/catalog/releases/\(s)/\(r)/tracklist/\(ordinal)/hints", body: patch, as: TracklistHintsResponse.self).hints
+    }
+
     func deleteTrack(id: Int64) async throws {
         try await api.delete("/catalog/tracks/\(id)")
     }

@@ -311,6 +311,8 @@ struct EditReleaseView: View {
                     }
                     if let linkedTrack {
                         hintToggleRow(track: linkedTrack)
+                    } else {
+                        tracklistHintToggleRow(entry: $entry)
                     }
                 }
                 .padding(.vertical, 4)
@@ -383,6 +385,43 @@ struct EditReleaseView: View {
         let on = track.hasHint(key)
         Button {
             Task { await model.setTrackHint(track, key: key, enabled: !on) }
+        } label: {
+            Label(label, systemImage: on ? "checkmark.square.fill" : "square")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(hasDuration ? (on ? Brand.teal : Brand.muted) : Brand.muted.opacity(0.5))
+        .disabled(!hasDuration)
+    }
+
+    /// Pauses/Live toggles for a tracklist ordinal with no linked catalog
+    /// track — release-tracklist-level hints (release_tracklists.hints),
+    /// so unlike hintToggleRow above this works whether or not anything's
+    /// ever been recognized/linked for this position. Live 2026-08-23:
+    /// deleting a track's catalog row wiped its track-scoped hint along
+    /// with it; this one survives that.
+    @ViewBuilder
+    private func tracklistHintToggleRow(entry: Binding<TracklistEntry>) -> some View {
+        let hasDuration = (entry.wrappedValue.durationMs ?? 0) > 0
+        HStack(spacing: 14) {
+            tracklistHintToggle(entry: entry, key: TrackHint.Key.boundarySensitive, label: "Pauses", hasDuration: hasDuration)
+            tracklistHintToggle(entry: entry, key: TrackHint.Key.liveTrack, label: "Live", hasDuration: hasDuration)
+            if !hasDuration {
+                Text("Set duration to enable").foregroundStyle(Brand.muted)
+            }
+        }
+        .font(.caption2)
+    }
+
+    @ViewBuilder
+    private func tracklistHintToggle(entry: Binding<TracklistEntry>, key: String, label: String, hasDuration: Bool) -> some View {
+        let on = entry.wrappedValue.hasHint(key)
+        Button {
+            let target = entry.wrappedValue
+            Task {
+                if await model.setTracklistHint(target, key: key, enabled: !on) {
+                    entry.wrappedValue.hints = (on ? target.hints?.filter { $0 != key } : (target.hints ?? []) + [key])
+                }
+            }
         } label: {
             Label(label, systemImage: on ? "checkmark.square.fill" : "square")
         }

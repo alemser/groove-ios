@@ -215,6 +215,32 @@ final class EditReleaseModel {
         }
     }
 
+    /// Toggles a playback hint directly on a tracklist ordinal
+    /// (release_tracklists.hints) rather than a catalog track — usable when
+    /// `trackId(for:)` finds nothing (never recognized into this position
+    /// yet, or its catalog track was deleted). Live 2026-08-23: deleting a
+    /// track wiped its boundary_sensitive hint along with it, because that
+    /// was track-scoped metadata; this is release-scoped metadata instead,
+    /// so it survives. groove-catalog rejects this unless the tracklist
+    /// entry already has a duration, same as setTrackHint above.
+    @discardableResult
+    func setTracklistHint(_ entry: TracklistEntry, key: String, enabled: Bool) async -> Bool {
+        guard let settings, let source = draft?.source, let releaseId = draft?.releaseId else { return false }
+        actionError = nil
+        do {
+            let hints = try await CatalogService(settings: settings).patchTracklistHint(
+                source: source, releaseId: releaseId, ordinal: entry.ordinal, key: key, enabled: enabled
+            )
+            if let idx = draft?.tracklist?.firstIndex(where: { $0.ordinal == entry.ordinal }) {
+                draft?.tracklist?[idx].hints = hints
+            }
+            return true
+        } catch {
+            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
     /// Detaches ONE catalog track from this edition — the tracklist position
     /// survives, so the caller should leave the draft tracklist entry alone.
     @discardableResult
