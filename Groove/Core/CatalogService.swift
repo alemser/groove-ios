@@ -3,6 +3,15 @@ import Foundation
 /// Typed facade over `APIClient` for every groove-catalog endpoint the app uses.
 /// Screens depend on this, not on raw paths, so the wire contract lives in one
 /// place.
+/// Percent-encodes one path segment. `.urlPathAllowed` deliberately permits
+/// "/", so using it on a value that may contain a slash silently splits the
+/// path into extra segments and hits the wrong route. This mirrors what the
+/// web studio gets from `encodeURIComponent`.
+func pathSegment(_ raw: String) -> String {
+    let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+    return raw.addingPercentEncoding(withAllowedCharacters: allowed) ?? raw
+}
+
 struct CatalogService {
     let api: APIClient
 
@@ -46,8 +55,8 @@ struct CatalogService {
     /// needs no catalog Track to exist for the slot, so it works even when
     /// nothing has been recognized/linked for that position yet.
     func patchTracklistHint(source: String, releaseId: String, ordinal: Int, key: String, enabled: Bool) async throws -> [String] {
-        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
-        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        let s = pathSegment(source)
+        let r = pathSegment(releaseId)
         let patch = enabled ? TrackHintPatch(add: [key]) : TrackHintPatch(remove: [key])
         return try await api.patch("/catalog/releases/\(s)/\(r)/tracklist/\(ordinal)/hints", body: patch, as: TracklistHintsResponse.self).hints
     }
@@ -92,8 +101,8 @@ struct CatalogService {
     }
 
     func deleteLibraryRelease(source: String, releaseId: String) async throws {
-        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
-        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        let s = pathSegment(source)
+        let r = pathSegment(releaseId)
         try await api.delete("/catalog/library/releases/\(s)/\(r)")
     }
 
@@ -137,8 +146,8 @@ struct CatalogService {
     }
 
     func detachLibraryEditionTracks(source: String, releaseId: String) async throws {
-        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
-        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        let s = pathSegment(source)
+        let r = pathSegment(releaseId)
         _ = try await api.post("/catalog/library/releases/\(s)/\(r)/detach-tracks", body: Empty(), as: EmptyResponse.self)
     }
 
@@ -146,14 +155,14 @@ struct CatalogService {
     /// jobs for just that track are dropped) while keeping its tracklist
     /// position — the release shape survives, unlike `deleteTrack`.
     func detachLibraryEditionTrack(source: String, releaseId: String, trackId: Int64) async throws {
-        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
-        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        let s = pathSegment(source)
+        let r = pathSegment(releaseId)
         _ = try await api.post("/catalog/library/releases/\(s)/\(r)/tracks/\(trackId)/detach", body: Empty(), as: EmptyResponse.self)
     }
 
     func releaseTracks(source: String, releaseId: String) async throws -> [Track] {
-        let s = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
-        let r = releaseId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? releaseId
+        let s = pathSegment(source)
+        let r = pathSegment(releaseId)
         return try await api.get("/catalog/library/releases/\(s)/\(r)/tracks", as: TrackListResponse.self).items
     }
 

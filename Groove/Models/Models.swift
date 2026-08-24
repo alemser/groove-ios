@@ -265,6 +265,25 @@ struct TracklistEntry: Codable, Identifiable, Hashable {
     func hasHint(_ key: String) -> Bool {
         (hints ?? []).contains(key)
     }
+
+    /// Decoded but never encoded. Hints have their own PATCH endpoint and
+    /// groove-catalog's replaceTracklistsTx only preserves an existing hint
+    /// when the incoming entry carries none — the web studio's Save omits
+    /// them for exactly that reason. Sending them back on a draft save would
+    /// let a screen opened before someone ticked a box elsewhere overwrite
+    /// that with its own stale view.
+    enum CodingKeys: String, CodingKey {
+        case position, ordinal, isrc, title, durationMs, hints
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(position, forKey: .position)
+        try c.encode(ordinal, forKey: .ordinal)
+        try c.encodeIfPresent(isrc, forKey: .isrc)
+        try c.encodeIfPresent(title, forKey: .title)
+        try c.encodeIfPresent(durationMs, forKey: .durationMs)
+    }
 }
 
 // MARK: - User release editing (draft/confirm cycle)

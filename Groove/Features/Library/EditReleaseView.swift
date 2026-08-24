@@ -416,12 +416,11 @@ struct EditReleaseView: View {
     private func tracklistHintToggle(entry: Binding<TracklistEntry>, key: String, label: String, hasDuration: Bool) -> some View {
         let on = entry.wrappedValue.hasHint(key)
         Button {
+            // setTracklistHint already stores the server's returned hints into
+            // the draft entry. Recomputing them locally here would overwrite
+            // that with a guess and drop anything else the server reported.
             let target = entry.wrappedValue
-            Task {
-                if await model.setTracklistHint(target, key: key, enabled: !on) {
-                    entry.wrappedValue.hints = (on ? target.hints?.filter { $0 != key } : (target.hints ?? []) + [key])
-                }
-            }
+            Task { await model.setTracklistHint(target, key: key, enabled: !on) }
         } label: {
             Label(label, systemImage: on ? "checkmark.square.fill" : "square")
         }
