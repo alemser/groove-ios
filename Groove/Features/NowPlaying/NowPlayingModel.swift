@@ -22,6 +22,13 @@ final class NowPlayingModel {
 
     private var pollTask: Task<Void, Never>?
 
+    /// Set when answering the edition question failed, so the card can say so
+    /// beside the buttons rather than failing silently.
+    var editionErrorMessage: String?
+
+    /// The open "which pressing is this?" question, if any (groove-identity#38).
+    var editionQuestion: EditionQuestion? { status?.editionQuestion }
+
     /// True when playback just went inactive but was active moments ago —
     /// "probably between tracks," not "nothing has played all session."
     func isLikelyTransitioning(at now: Date = Date()) -> Bool {
@@ -56,6 +63,20 @@ final class NowPlayingModel {
             errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
         }
         hasLoadedOnce = true
+    }
+
+    /// Answers the edition question. The session moves to that edition's
+    /// tracklist and the choice is remembered for the album; the next poll
+    /// clears the card because the question is gone server-side.
+    func chooseEdition(_ option: EditionOption, settings: AppSettings) async {
+        let service = CatalogService(settings: settings)
+        do {
+            try await service.chooseAlbumProgrammeEdition(source: option.source, releaseId: option.releaseId)
+            editionErrorMessage = nil
+            await refresh(service)
+        } catch {
+            editionErrorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
     }
 
     /// Interpolated playback position in ms at `now`, clamped to the track length.

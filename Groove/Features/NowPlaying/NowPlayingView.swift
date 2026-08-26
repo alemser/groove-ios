@@ -114,6 +114,16 @@ struct NowPlayingView: View {
                 }
 
                 progress(pb)
+
+                // Sits under the transport rather than over the artwork: the
+                // question is not urgent enough to interrupt what is playing,
+                // but it does belong on the screen that shows the record.
+                if let question = model.editionQuestion {
+                    EditionQuestionCard(question: question, onChoose: { option in
+                        Task { await model.chooseEdition(option, settings: settings) }
+                    }, errorMessage: model.editionErrorMessage)
+                    .padding(.top, 4)
+                }
             }
             .padding()
             .frame(maxWidth: 520)

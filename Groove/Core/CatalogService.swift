@@ -190,6 +190,21 @@ struct CatalogService {
         try await api.postNoContent("/identity/album-programme/confirm-session")
     }
 
+    /// Answers "which pressing is playing" (groove-identity#38).
+    ///
+    /// The operator's answer outranks every acoustic and metadata signal,
+    /// because all of them were only ever trying to infer what the operator can
+    /// simply state. It locks the session onto that edition's tracklist — so
+    /// the numbering and cover follow the pressing actually on the platter —
+    /// and is remembered for the album, so the same record is not queried on
+    /// every play. Catalog rows are not moved.
+    func chooseAlbumProgrammeEdition(source: String, releaseId: String) async throws {
+        try await api.postNoContent(
+            "/identity/album-programme/choose-edition",
+            body: ["source": source, "release_id": releaseId]
+        )
+    }
+
     // MARK: User release editing (draft/confirm cycle for an owned release)
 
     /// The confirmed-in-place edit path: only reachable when the release has

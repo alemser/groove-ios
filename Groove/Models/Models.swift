@@ -468,6 +468,45 @@ struct CatalogStatus: Decodable {
     var catalogDbPath: String?
     var enricherChain: [String]?
     var identityStatusUrl: String?
+    /// Set when more than one library edition holds the playing track and
+    /// nothing settled which pressing it is. See groove-identity#38.
+    var editionQuestion: EditionQuestion?
+}
+
+/// An unanswered "which pressing is this?".
+///
+/// Only reaches the app when the evidence genuinely ran out: a track exclusive
+/// to one edition, or the detector's acoustic reading of the medium, resolves it
+/// silently, and so does a previously remembered answer. What is left is the
+/// case where guessing gets the cover, the year and the track numbering wrong —
+/// the vinyl numbers sides A1-A5 / B1-B5 where the CD runs 1-12.
+struct EditionQuestion: Decodable, Equatable {
+    var artist: String?
+    var album: String?
+    var trackId: Int64?
+    var candidates: [EditionOption]
+
+    /// Stable identity for the question, so the UI can tell a new one from a
+    /// redraw of the same one.
+    var key: String {
+        [artist ?? "", album ?? "", candidates.map(\.releaseId).joined(separator: ",")].joined(separator: "|")
+    }
+}
+
+/// One answer the operator can give.
+struct EditionOption: Decodable, Equatable, Identifiable {
+    var source: String
+    var releaseId: String
+    var album: String?
+    var year: String?
+    var releaseFormat: String?
+    var artworkUrl: String?
+    var tracklistCount: Int?
+    /// Where the recognised track sits on THIS edition ("A1" vs "6") — usually
+    /// the quickest way for a human to tell two pressings apart.
+    var position: String?
+
+    var id: String { source + "/" + releaseId }
 }
 
 struct Playback: Decodable {

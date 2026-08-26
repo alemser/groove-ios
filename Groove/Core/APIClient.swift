@@ -64,6 +64,12 @@ struct APIClient {
         _ = try await sendRaw(path, method: "POST", body: Optional<Empty>.none)
     }
 
+    /// POST with a body to an endpoint that answers 204. Distinct from `post`,
+    /// which requires a decodable response the caller does not have.
+    func postNoContent<Body: Encodable>(_ path: String, body: Body) async throws {
+        _ = try await sendRaw(path, method: "POST", body: body)
+    }
+
     @discardableResult
     func patch<Body: Encodable, T: Decodable>(_ path: String, body: Body, as type: T.Type = T.self) async throws -> T {
         try await send(path, method: "PATCH", body: body)
