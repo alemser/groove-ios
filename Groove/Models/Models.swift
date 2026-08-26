@@ -471,6 +471,45 @@ struct CatalogStatus: Decodable {
     /// Set when more than one library edition holds the playing track and
     /// nothing settled which pressing it is. See groove-identity#38.
     var editionQuestion: EditionQuestion?
+    /// The pressing actually on the platter, once something settled it —
+    /// acoustically, from the amplifier's input, or because the operator was
+    /// asked and answered.
+    ///
+    /// A catalog track row is a RECORDING and carries whichever edition first
+    /// claimed it, so without this a browse surface has no way to tell the 1977
+    /// LP from the 2001 CD of the same album: both hold the playing title, and
+    /// both would claim the play.
+    var playingEdition: PlayingEdition?
+
+    /// Whether the given edition is the one playing.
+    ///
+    /// `false` only when something settled a DIFFERENT pressing. With nothing
+    /// settled there is nothing to contradict, so callers keep whatever weaker
+    /// evidence they had rather than going silent.
+    func contradictsPlayingEdition(source: String, releaseId: String) -> Bool {
+        guard let playing = playingEdition else { return false }
+        return !playing.matches(source: source, releaseId: releaseId)
+    }
+}
+
+/// The pressing on the platter, as settled by groove-identity.
+struct PlayingEdition: Decodable, Equatable {
+    var source: String
+    var releaseId: String
+    var releaseFormat: String?
+    var artist: String?
+    var album: String?
+
+    func matches(source: String, releaseId: String) -> Bool {
+        let sameRelease = releaseId.trimmingCharacters(in: .whitespacesAndNewlines)
+            == self.releaseId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard sameRelease else { return false }
+        // Source is advisory: identity defaults it to "user" when a session
+        // carries none, so a release id that matches is a match.
+        let mine = self.source.trimmingCharacters(in: .whitespacesAndNewlines)
+        let theirs = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        return mine.isEmpty || theirs.isEmpty || mine.caseInsensitiveCompare(theirs) == .orderedSame
+    }
 }
 
 /// An unanswered "which pressing is this?".
