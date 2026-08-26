@@ -428,6 +428,15 @@ struct CatalogService {
         try await api.patch("/rig/amplifier", body: patch)
     }
 
+    func rigFormatHint() async throws -> RigFormatHint {
+        try await api.get("/rig/amplifier/format-hint")
+    }
+
+    @discardableResult
+    func rigSetFormatHint(useAmplifierInput: Bool) async throws -> RigFormatHint {
+        try await api.patch("/rig/amplifier/format-hint", body: RigFormatHint(useAmplifierInput: useAmplifierInput))
+    }
+
     func rigAmplifierProfiles() async throws -> RigAmplifierProfilesResponse {
         try await api.get("/rig/amplifier/profiles")
     }

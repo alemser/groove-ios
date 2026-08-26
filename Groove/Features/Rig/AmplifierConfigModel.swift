@@ -20,6 +20,9 @@ final class AmplifierConfigModel {
     /// tell the user where their previous setup went instead of leaving
     /// them to wonder whether "Discard and Activate" really discarded it.
     var lastBackupProfileId: String?
+    /// Whether the amplifier's selected input may inform which medium is
+    /// playing. Loaded and saved separately from `config` — see `RigFormatHint`.
+    var useAmplifierInputForFormat = true
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
@@ -39,10 +42,14 @@ final class AmplifierConfigModel {
             let service = CatalogService(settings: settings)
             async let cfg = service.rigAmplifierConfig()
             async let profs = service.rigAmplifierProfiles()
+            async let hint = service.rigFormatHint()
             config = try await cfg
             let profResp = try await profs
             profiles = profResp.profiles
             activeProfileId = profResp.activeProfileId
+            // An older groove-rig has no such route; the setting defaults to on
+            // there, so a 404 must not block the rest of the screen.
+            useAmplifierInputForFormat = (try? await hint)?.useAmplifierInput ?? true
             phase = .loaded
         } catch {
             if config == nil {
@@ -52,12 +59,15 @@ final class AmplifierConfigModel {
     }
 
     @discardableResult
-    func save(_ patch: RigAmplifierConfig) async -> Bool {
+    func save(_ patch: RigAmplifierConfig, useAmplifierInputForFormat: Bool) async -> Bool {
         guard let settings else { return false }
         isSaving = true
         defer { isSaving = false }
         do {
-            config = try await CatalogService(settings: settings).rigPatchAmplifier(patch)
+            let service = CatalogService(settings: settings)
+            config = try await service.rigPatchAmplifier(patch)
+            let hint = try await service.rigSetFormatHint(useAmplifierInput: useAmplifierInputForFormat)
+            self.useAmplifierInputForFormat = hint.useAmplifierInput
             actionError = nil
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true

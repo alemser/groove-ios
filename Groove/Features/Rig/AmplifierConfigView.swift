@@ -34,6 +34,7 @@ struct AmplifierConfigView: View {
     @State private var warmUpSecs = ""
     @State private var standbyTimeoutMins = ""
     @State private var inputs: [RigInputConfig] = []
+    @State private var useInputForFormat = true
 
     @State private var selectedProfileId = ""
     @State private var showSaveProfileSheet = false
@@ -56,6 +57,7 @@ struct AmplifierConfigView: View {
         .grooveScreenBackground()
         .task { model.configure(settings) }
         .onChange(of: model.config) { _, new in seed(from: new) }
+        .onChange(of: model.useAmplifierInputForFormat) { _, new in useInputForFormat = new }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button(model.isSaving ? "Saving…" : "Save") { Task { await save() } }
@@ -118,6 +120,13 @@ struct AmplifierConfigView: View {
                     .keyboardType(.numberPad)
                 TextField("Standby timeout (mins)", text: $standbyTimeoutMins)
                     .keyboardType(.numberPad)
+            }
+
+            Section {
+                Toggle("Use Input to Detect Format", isOn: $useInputForFormat)
+            } footer: {
+                Text("When an album is in your catalogue on more than one format, the input this amplifier is switched to decides which one is playing — PHONO means the record. Turn this off if you change inputs by hand: the rig only knows the input it set itself, so a stale one would answer confidently and wrongly.")
+                    .foregroundStyle(Brand.muted)
             }
 
             Section {
@@ -241,6 +250,7 @@ struct AmplifierConfigView: View {
         warmUpSecs = config.warmUpSecs.map(String.init) ?? ""
         standbyTimeoutMins = config.standbyTimeoutMins.map(String.init) ?? ""
         inputs = config.inputs ?? []
+        useInputForFormat = model.useAmplifierInputForFormat
         if selectedProfileId.isEmpty {
             selectedProfileId = model.activeProfileId ?? config.profileId ?? ""
         }
@@ -262,7 +272,7 @@ struct AmplifierConfigView: View {
             cycle: model.config?.cycle,
             inputs: outboundInputs
         )
-        await model.save(patch)
+        await model.save(patch, useAmplifierInputForFormat: useInputForFormat)
     }
 
     private func export() async {
