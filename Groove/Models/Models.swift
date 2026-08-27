@@ -544,6 +544,13 @@ struct EditionOption: Decodable, Equatable, Identifiable {
     /// Where the recognised track sits on THIS edition ("A1" vs "6") — usually
     /// the quickest way for a human to tell two pressings apart.
     var position: String?
+    /// Marks the option the evidence leans toward without being certain enough
+    /// to skip the question — the amplifier's input, or the detector's reading
+    /// of the medium. Offered first so confirming is one tap; it decides nothing.
+    var suggested: Bool?
+    /// Names the hint ("amplifier is on Phono"), so the operator can judge it
+    /// rather than trust it.
+    var suggestedWhy: String?
 
     var id: String { source + "/" + releaseId }
 }

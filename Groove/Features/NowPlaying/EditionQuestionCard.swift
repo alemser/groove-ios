@@ -53,7 +53,7 @@ struct EditionQuestionCard: View {
                     .font(.footnote)
                     .foregroundStyle(Brand.warn)
             } else {
-                Text("More than one edition in your library holds this track. The answer is remembered for this album.")
+                Text("More than one release in your library matches. Nothing here is certain enough to choose for you.")
                     .font(.footnote)
                     .foregroundStyle(Brand.muted)
             }
@@ -76,9 +76,19 @@ struct EditionQuestionCard: View {
                 .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(headline(option))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Brand.text)
+                HStack(spacing: 6) {
+                    Text(headline(option))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.text)
+                    if option.suggested == true {
+                        Text("LIKELY")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Brand.teal)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Brand.teal.opacity(0.16), in: Capsule())
+                    }
+                }
                 if let detail = detail(option) {
                     Text(detail)
                         .font(.caption)
@@ -115,6 +125,12 @@ struct EditionQuestionCard: View {
         }
         if let count = option.tracklistCount, count > 0 {
             bits.append("\(count) tracks")
+        }
+        // The hint is named, not applied: the operator can see why the system
+        // leans this way and overrule it, which is the point of not letting the
+        // hint answer by itself.
+        if option.suggested == true, let why = option.suggestedWhy?.nonEmpty {
+            bits.append(why)
         }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
