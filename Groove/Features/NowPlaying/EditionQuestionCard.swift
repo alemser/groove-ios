@@ -2,18 +2,21 @@ import SwiftUI
 
 /// "Which pressing is this?" — groove-identity#38.
 ///
-/// Shown only when the system could not settle it on evidence. A track
-/// exclusive to one edition, the detector's acoustic reading of the medium, or
-/// a previously remembered answer all resolve it silently. What reaches here is
-/// the genuinely ambiguous case, where guessing gets the cover, the year and the
-/// track numbering wrong — the 1977 vinyl numbers sides A1-A5 / B1-B5 where the
-/// 2001 CD runs 1-12.
+/// Shown whenever more than one release in the library matches, unless there is
+/// certainty about which it is — a track that exists on only one of them. The
+/// amplifier's input and the detector's reading of the medium are hints: they
+/// mark the likely option and say why, but they do not answer.
 ///
-/// The answer locks the session onto that edition's tracklist and is remembered
-/// for the album. Catalog rows are never moved.
+/// Guessing gets the cover, the year and the numbering wrong — the 1977 vinyl
+/// runs A1-A5 / B1-B5 where the 2001 CD runs 1-12.
+///
+/// The answer locks the session onto that edition's tracklist. Dismissing keeps
+/// whatever is showing, so the question is never a dead end. Catalog rows are
+/// never moved.
 struct EditionQuestionCard: View {
     let question: EditionQuestion
     let onChoose: (EditionOption) -> Void
+    var onDismiss: (() -> Void)?
 
     @State private var answering: String?
     var errorMessage: String?
@@ -56,6 +59,15 @@ struct EditionQuestionCard: View {
                 Text("More than one release in your library matches. Nothing here is certain enough to choose for you.")
                     .font(.footnote)
                     .foregroundStyle(Brand.muted)
+            }
+
+            // Without this the question blocks the screen until it is answered,
+            // which locked the app for anyone happy with what was showing.
+            if let onDismiss {
+                Button("Keep what is showing", action: onDismiss)
+                    .font(.footnote)
+                    .foregroundStyle(Brand.muted)
+                    .disabled(answering != nil)
             }
         }
         .padding(16)

@@ -205,6 +205,12 @@ struct CatalogService {
         )
     }
 
+    /// Puts the pressing question away without changing the edition. A modal
+    /// with no way out is a trap; the choice stays reachable on the album card.
+    func dismissAlbumProgrammeEditionQuestion() async throws {
+        try await api.postNoContent("/identity/album-programme/dismiss-edition-question")
+    }
+
     // MARK: User release editing (draft/confirm cycle for an owned release)
 
     /// The confirmed-in-place edit path: only reachable when the release has

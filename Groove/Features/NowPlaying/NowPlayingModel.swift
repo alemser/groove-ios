@@ -79,6 +79,17 @@ final class NowPlayingModel {
         }
     }
 
+    func dismissEditionQuestion(settings: AppSettings) async {
+        let service = CatalogService(settings: settings)
+        do {
+            try await service.dismissAlbumProgrammeEditionQuestion()
+            editionErrorMessage = nil
+            await refresh(service)
+        } catch {
+            editionErrorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+
     /// Interpolated playback position in ms at `now`, clamped to the track length.
     func interpolatedPositionMs(at now: Date) -> Int64? {
         guard let pb = status?.playback, pb.active, let base = pb.positionMs else {
