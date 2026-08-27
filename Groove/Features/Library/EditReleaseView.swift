@@ -289,11 +289,22 @@ struct EditReleaseView: View {
                         TextField("ISRC", text: Binding(get: { entry.isrc ?? "" }, set: { entry.isrc = $0.nonEmpty }))
                             .font(.caption)
                         Spacer()
+                        // A track with no time cannot be saved, so the field
+                        // says so before the Save button has to.
                         TextField("m:ss", text: durationBinding(for: entry))
                             .font(.caption.monospacedDigit())
                             .keyboardType(.numbersAndPunctuation)
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
+                            .foregroundStyle((entry.durationMs ?? 0) > 0 ? Brand.text : Brand.err)
+                            .overlay(alignment: .trailing) {
+                                if (entry.durationMs ?? 0) <= 0 {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .strokeBorder(Brand.err.opacity(0.5), lineWidth: 1)
+                                        .frame(width: 64, height: 24)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                     }
                     if let linkedTrack, !linkedTrack.isPlaceholderStub {
                         Label("Recognized", systemImage: "checkmark.circle")
@@ -479,11 +490,49 @@ struct EditReleaseView: View {
         return patch
     }
 
+    /// Tracks with no duration.
+    ///
+    /// Every track needs one before a release can be saved or published: the
+    /// album programme schedules a whole side from cumulative durations, so one
+    /// blank row breaks the clock for every track after it — and it surfaces
+    /// hours later as a mislabelled track, never as anything pointing back here.
+    private var tracksMissingDuration: [String] {
+        tracklist
+            .filter { ($0.durationMs ?? 0) <= 0 }
+            .map { entry in
+                let where_ = entry.position?.nonEmpty ?? "#\(entry.ordinal)"
+                guard let title = entry.title?.nonEmpty else { return where_ }
+                return "\(where_) \(title)"
+            }
+    }
+
+    private var missingDurationMessage: String {
+        let missing = tracksMissingDuration
+        let noun = missing.count == 1 ? "track" : "tracks"
+        return "\(missing.count) \(noun) still need a time: \(missing.joined(separator: ", ")). "
+            + "Every track needs a duration before the release can be saved."
+    }
+
     private func saveDraft() async {
+        guard tracksMissingDuration.isEmpty else {
+            model.actionError = missingDurationMessage
+            showForcePublish = false
+            return
+        }
         await model.saveDraft(buildPatch())
     }
 
     private func publish(force: Bool = false) async {
+        // Checked here as well as on the server so the operator is told which
+        // tracks, in the screen where the fields are, rather than being handed a
+        // refusal after a round trip.
+        guard tracksMissingDuration.isEmpty else {
+            model.actionError = missingDurationMessage
+            // Never offered for this: a missing duration is not a judgement call
+            // the operator can overrule — the schedule simply cannot be built.
+            showForcePublish = false
+            return
+        }
         _ = await model.saveDraft(buildPatch())
         let ok = await model.publish(force: force)
         if ok {
