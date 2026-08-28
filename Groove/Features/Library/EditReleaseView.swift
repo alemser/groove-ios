@@ -289,11 +289,22 @@ struct EditReleaseView: View {
                         TextField("ISRC", text: Binding(get: { entry.isrc ?? "" }, set: { entry.isrc = $0.nonEmpty }))
                             .font(.caption)
                         Spacer()
+                        // A track with no time cannot be saved, so the field
+                        // says so before the Save button has to.
                         TextField("m:ss", text: durationBinding(for: entry))
                             .font(.caption.monospacedDigit())
                             .keyboardType(.numbersAndPunctuation)
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
+                            .foregroundStyle((entry.durationMs ?? 0) > 0 ? Brand.text : Brand.err)
+                            .overlay(alignment: .trailing) {
+                                if (entry.durationMs ?? 0) <= 0 {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .strokeBorder(Brand.err.opacity(0.5), lineWidth: 1)
+                                        .frame(width: 64, height: 24)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                     }
                     if let linkedTrack, !linkedTrack.isPlaceholderStub {
                         Label("Recognized", systemImage: "checkmark.circle")
@@ -308,6 +319,11 @@ struct EditReleaseView: View {
                         Label("Not yet recognized", systemImage: "questionmark.circle")
                             .font(.caption2)
                             .foregroundStyle(Brand.muted)
+                    }
+                    if let linkedTrack {
+                        hintToggleRow(track: linkedTrack)
+                    } else {
+                        tracklistHintToggleRow(entry: $entry)
                     }
                 }
                 .padding(.vertical, 4)
@@ -357,6 +373,71 @@ struct EditReleaseView: View {
             Text("Drag to reorder; the play order is saved alongside position labels like \"A1\".")
                 .foregroundStyle(Brand.muted)
         }
+    }
+
+    /// Pauses/Live toggles for one linked catalog track — a recognized row
+    /// only, matching groove-catalog's own rule that a hint needs a real
+    /// `duration_ms` before it's accepted (`ErrHintRequiresDuration`).
+    @ViewBuilder
+    private func hintToggleRow(track: Track) -> some View {
+        let hasDuration = (track.durationMs ?? 0) > 0
+        HStack(spacing: 14) {
+            hintToggle(track: track, key: TrackHint.Key.boundarySensitive, label: "Pauses", hasDuration: hasDuration)
+            hintToggle(track: track, key: TrackHint.Key.liveTrack, label: "Live", hasDuration: hasDuration)
+            if !hasDuration {
+                Text("Set duration to enable").foregroundStyle(Brand.muted)
+            }
+        }
+        .font(.caption2)
+    }
+
+    @ViewBuilder
+    private func hintToggle(track: Track, key: String, label: String, hasDuration: Bool) -> some View {
+        let on = track.hasHint(key)
+        Button {
+            Task { await model.setTrackHint(track, key: key, enabled: !on) }
+        } label: {
+            Label(label, systemImage: on ? "checkmark.square.fill" : "square")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(hasDuration ? (on ? Brand.teal : Brand.muted) : Brand.muted.opacity(0.5))
+        .disabled(!hasDuration)
+    }
+
+    /// Pauses/Live toggles for a tracklist ordinal with no linked catalog
+    /// track — release-tracklist-level hints (release_tracklists.hints),
+    /// so unlike hintToggleRow above this works whether or not anything's
+    /// ever been recognized/linked for this position. Live 2026-08-23:
+    /// deleting a track's catalog row wiped its track-scoped hint along
+    /// with it; this one survives that.
+    @ViewBuilder
+    private func tracklistHintToggleRow(entry: Binding<TracklistEntry>) -> some View {
+        let hasDuration = (entry.wrappedValue.durationMs ?? 0) > 0
+        HStack(spacing: 14) {
+            tracklistHintToggle(entry: entry, key: TrackHint.Key.boundarySensitive, label: "Pauses", hasDuration: hasDuration)
+            tracklistHintToggle(entry: entry, key: TrackHint.Key.liveTrack, label: "Live", hasDuration: hasDuration)
+            if !hasDuration {
+                Text("Set duration to enable").foregroundStyle(Brand.muted)
+            }
+        }
+        .font(.caption2)
+    }
+
+    @ViewBuilder
+    private func tracklistHintToggle(entry: Binding<TracklistEntry>, key: String, label: String, hasDuration: Bool) -> some View {
+        let on = entry.wrappedValue.hasHint(key)
+        Button {
+            // setTracklistHint already stores the server's returned hints into
+            // the draft entry. Recomputing them locally here would overwrite
+            // that with a guess and drop anything else the server reported.
+            let target = entry.wrappedValue
+            Task { await model.setTracklistHint(target, key: key, enabled: !on) }
+        } label: {
+            Label(label, systemImage: on ? "checkmark.square.fill" : "square")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(hasDuration ? (on ? Brand.teal : Brand.muted) : Brand.muted.opacity(0.5))
+        .disabled(!hasDuration)
     }
 
     private func durationBinding(for entry: TracklistEntry) -> Binding<String> {
@@ -409,11 +490,49 @@ struct EditReleaseView: View {
         return patch
     }
 
+    /// Tracks with no duration.
+    ///
+    /// Every track needs one before a release can be saved or published: the
+    /// album programme schedules a whole side from cumulative durations, so one
+    /// blank row breaks the clock for every track after it — and it surfaces
+    /// hours later as a mislabelled track, never as anything pointing back here.
+    private var tracksMissingDuration: [String] {
+        tracklist
+            .filter { ($0.durationMs ?? 0) <= 0 }
+            .map { entry in
+                let where_ = entry.position?.nonEmpty ?? "#\(entry.ordinal)"
+                guard let title = entry.title?.nonEmpty else { return where_ }
+                return "\(where_) \(title)"
+            }
+    }
+
+    private var missingDurationMessage: String {
+        let missing = tracksMissingDuration
+        let noun = missing.count == 1 ? "track" : "tracks"
+        return "\(missing.count) \(noun) still need a time: \(missing.joined(separator: ", ")). "
+            + "Every track needs a duration before the release can be saved."
+    }
+
     private func saveDraft() async {
+        guard tracksMissingDuration.isEmpty else {
+            model.actionError = missingDurationMessage
+            showForcePublish = false
+            return
+        }
         await model.saveDraft(buildPatch())
     }
 
     private func publish(force: Bool = false) async {
+        // Checked here as well as on the server so the operator is told which
+        // tracks, in the screen where the fields are, rather than being handed a
+        // refusal after a round trip.
+        guard tracksMissingDuration.isEmpty else {
+            model.actionError = missingDurationMessage
+            // Never offered for this: a missing duration is not a judgement call
+            // the operator can overrule — the schedule simply cannot be built.
+            showForcePublish = false
+            return
+        }
         _ = await model.saveDraft(buildPatch())
         let ok = await model.publish(force: force)
         if ok {

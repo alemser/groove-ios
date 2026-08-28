@@ -23,6 +23,10 @@ struct Track: Decodable, Identifiable, Hashable {
     var durationMs: Int64?
     var artworkUrl: String?
     var providerName: String?
+    /// Catalog playback hints (`boundary_sensitive` / `live_track`) — requires
+    /// `durationMs` to be set before groove-catalog will accept one. See
+    /// `TrackHint.Key`.
+    var hints: [TrackHint]?
     /// Timestamp of the most recent real play, nil if this track has never
     /// actually been heard. NOT the same as `providerName == "album_programme"`:
     /// that field only records how the row was first materialized and is
@@ -41,6 +45,8 @@ struct Track: Decodable, Identifiable, Hashable {
     var displayArtist: String { artist?.nonEmpty ?? "Unknown artist" }
     var displayAlbum: String? { album?.nonEmpty }
 
+    func hasHint(_ key: String) -> Bool { (hints ?? []).contains { $0.key == key } }
+
     static func == (lhs: Track, rhs: Track) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
@@ -51,6 +57,44 @@ struct TrackDisplayPatch: Encodable {
     var displayAlbum: String?
     var releaseFormat: String?
     var reset: Bool?
+}
+
+// MARK: - Track hints
+
+/// A catalog playback hint on one track — mirrors groove-catalog's
+/// `hints.Entry` (`internal/hints/vocabulary.go`). `source` is `"manual"`
+/// when an operator set it directly, `"auto"` when groove-identity
+/// self-learned it after a live continuity miss.
+struct TrackHint: Decodable, Hashable {
+    var key: String
+    var source: String
+    var confidence: Double?
+
+    /// The two track-scoped keys groove-catalog's vocabulary defines today
+    /// (a third, `gapless`, is release-scoped — see `ReleaseHint`).
+    enum Key {
+        static let boundarySensitive = "boundary_sensitive"
+        static let liveTrack = "live_track"
+    }
+}
+
+/// Body for `PATCH /catalog/tracks/{id}/hints` — mirrors groove-catalog's
+/// `store.HintPatch`. Add and remove are independent; a key present in
+/// neither is left untouched.
+struct TrackHintPatch: Encodable {
+    var add: [String] = []
+    var remove: [String] = []
+}
+
+struct TrackHintsResponse: Decodable {
+    var hints: [TrackHint]
+}
+
+/// Response for `PATCH /catalog/releases/{source}/{release_id}/tracklist/{ordinal}/hints`.
+/// Unlike TrackHintsResponse, these are plain keys (no source/confidence) —
+/// release-tracklist-level hints have no "auto-learned" provenance today.
+struct TracklistHintsResponse: Decodable {
+    var hints: [String]
 }
 
 struct TrackProfile: Decodable {
@@ -211,8 +255,35 @@ struct TracklistEntry: Codable, Identifiable, Hashable {
     var isrc: String?
     var title: String?
     var durationMs: Int64?
+    /// Release-tracklist-level playback hints (boundary_sensitive, live_track)
+    /// — set on this ordinal directly (release_tracklists.hints), independent
+    /// of whether a catalog Track is linked to it. See EditReleaseModel.setTracklistHint.
+    var hints: [String]?
 
     var id: Int { ordinal }
+
+    func hasHint(_ key: String) -> Bool {
+        (hints ?? []).contains(key)
+    }
+
+    /// Decoded but never encoded. Hints have their own PATCH endpoint and
+    /// groove-catalog's replaceTracklistsTx only preserves an existing hint
+    /// when the incoming entry carries none — the web studio's Save omits
+    /// them for exactly that reason. Sending them back on a draft save would
+    /// let a screen opened before someone ticked a box elsewhere overwrite
+    /// that with its own stale view.
+    enum CodingKeys: String, CodingKey {
+        case position, ordinal, isrc, title, durationMs, hints
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(position, forKey: .position)
+        try c.encode(ordinal, forKey: .ordinal)
+        try c.encodeIfPresent(isrc, forKey: .isrc)
+        try c.encodeIfPresent(title, forKey: .title)
+        try c.encodeIfPresent(durationMs, forKey: .durationMs)
+    }
 }
 
 // MARK: - User release editing (draft/confirm cycle)
@@ -397,6 +468,91 @@ struct CatalogStatus: Decodable {
     var catalogDbPath: String?
     var enricherChain: [String]?
     var identityStatusUrl: String?
+    /// Set when more than one library edition holds the playing track and
+    /// nothing settled which pressing it is. See groove-identity#38.
+    var editionQuestion: EditionQuestion?
+    /// The pressing actually on the platter, once something settled it —
+    /// acoustically, from the amplifier's input, or because the operator was
+    /// asked and answered.
+    ///
+    /// A catalog track row is a RECORDING and carries whichever edition first
+    /// claimed it, so without this a browse surface has no way to tell the 1977
+    /// LP from the 2001 CD of the same album: both hold the playing title, and
+    /// both would claim the play.
+    var playingEdition: PlayingEdition?
+
+    /// Whether the given edition is the one playing.
+    ///
+    /// `false` only when something settled a DIFFERENT pressing. With nothing
+    /// settled there is nothing to contradict, so callers keep whatever weaker
+    /// evidence they had rather than going silent.
+    func contradictsPlayingEdition(source: String, releaseId: String) -> Bool {
+        guard let playing = playingEdition else { return false }
+        return !playing.matches(source: source, releaseId: releaseId)
+    }
+}
+
+/// The pressing on the platter, as settled by groove-identity.
+struct PlayingEdition: Decodable, Equatable {
+    var source: String
+    var releaseId: String
+    var releaseFormat: String?
+    var artist: String?
+    var album: String?
+
+    func matches(source: String, releaseId: String) -> Bool {
+        let sameRelease = releaseId.trimmingCharacters(in: .whitespacesAndNewlines)
+            == self.releaseId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard sameRelease else { return false }
+        // Source is advisory: identity defaults it to "user" when a session
+        // carries none, so a release id that matches is a match.
+        let mine = self.source.trimmingCharacters(in: .whitespacesAndNewlines)
+        let theirs = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        return mine.isEmpty || theirs.isEmpty || mine.caseInsensitiveCompare(theirs) == .orderedSame
+    }
+}
+
+/// An unanswered "which pressing is this?".
+///
+/// Only reaches the app when the evidence genuinely ran out: a track exclusive
+/// to one edition, or the detector's acoustic reading of the medium, resolves it
+/// silently, and so does a previously remembered answer. What is left is the
+/// case where guessing gets the cover, the year and the track numbering wrong —
+/// the vinyl numbers sides A1-A5 / B1-B5 where the CD runs 1-12.
+struct EditionQuestion: Decodable, Equatable {
+    var artist: String?
+    var album: String?
+    var trackId: Int64?
+    var candidates: [EditionOption]
+
+    /// Stable identity for the question, so the UI can tell a new one from a
+    /// redraw of the same one.
+    var key: String {
+        [artist ?? "", album ?? "", candidates.map(\.releaseId).joined(separator: ",")].joined(separator: "|")
+    }
+}
+
+/// One answer the operator can give.
+struct EditionOption: Decodable, Equatable, Identifiable {
+    var source: String
+    var releaseId: String
+    var album: String?
+    var year: String?
+    var releaseFormat: String?
+    var artworkUrl: String?
+    var tracklistCount: Int?
+    /// Where the recognised track sits on THIS edition ("A1" vs "6") — usually
+    /// the quickest way for a human to tell two pressings apart.
+    var position: String?
+    /// Marks the option the evidence leans toward without being certain enough
+    /// to skip the question — the amplifier's input, or the detector's reading
+    /// of the medium. Offered first so confirming is one tap; it decides nothing.
+    var suggested: Bool?
+    /// Names the hint ("amplifier is on Phono"), so the operator can judge it
+    /// rather than trust it.
+    var suggestedWhy: String?
+
+    var id: String { source + "/" + releaseId }
 }
 
 struct Playback: Decodable {

@@ -131,6 +131,17 @@ struct RigAmplifierConfig: Codable, Hashable {
     var inputs: [RigInputConfig]?
 }
 
+/// Whether the amplifier's selected input may be read as evidence of which
+/// medium is playing, when an album exists in the catalogue on more than one
+/// format.
+///
+/// Deliberately its own endpoint rather than a field on `RigAmplifierConfig`:
+/// it belongs to the installation, and activating another amplifier profile
+/// replaces that config wholesale, which would silently reset the choice.
+struct RigFormatHint: Codable, Hashable {
+    var useAmplifierInput: Bool
+}
+
 struct RigStoredAmplifierProfile: Codable, Identifiable, Hashable {
     var id: String
     var name: String

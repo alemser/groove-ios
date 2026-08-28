@@ -11,13 +11,30 @@ the enrichment review queue — all against your `groove-catalog` server on the 
 
 | Tab | What it does | Catalog API |
 |-----|--------------|-------------|
-| **Now Playing** | Live now-playing with artwork, smooth progress, source/format/confidence badges. Polls while foregrounded. | `GET /status` |
+| **Now Playing** | Live now-playing with artwork, smooth progress, source/format/confidence badges. Polls while foregrounded. Floats the "which pressing is playing?" question when an album is in the library on more than one release. | `GET /status`, `POST /identity/album-programme/choose-edition`, `…/dismiss-edition-question` |
 | **History** | Paginated recognition feed with artwork, relative timestamps, "show unidentified" filter, swipe-to-delete, tap-through to the track. | `GET /catalog/plays`, `DELETE /catalog/plays/{epoch}` |
 | **Library → Releases** | Searchable grid of confirmed editions with owned badges; open a release to see metadata and remove owned editions. | `GET /catalog/releases`, `DELETE /catalog/library/releases/{source}/{release_id}` |
 | **Library → Tracks** | Infinite-scroll catalog with confirmed/edited/format badges and on-device filtering. | `GET /catalog/tracks` |
 | **Track detail** | Artwork, metadata, provider-vs-display names, recent plays, fingerprint count. Edit display title/artist/album + media format, reset to provider, or delete. | `GET /catalog/tracks/{id}/profile`, `PATCH …/display`, `DELETE …` |
 | **Review** | Pending associations (accept suggestion / dismiss) and enrich jobs; open a job to confirm or discard release candidates with tracklists. | `…/plays/pending-association`, `…/associate`, `…/enrich/jobs`, `…/enrich/releases/{id}/confirm` |
 | **Settings** | Connect to a server (with live test), toggle metadata enrichers, view stack health. | `GET /status`, `GET /enrich/providers`, `PATCH /enrich/providers/{id}` |
+| **Rig → Amplifier** | Model, inputs and profiles, plus whether the selected input may tell vinyl from digital. | `GET/PATCH /rig/amplifier`, `GET/PATCH /rig/amplifier/format-hint` |
+
+### Which pressing is playing
+
+Asked whenever more than one release in the library matches, unless the track
+exists on only one of them. The amplifier's input and the detector's reading of
+the medium are **hints**: they mark the likely option and say why, but they do
+not answer — the amplifier reports the input it last commanded, and nothing reads
+it back, so a selector turned by hand leaves it wrong with no way to know.
+
+The card floats over the screen rather than sitting under the transport: until it
+is answered the album shown may be the wrong pressing. "Keep what is showing"
+dismisses it without changing anything, so it is never a dead end.
+
+A release cannot be saved or published with a track missing its duration, and
+that one is not forceable — the album programme schedules a whole side from
+cumulative times.
 
 ## Design
 

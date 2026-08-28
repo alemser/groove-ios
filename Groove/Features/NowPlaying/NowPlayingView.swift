@@ -12,6 +12,15 @@ struct NowPlayingView: View {
     var body: some View {
         NavigationStack {
             content
+                // Floated over the screen rather than tucked under the
+                // transport. Until it is answered the album shown may be the
+                // wrong pressing, so the question belongs in front of what it
+                // calls into doubt — not below it, where it reads as a note.
+                .overlay {
+                    if let question = model.editionQuestion {
+                        editionQuestionOverlay(question)
+                    }
+                }
                 .navigationTitle("Now Playing")
                 .navigationBarTitleDisplayMode(.inline)
                 .grooveScreenBackground()
@@ -114,6 +123,7 @@ struct NowPlayingView: View {
                 }
 
                 progress(pb)
+
             }
             .padding()
             .frame(maxWidth: 520)
@@ -194,5 +204,21 @@ struct NowPlayingView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func editionQuestionOverlay(_ question: EditionQuestion) -> some View {
+        ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+            EditionQuestionCard(question: question, onChoose: { option in
+                Task { await model.chooseEdition(option, settings: settings) }
+            }, onDismiss: {
+                Task { await model.dismissEditionQuestion(settings: settings) }
+            }, errorMessage: model.editionErrorMessage)
+            .padding(20)
+            .frame(maxWidth: 520)
+        }
+        .transition(.opacity)
     }
 }

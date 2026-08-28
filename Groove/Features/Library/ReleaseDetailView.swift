@@ -212,7 +212,16 @@ struct ReleaseDetailView: View {
     /// a different provider/edition. Falls back to a title(+artist) compare
     /// against the live playback so the highlight doesn't depend on that link.
     private func isPlaying(_ entry: TracklistEntry, resolvedTrackId: Int64?) -> Bool {
-        guard let pb = nowPlaying.status?.playback, pb.active else { return false }
+        guard let status = nowPlaying.status, status.playback.active else { return false }
+        let pb = status.playback
+        // Both pressings of an album hold the same titles, and a track row can
+        // be tagged to either — so with two editions in the library the title
+        // fallback below lights up the CD's tracklist while the LP is on the
+        // platter (live 2026-08-26). Once something has settled which pressing
+        // is playing, the other one does not get to claim the play.
+        if status.contradictsPlayingEdition(source: release.source, releaseId: release.releaseId) {
+            return false
+        }
         if let resolvedTrackId, let pbId = pb.trackId, pbId > 0 {
             return resolvedTrackId == pbId
         }

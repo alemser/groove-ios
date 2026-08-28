@@ -247,7 +247,11 @@ struct ReleasesView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(model.releases) { release in
                             NavigationLink(value: release) {
-                                ReleaseCardView(release: release, isDropTarget: dropTargetReleaseId == release.id)
+                                ReleaseCardView(
+                                    release: release,
+                                    isDropTarget: dropTargetReleaseId == release.id,
+                                    isPlaying: isPlayingEdition(release)
+                                )
                             }
                             .buttonStyle(.plain)
                             .dropDestination(for: String.self) { items, _ in
@@ -322,6 +326,16 @@ struct ReleasesView: View {
     /// mirrors `oceano-player-ios`'s `NowPlayingBannerView` (artwork + title/
     /// artist + format badge + live-pulse dot, tappable into the full player)
     /// rather than relying on scroll position to surface it.
+    /// Whether this is the pressing on the platter. Two editions of one album
+    /// look identical in the grid — same cover art is common, same title always
+    /// — so without a marker the operator has no way to open the one that is
+    /// actually playing except by guessing.
+    private func isPlayingEdition(_ release: LibraryRelease) -> Bool {
+        guard let status = nowPlaying.status, status.playback.active,
+              let playing = status.playingEdition else { return false }
+        return playing.matches(source: release.source, releaseId: release.releaseId)
+    }
+
     private func nowPlayingBanner(_ pb: Playback) -> some View {
         Button {
             navigation.openNowPlaying()
@@ -408,6 +422,7 @@ enum PendingTrackDropWire {
 struct ReleaseCardView: View {
     let release: LibraryRelease
     var isDropTarget = false
+    var isPlaying = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -417,6 +432,16 @@ struct ReleaseCardView: View {
                     if isDropTarget {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(Brand.accent, lineWidth: 2)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isPlaying {
+                        Image(systemName: "waveform")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Brand.accent)
+                            .padding(6)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .padding(6)
                     }
                 }
                 .animation(.easeInOut(duration: 0.15), value: isDropTarget)
@@ -438,7 +463,7 @@ struct ReleaseCardView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(release.album), \(release.artist)\(release.owned ? ", owned" : "")")
+        .accessibilityLabel("\(release.album), \(release.artist)\(release.owned ? ", owned" : "")\(isPlaying ? ", now playing" : "")")
     }
 }
 
