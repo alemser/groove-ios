@@ -364,6 +364,10 @@ struct EditReleaseView: View {
             Button {
                 let nextOrdinal = (tracklist.map(\.ordinal).max() ?? 0) + 1
                 tracklist.append(TracklistEntry(position: nil, ordinal: nextOrdinal, isrc: nil, title: "New Track", durationMs: nil))
+                // A blank position on a vinyl release is not "no label", it is
+                // a label nobody has worked out yet; renumber gives it the
+                // side it was appended to.
+                renumber()
             } label: {
                 Label("Add Track", systemImage: "plus")
             }
@@ -457,9 +461,61 @@ struct EditReleaseView: View {
         return Int64((m * 60 + s) * 1000)
     }
 
+    /// A side reference like "A1" or "1-B", or nil for anything else.
+    private static func vinylSideAndTrack(_ raw: String?) -> (side: String, track: Int)? {
+        let value = (raw ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        guard !value.isEmpty else { return nil }
+        for pattern in [#"^([A-D])[-.]?(\d{1,2})$"#, #"^(\d{1,2})[-.]?([A-D])$"#] {
+            guard let re = try? NSRegularExpression(pattern: pattern),
+                  let m = re.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
+                  let r1 = Range(m.range(at: 1), in: value), let r2 = Range(m.range(at: 2), in: value)
+            else { continue }
+            let a = String(value[r1]), b = String(value[r2])
+            if let n = Int(b) { return (a, n) }
+            if let n = Int(a) { return (b, n) }
+        }
+        return nil
+    }
+
+    private static func isPlainNumber(_ raw: String?) -> Bool {
+        let value = (raw ?? "").trimmingCharacters(in: .whitespaces)
+        guard let n = Int(value) else { return false }
+        return String(n) == value
+    }
+
+    /// Puts `ordinal` and the visible position label back in step with the rows'
+    /// order, after a move, an insert or a delete.
+    ///
+    /// Renumbering only `ordinal` — which is what this used to do — moved the
+    /// track and left every label where it was: the moved row kept its old
+    /// number and nothing below it shifted, so the tracklist read 1,2,8,3,4 and
+    /// the one number the operator can actually see was the wrong one.
+    ///
+    /// On a numeric release the labels are simply 1...n. On vinyl the label
+    /// carries the side, so each side is numbered on its own and the letter is
+    /// kept: a row's side comes from its own label, or from the row above it
+    /// when it has none, which is how a track typed in as "8" and dragged into
+    /// side A becomes A3. Best effort by design — anything that is neither a
+    /// plain number nor a side reference ("1-3", "AA") is left as typed.
     private func renumber() {
+        let refs = tracklist.map { Self.vinylSideAndTrack($0.position) }
+        let vinyl = refs.contains { $0 != nil }
+        var counters: [String: Int] = [:]
+        var side = ""
         for index in tracklist.indices {
             tracklist[index].ordinal = index + 1
+            let raw = (tracklist[index].position ?? "").trimmingCharacters(in: .whitespaces)
+            guard vinyl else {
+                if raw.isEmpty || Self.isPlainNumber(raw) {
+                    tracklist[index].position = String(index + 1)
+                }
+                continue
+            }
+            if let ref = refs[index] { side = ref.side }
+            guard !side.isEmpty else { continue }
+            if refs[index] == nil, !raw.isEmpty, !Self.isPlainNumber(raw) { continue }
+            counters[side, default: 0] += 1
+            tracklist[index].position = side + String(counters[side] ?? 1)
         }
     }
 
