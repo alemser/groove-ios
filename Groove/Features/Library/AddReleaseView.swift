@@ -28,7 +28,10 @@ final class AddReleaseModel {
         Task {
             phase = .loading
             do {
-                results = try await CatalogService(settings: settings).identifySearch(artist: artist, album: album)
+                // A wider net than the default 25: the filters below only ever
+                // narrow what came back, so a pressing that fell outside the
+                // page can never be filtered into view.
+                results = try await CatalogService(settings: settings).identifySearch(artist: artist, album: album, limit: 40)
                 phase = .loaded
             } catch {
                 phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
@@ -82,6 +85,8 @@ struct AddReleaseView: View {
     @State private var artist = ""
     @State private var album = ""
     @State private var created: CreatedDraft?
+    @State private var selectedFormat: String?
+    @State private var selectedCountry: String?
 
     private enum Field { case artist, album }
 
@@ -120,6 +125,7 @@ struct AddReleaseView: View {
                         .foregroundStyle(Brand.muted)
                 }
 
+                filterSection
                 resultsSection
 
                 Section {
@@ -176,9 +182,16 @@ struct AddReleaseView: View {
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
                 }
+            } else if filteredResults.isEmpty {
+                Section {
+                    Text("No result matches those filters. The pressing you want may not be in the providers — clear the filters to see everything that came back, or save with just artist and album below.")
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                    Button("Clear filters") { selectedFormat = nil; selectedCountry = nil }
+                }
             } else {
                 Section("Results") {
-                    ForEach(model.results) { hit in
+                    ForEach(filteredResults) { hit in
                         Button {
                             Task { await createFromHit(hit) }
                         } label: {
@@ -193,8 +206,80 @@ struct AddReleaseView: View {
         }
     }
 
+    /// One value a result can be filtered by, with how many results carry it.
+    private struct FilterOption: Identifiable, Hashable {
+        let key: String
+        let label: String
+        let count: Int
+        var id: String { key }
+    }
+
+    /// Options are built from what the search actually returned, never from a
+    /// fixed list of countries and formats. Two reasons: every option offered
+    /// is guaranteed to leave at least one result, and the ABSENCE of an option
+    /// is itself the answer — no "Vinyl" in the list means the providers hold
+    /// no vinyl pressing of this record, which is what the operator wanted to
+    /// know before typing one in by hand.
+    private func options(_ value: (IdentifySearchHit) -> String?) -> [FilterOption] {
+        var counts: [String: (label: String, n: Int)] = [:]
+        for hit in model.results {
+            let raw = (value(hit) ?? "").trimmingCharacters(in: .whitespaces)
+            guard !raw.isEmpty else { continue }
+            let key = raw.lowercased()
+            counts[key] = (counts[key]?.label ?? raw, (counts[key]?.n ?? 0) + 1)
+        }
+        return counts
+            .map { FilterOption(key: $0.key, label: $0.value.label, count: $0.value.n) }
+            .sorted { $0.count == $1.count ? $0.label < $1.label : $0.count > $1.count }
+    }
+
+    private var formatOptions: [FilterOption] { options(\.releaseFormat) }
+    private var countryOptions: [FilterOption] { options(\.country) }
+
+    private var filteredResults: [IdentifySearchHit] {
+        model.results.filter { hit in
+            let f = (hit.releaseFormat ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+            let c = (hit.country ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+            return (selectedFormat == nil || f == selectedFormat)
+                && (selectedCountry == nil || c == selectedCountry)
+        }
+    }
+
+    @ViewBuilder
+    private var filterSection: some View {
+        if model.phase == .loaded, formatOptions.count > 1 || countryOptions.count > 1 {
+            Section {
+                if formatOptions.count > 1 {
+                    Picker("Format", selection: $selectedFormat) {
+                        Text("Any").tag(String?.none)
+                        ForEach(formatOptions) { o in
+                            Text("\(o.label) (\(o.count))").tag(String?.some(o.key))
+                        }
+                    }
+                }
+                if countryOptions.count > 1 {
+                    Picker("Country", selection: $selectedCountry) {
+                        Text("Any").tag(String?.none)
+                        ForEach(countryOptions) { o in
+                            Text("\(o.label) (\(o.count))").tag(String?.some(o.key))
+                        }
+                    }
+                }
+            } header: {
+                Text("Narrow the results")
+            } footer: {
+                Text("Only what this search returned is offered. A format or country missing from these lists means the providers hold no such pressing of this record.")
+                    .foregroundStyle(Brand.muted)
+            }
+        }
+    }
+
     private func search() {
         focusedField = nil
+        // A new search is a new set of results; carrying the old filters over
+        // would silently hide most of it.
+        selectedFormat = nil
+        selectedCountry = nil
         model.search(artist: artist, album: album)
     }
 
