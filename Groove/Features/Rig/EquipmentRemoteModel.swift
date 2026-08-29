@@ -59,6 +59,10 @@ final class EquipmentRemoteModel {
             actionError = nil
         } catch {
             actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            // The tap was confirmed by a haptic before the request went out; a
+            // failure has to be felt too, or the operator is left believing the
+            // command reached the equipment.
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

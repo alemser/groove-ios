@@ -12,6 +12,8 @@ final class AmplifierModel {
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    /// Tail of the serial chain of volume steps — see volume(direction:).
+    private var volumeChain: Task<Void, Never>?
 
     var amplifier: RigAmplifierStatus? { snapshot?.amplifier }
     var amplifierTarget: RigTargetStatus? { snapshot?.targets.first { $0.id == "amplifier" } }
@@ -50,6 +52,10 @@ final class AmplifierModel {
             actionError = nil
         } catch {
             actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            // The tap was confirmed by a haptic before the request went out.
+            // If it then failed, say so the same way — the error text sits at
+            // the bottom of a scrolling screen and is easy to miss.
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 
@@ -88,11 +94,31 @@ final class AmplifierModel {
         }
     }
 
+    /// Volume is the one control people press in bursts, and perform()'s
+    /// one-at-a-time guard DROPPED those taps: press five times while a request
+    /// is in flight and only the first is sent, with nothing on screen or in the
+    /// hand to say the others went nowhere. That reads as a broken button.
+    ///
+    /// So volume does not go through perform(). Each press is appended to a
+    /// serial chain and sent in order — five presses are five steps, which is
+    /// what the amplifier's own remote does. The chain matters: sending them
+    /// concurrently would let the rig transmit two IR codes at once.
     func volume(direction: String) async {
         guard let settings else { return }
-        await perform {
-            self.snapshot = try await CatalogService(settings: settings).rigAction(action: "volume_\(direction)")
+        let previous = volumeChain
+        let task = Task { @MainActor [weak self] in
+            _ = await previous?.result
+            guard let self else { return }
+            do {
+                self.snapshot = try await CatalogService(settings: settings).rigAction(action: "volume_\(direction)")
+                self.actionError = nil
+            } catch {
+                self.actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
+        volumeChain = task
+        await task.value
     }
 
     func nextInput() async {

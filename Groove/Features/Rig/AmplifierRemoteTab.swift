@@ -281,10 +281,23 @@ struct AmplifierRemoteTab: View {
     }
 }
 
+/// The remote's buttons fire IR at the amplifier, and an IR command has no
+/// result on this screen by nature — what changes is across the room. So the
+/// button is the only place confirmation can come from, and a 4% scale on a
+/// 44pt control is under two points of movement.
+///
+/// The tap is confirmed on PRESS rather than on the reply. The round trip to
+/// groove-rig and out to the amplifier takes long enough that waiting for it is
+/// exactly what makes the button feel dead; by then the operator has already
+/// pressed again. Failures are reported by the models, as `.error`.
 private struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                guard pressed else { return }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
     }
 }
