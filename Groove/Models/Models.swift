@@ -366,6 +366,10 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
     /// (groove-catalog#32b) instead of a duplicate queue entry per play.
     var playCount: Int?
     var lastSeenAt: String?
+    /// Lower-bound length of the captured audio (capture is usually still
+    /// open when this row is registered) — a hint toward which catalog track
+    /// this might be, by comparing against known track durations.
+    var capturedMs: Int64?
 
     var id: UInt64 { listenerEpoch }
 }
@@ -375,6 +379,9 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
 struct IdentificationSuggestion: Decodable, Hashable {
     var source: String?
     var reason: String?
+    var title: String?
+    var ordinal: Int?
+    var trackId: Int64?
 }
 
 struct PendingAssociationsResponse: Decodable {
@@ -613,6 +620,7 @@ extension String {
         case "provider_error": return "Provider error"
         case "programme_end": return "Programme end"
         case "expected_next_track": return "Next track in album sequence"
+        case "last_known_track_no_next": return "Last confirmed track (no next expected)"
         default: return nonEmpty?.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

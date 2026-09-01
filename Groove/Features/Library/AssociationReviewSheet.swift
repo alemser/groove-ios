@@ -257,6 +257,25 @@ struct AssociationRowView: View {
 
     private var hasSuggestion: Bool { (item.suggestedTrackId ?? 0) > 0 }
 
+    /// Mirrors the web pending panel's `pendingContextLabel`: was this
+    /// captured mid a known, correctly-identified play (and after which
+    /// track), or is there no session context to anchor it at all?
+    private var contextLabel: String {
+        switch item.suggestion?.reason {
+        case "last_known_track_no_next":
+            return "During known play: after \"\(item.suggestion?.title ?? "a known track")\""
+        case "expected_next_track":
+            return "During known play: expected next track in album"
+        default:
+            return (item.playTrackId ?? 0) > 0 ? "During known play" : "No active session context"
+        }
+    }
+
+    private var capturedDurationLabel: String? {
+        guard let ms = item.capturedMs, ms > 0 else { return nil }
+        return "captured \(Format.duration(ms))"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
@@ -274,7 +293,7 @@ struct AssociationRowView: View {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(Brand.muted)
                     }
-                    Text(Format.relative(item.startedAt)).font(.caption).foregroundStyle(Brand.muted)
+                    Text(Format.preciseWhen(item.startedAt)).font(.caption).foregroundStyle(Brand.muted)
                 }
                 Text(item.suggestedTitle?.nonEmpty ?? "Unidentified play")
                     .font(.body.weight(.medium)).foregroundStyle(Brand.text)
@@ -285,8 +304,16 @@ struct AssociationRowView: View {
                     Text(item.failureReason?.humanizedReason ?? "No suggestion")
                         .font(.subheadline).foregroundStyle(Brand.muted)
                 }
-                if let reason = item.suggestion?.reason?.humanizedReason {
-                    Text(reason)
+                Text([contextLabel, capturedDurationLabel].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(Brand.teal)
+                // contextLabel above already spells out the album-programme
+                // reasons in full sentences — only show the raw humanized
+                // reason for anything else, to avoid saying the same thing twice.
+                if let reason = item.suggestion?.reason,
+                   reason != "last_known_track_no_next", reason != "expected_next_track",
+                   let humanized = reason.humanizedReason {
+                    Text(humanized)
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
                         .italic()

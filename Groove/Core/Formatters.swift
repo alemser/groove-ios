@@ -45,6 +45,19 @@ enum Format {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
+    /// Relative under an hour ("12 min ago"), then switches to an absolute
+    /// clock time with seconds — past the 1h mark, rounding to "2h ago" loses
+    /// the precision needed to tell apart two same-session unresolved plays.
+    static func preciseWhen(_ raw: String?) -> String {
+        guard let date = date(raw) else { return "" }
+        let diffMin = Date().timeIntervalSince(date) / 60
+        if diffMin < 1 { return "just now" }
+        if diffMin < 60 { return "\(Int(diffMin.rounded())) min ago" }
+        let sameDay = Calendar.current.isDateInToday(date)
+        let time = date.formatted(date: .omitted, time: .standard)
+        return sameDay ? "at \(time)" : "\(date.formatted(date: .abbreviated, time: .omitted)) at \(time)"
+    }
+
     static func confidence(_ value: Double?) -> String? {
         guard let value, value > 0 else { return nil }
         return "\(Int((value * 100).rounded()))%"
