@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var scheme = "http"
     @State private var probe = ProbeState.idle
     @State private var saved = false
+    @State private var showSwitchServer = false
 
     var body: some View {
         NavigationStack {
@@ -56,6 +57,11 @@ struct SettingsView: View {
                 }
 
                 Section("Catalog Server") {
+                    Button {
+                        showSwitchServer = true
+                    } label: {
+                        Label("Switch Server", systemImage: "dot.radiowaves.left.and.right")
+                    }
                     TextField("Host or IP", text: $host)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -103,6 +109,16 @@ struct SettingsView: View {
             .navigationTitle("Settings")
         }
         .onAppear(perform: loadFields)
+        .sheet(isPresented: $showSwitchServer, onDismiss: loadFields) {
+            NavigationStack {
+                ConnectView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showSwitchServer = false }
+                        }
+                    }
+            }
+        }
     }
 
     private func row(title: String, subtitle: String, icon: String, tint: Color) -> some View {

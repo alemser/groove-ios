@@ -6,6 +6,7 @@ import SwiftUI
 /// a fallback link instead of showing input fields by default.
 struct ConnectView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(\.dismiss) private var dismiss
 
     @State private var host = ""
     @State private var port = "7073"
@@ -232,6 +233,9 @@ struct ConnectView: View {
             settings.scheme = trial.scheme
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             probe = .idle
+            // No-op on first run (nothing presenting this view yet); closes
+            // the sheet when reached from Settings' "Switch Server".
+            dismiss()
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             probe = .failed((error as? APIError)?.localizedDescription ?? error.localizedDescription)
