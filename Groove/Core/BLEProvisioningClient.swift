@@ -24,7 +24,7 @@ struct BLEProvisioningStatus: Decodable, Equatable {
 }
 
 extension CBManagerState {
-    /// TEMPORARY diagnostic helper — see `BLEProvisioningClient.onDebugLog`.
+    /// Human-readable name for console logging (`BLEProvisioningClient.log`).
     var diagnosticName: String {
         switch self {
         case .unknown: return "unknown"
@@ -68,14 +68,11 @@ final class BLEProvisioningClient: NSObject {
     var onNetworksUpdated: (([BLEWiFiNetwork]) -> Void)?
     var onStatusUpdated: ((BLEProvisioningStatus) -> Void)?
     var onDisconnected: (() -> Void)?
-    /// TEMPORARY diagnostic hook (2026-09-02, Phase 2 first field test) —
-    /// surfaces what CoreBluetooth is actually seeing directly in the UI,
-    /// since there's no way to attach a console to a phone running a plain
-    /// Xcode-installed build. Remove once Phase 2 is confirmed working.
-    var onDebugLog: ((String) -> Void)?
 
     private func log(_ message: String) {
-        onDebugLog?(message)
+        #if DEBUG
+        print("[BLEProvisioning] \(message)")
+        #endif
     }
 
     /// True once `discoverAndConnect` has actually succeeded and the link is

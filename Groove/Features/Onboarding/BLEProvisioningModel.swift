@@ -19,9 +19,6 @@ final class BLEProvisioningModel {
 
     var phase: Phase = .searching
     var networks: [BLEWiFiNetwork] = []
-    /// TEMPORARY diagnostic (2026-09-02, Phase 2 first field test) — see
-    /// BLEProvisioningClient.onDebugLog. Remove once confirmed working.
-    var debugLog: [String] = []
 
     private let client = BLEProvisioningClient()
 
@@ -38,9 +35,6 @@ final class BLEProvisioningModel {
             // real loss of connection, not part of the happy path.
             guard let self, case .success = self.phase else { return }
         }
-        client.onDebugLog = { [weak self] line in
-            self?.debugLog.append(line)
-        }
         connectAndScan()
     }
 
@@ -54,7 +48,6 @@ final class BLEProvisioningModel {
     private func connectAndScan() {
         phase = .searching
         networks = []
-        debugLog.append("── retry ──")
         Task {
             do {
                 try await client.discoverAndConnect()
