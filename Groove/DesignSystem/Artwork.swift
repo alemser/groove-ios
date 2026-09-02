@@ -13,6 +13,13 @@ struct Artwork: View {
     var isRecognizing: Bool = false
 
     @Environment(AppSettings.self) private var settings
+    // AsyncImage never retries on its own — a single transient blip fetching
+    // an external cover-art CDN over the LAN (the common case here, unlike
+    // the web UI's browser-level retry/caching) leaves the placeholder up
+    // for good. Bumping this forces AsyncImage to recreate itself and try
+    // again, up to a couple of times, before settling on the placeholder.
+    @State private var retryCount = 0
+    private let maxRetries = 2
 
     var body: some View {
         let url = settings.resolveArtwork(raw)
@@ -22,12 +29,19 @@ struct Artwork: View {
                 image.resizable().scaledToFill()
             case .failure:
                 placeholder
+                    .task(id: retryCount) {
+                        guard retryCount < maxRetries else { return }
+                        try? await Task.sleep(for: .milliseconds(600 * Int64(retryCount + 1)))
+                        guard !Task.isCancelled else { return }
+                        retryCount += 1
+                    }
             case .empty:
                 if url == nil { placeholder } else { shimmer }
             @unknown default:
                 placeholder
             }
         }
+        .id(retryCount)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

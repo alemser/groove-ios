@@ -35,23 +35,28 @@ final class ReleasesModel {
         guard let settings else { return }
         lastQuery = query
         if releases.isEmpty && pending.isEmpty { phase = .loading }
+        let service = CatalogService(settings: settings)
         do {
-            let service = CatalogService(settings: settings)
-            async let releaseList = service.releases(query: query)
-            async let pendingList = service.pendingReleaseTracks()
-            async let associations = service.pendingAssociations()
             // Zero-track releases are legitimate on the web "Releases" management
             // page (where they're kept around specifically so the user can Remove
             // them), but here they're just phantom albums cluttering the library —
             // and their confirmed_at can be more recent than a real release's last
             // play, which threw off the "most recently played first" ordering too.
-            releases = try await releaseList.filter { $0.catalogTracks > 0 }
-            pending = try await pendingList
-            associationsCount = try await associations.items.count
-            phase = .loaded
+            let releaseList = try await service.releases(query: query)
+            releases = releaseList.filter { $0.catalogTracks > 0 }
         } catch {
             phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            return
         }
+        // Pending tracks and the association badge are supplementary — a slow
+        // or failed fetch here used to fail the whole `async let` group and
+        // blank the entire screen even though the release list above had
+        // already loaded fine. Degrade to the previous value instead.
+        async let pendingList = service.pendingReleaseTracks()
+        async let associations = service.pendingAssociations()
+        pending = (try? await pendingList) ?? pending
+        associationsCount = (try? await associations)?.items.count ?? associationsCount
+        phase = .loaded
     }
 
     /// Attaches `trackId` to `release` by copying metadata from a track it already
