@@ -19,23 +19,20 @@ final class AttentionCenter {
     /// "Release matching" — reuses this poller instead of adding a second one.
     private(set) var autonomous = false
 
-    private var pollTask: Task<Void, Never>?
+    private var poller: Poller?
     private var settings: AppSettings?
 
     func start(_ settings: AppSettings) {
         self.settings = settings
-        guard pollTask == nil else { return }
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refresh()
-                try? await Task.sleep(for: .seconds(30))
-            }
-        }
+        guard poller == nil else { return }
+        let p = Poller(interval: .seconds(30)) { [weak self] in await self?.refresh() }
+        poller = p
+        p.start()
     }
 
     func stop() {
-        pollTask?.cancel()
-        pollTask = nil
+        poller?.stop()
+        poller = nil
     }
 
     func refresh() async {

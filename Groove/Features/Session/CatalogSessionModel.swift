@@ -34,8 +34,8 @@ final class CatalogSessionModel {
     private var lastNowOrdinal = 0
     private var tracklistForTrackId: Int64?
     private var settings: AppSettings?
-    private var statusTask: Task<Void, Never>?
-    private var pendingTask: Task<Void, Never>?
+    private var statusPoller: Poller?
+    private var pendingPoller: Poller?
 
     /// Once a real track has played this sitting, a silence gap reads as
     /// "between tracks", never back to the empty idle state.
@@ -56,27 +56,21 @@ final class CatalogSessionModel {
     }
 
     func start() {
-        guard statusTask == nil, let settings else { return }
+        guard statusPoller == nil, let settings else { return }
         let service = CatalogService(settings: settings)
-        statusTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.pollStatus(service)
-                try? await Task.sleep(for: .seconds(1))
-            }
-        }
-        pendingTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.loadPending(service)
-                try? await Task.sleep(for: .seconds(5))
-            }
-        }
+        let status = Poller(interval: .seconds(1)) { [weak self] in await self?.pollStatus(service) }
+        let pending = Poller(interval: .seconds(5)) { [weak self] in await self?.loadPending(service) }
+        statusPoller = status
+        pendingPoller = pending
+        status.start()
+        pending.start()
     }
 
     func stop() {
-        statusTask?.cancel()
-        statusTask = nil
-        pendingTask?.cancel()
-        pendingTask = nil
+        statusPoller?.stop()
+        statusPoller = nil
+        pendingPoller?.stop()
+        pendingPoller = nil
     }
 
     /// Position in ms at `now`, interpolated between 1s polls — same pattern

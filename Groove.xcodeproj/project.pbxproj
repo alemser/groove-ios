@@ -73,6 +73,7 @@
 		F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C276B60479555871B884B5E /* NavigationState.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
+		EF5FF29136C5323F50BA8F5C /* Poller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A21577707E88064BC0A24E1 /* Poller.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -133,6 +134,7 @@
 		CA8BD7C8D9EB3F5C87DC8D8D /* OceanoWordmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanoWordmark.swift; sourceTree = "<group>"; };
 		CCA960A78CBB07569FF3BBCC /* RecognitionInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionInfoSheet.swift; sourceTree = "<group>"; };
 		CFF1193157A2AE8C0D67BA94 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		3A21577707E88064BC0A24E1 /* Poller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Poller.swift; sourceTree = "<group>"; };
 		D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteQuickAccessSheet.swift; sourceTree = "<group>"; };
 		D5EB40C22B18DFB61CAA5600 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB9253360D61A0BC5E0BE49D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 				27254E509C0A5183FE8A30CB /* AttentionCenter.swift */,
 				4271F4F0D0D2FEC9D2446F75 /* CatalogDiscovery.swift */,
 				BC847C6CED4853F2D4663F1D /* CatalogService.swift */,
+				3A21577707E88064BC0A24E1 /* Poller.swift */,
 				B26F2A1EC6AA9160C8B6AB11 /* Formatters.swift */,
 				5C276B60479555871B884B5E /* NavigationState.swift */,
 			);
@@ -428,6 +431,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */,
+				EF5FF29136C5323F50BA8F5C /* Poller.swift in Sources */,
 				C9D4BF7C12E77F859C6C00DD /* AddEquipmentView.swift in Sources */,
 				71BAC18D62D28ADD88BF0792 /* AddReleaseView.swift in Sources */,
 				F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */,

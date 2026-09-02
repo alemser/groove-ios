@@ -20,7 +20,7 @@ final class NowPlayingModel {
     private(set) var lastActiveAt: Date?
     private let transitionGraceInterval: TimeInterval = 25
 
-    private var pollTask: Task<Void, Never>?
+    private var poller: Poller?
 
     /// Set when answering the edition question failed, so the card can say so
     /// beside the buttons rather than failing silently.
@@ -37,19 +37,16 @@ final class NowPlayingModel {
     }
 
     func start(_ settings: AppSettings) {
-        guard pollTask == nil else { return }
+        guard poller == nil else { return }
         let service = CatalogService(settings: settings)
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refresh(service)
-                try? await Task.sleep(for: .seconds(2))
-            }
-        }
+        let p = Poller(interval: .seconds(2)) { [weak self] in await self?.refresh(service) }
+        poller = p
+        p.start()
     }
 
     func stop() {
-        pollTask?.cancel()
-        pollTask = nil
+        poller?.stop()
+        poller = nil
     }
 
     func refresh(_ service: CatalogService) async {
