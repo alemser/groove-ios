@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var probe = ProbeState.idle
     @State private var saved = false
     @State private var showSwitchServer = false
+    @State private var showBLEProvisioning = false
 
     var body: some View {
         NavigationStack {
@@ -61,6 +62,11 @@ struct SettingsView: View {
                         showSwitchServer = true
                     } label: {
                         Label("Switch Server", systemImage: "dot.radiowaves.left.and.right")
+                    }
+                    Button {
+                        showBLEProvisioning = true
+                    } label: {
+                        Label("Reconfigure Wi-Fi via Bluetooth", systemImage: "wifi")
                     }
                     TextField("Host or IP", text: $host)
                         .textInputAutocapitalization(.never)
@@ -118,6 +124,13 @@ struct SettingsView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showBLEProvisioning) {
+            // This device is presumably already configured (you're in
+            // Settings) -- always-advertise on the groove-provision side
+            // means "reconfigure" is the exact same flow as first-run, just
+            // reached from a different entry point.
+            BLEProvisioningView()
         }
     }
 

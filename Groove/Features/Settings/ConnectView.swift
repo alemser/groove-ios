@@ -15,6 +15,7 @@ struct ConnectView: View {
     @State private var discovery = CatalogDiscovery()
     @State private var showManualEntry = false
     @State private var showSlowHint = false
+    @State private var showBLEProvisioning = false
     @State private var autoConnectAttemptedIDs: Set<String> = []
 
     var body: some View {
@@ -121,11 +122,28 @@ struct ConnectView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(Brand.accent)
                     .controlSize(.large)
+                    Button {
+                        showBLEProvisioning = true
+                    } label: {
+                        Label("Set Up a New Oceano via Bluetooth", systemImage: "dot.radiowaves.left.and.right")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Brand.teal)
+                    .controlSize(.large)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 8)
+        .sheet(isPresented: $showBLEProvisioning) {
+            // No extra handoff logic needed here: discovery.startBrowsing()
+            // is already running for the lifetime of this view, so once the
+            // device joins WiFi and starts advertising over mDNS instead,
+            // the existing Bonjour search picks it up on its own.
+            BLEProvisioningView()
+        }
     }
 
     // MARK: - Discovered hosts
