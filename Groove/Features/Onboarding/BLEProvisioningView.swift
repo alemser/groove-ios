@@ -22,17 +22,17 @@ struct BLEProvisioningView: View {
                     debugPanel
                 }
             }
-                .grooveScreenBackground()
-                .navigationTitle("Set Up Oceano")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            model.cancel()
-                            dismiss()
-                        }
+            .grooveScreenBackground()
+            .navigationTitle("Set Up Oceano")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        model.cancel()
+                        dismiss()
                     }
                 }
+            }
         }
         .task {
             model.start()
