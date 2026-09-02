@@ -136,7 +136,7 @@ struct SettingsView: View {
                     .font(.body.weight(.medium))
                     .foregroundStyle(Brand.text)
                 if settings.baseURL != nil {
-                    Text("\(settings.host):\(settings.port)")
+                    Text(settings.host + ":" + String(settings.port))
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
                 } else {
