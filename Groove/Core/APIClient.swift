@@ -186,14 +186,22 @@ struct APIClient {
     }
 
     /// Single choke point every request runs through. GET is safe to repeat,
-    /// so a transient transport failure (timeout, dropped connection — the
-    /// LAN-to-Pi hop this app talks over is exactly where those happen) gets
-    /// one retry with a short backoff. Writes (POST/PATCH/PUT/DELETE) never
-    /// retry here: replaying one after an ambiguous failure could double-apply
-    /// it. A non-2xx HTTP response is a real answer from the server, not a
-    /// transient failure, and is never retried either way.
+    /// so a transient transport failure gets a couple of retries with rising
+    /// backoff. This app's `host` is stored as a Bonjour `.local` hostname
+    /// (deliberately, see CatalogDiscovery — an IP wouldn't survive a DHCP
+    /// lease change), and resolving that over mDNS is known to be flaky on
+    /// the very first request right after a cold app launch: the OS's mDNS
+    /// resolver hasn't been "primed" the way it is when the user explicitly
+    /// browses in Settings → Switch Server, so the first attempt can fail
+    /// outright rather than just being slow. Three attempts (500ms, then
+    /// 1000ms backoff) gives that resolution a beat to catch up instead of
+    /// surfacing a false "something went wrong" on every launch. Writes
+    /// (POST/PATCH/PUT/DELETE) never retry here: replaying one after an
+    /// ambiguous failure could double-apply it. A non-2xx HTTP response is a
+    /// real answer from the server, not a transient failure, and is never
+    /// retried either way.
     private func execute(_ req: URLRequest) async throws -> Data {
-        let maxAttempts = req.httpMethod == "GET" ? 2 : 1
+        let maxAttempts = req.httpMethod == "GET" ? 3 : 1
         var lastTransportError = APIError.transport("Unknown transport error.")
         for attempt in 1...maxAttempts {
             do {
@@ -211,7 +219,7 @@ struct APIClient {
             } catch {
                 lastTransportError = .transport(error.localizedDescription)
                 if attempt < maxAttempts {
-                    try? await Task.sleep(for: .milliseconds(400))
+                    try? await Task.sleep(for: .milliseconds(500 * attempt))
                 }
             }
         }
