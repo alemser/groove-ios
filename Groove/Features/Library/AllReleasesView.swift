@@ -40,7 +40,7 @@ final class AllReleasesModel {
             releases = try await CatalogService(settings: settings).releases(query: query)
             phase = .loaded
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
         }
     }
 
@@ -51,7 +51,7 @@ final class AllReleasesModel {
             try await CatalogService(settings: settings).deleteLibraryRelease(source: release.source, releaseId: release.releaseId)
             releases.removeAll { $0.id == release.id }
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
         deletingId = nil
     }

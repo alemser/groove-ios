@@ -60,7 +60,7 @@ final class NowPlayingModel {
             if next.playback.active { lastActiveAt = Date() }
             errorMessage = nil
         } catch {
-            errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            errorMessage = error.localizedForDisplay
         }
         hasLoadedOnce = true
     }
@@ -75,7 +75,7 @@ final class NowPlayingModel {
             editionErrorMessage = nil
             await refresh(service)
         } catch {
-            editionErrorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            editionErrorMessage = error.localizedForDisplay
         }
     }
 
@@ -86,7 +86,7 @@ final class NowPlayingModel {
             editionErrorMessage = nil
             await refresh(service)
         } catch {
-            editionErrorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            editionErrorMessage = error.localizedForDisplay
         }
     }
 

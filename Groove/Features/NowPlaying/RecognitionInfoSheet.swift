@@ -83,7 +83,7 @@ struct RecognitionInfoSheet: View {
         do {
             track = try await CatalogService(settings: settings).trackProfile(id: id).track
         } catch {
-            loadError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            loadError = error.localizedForDisplay
         }
     }
 }

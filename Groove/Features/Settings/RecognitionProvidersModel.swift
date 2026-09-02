@@ -28,7 +28,7 @@ final class RecognitionProvidersModel {
             phase = .loaded
         } catch {
             if state == nil {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
         }
         usage = try? await CatalogService(settings: settings).recognitionObservability()
@@ -40,7 +40,7 @@ final class RecognitionProvidersModel {
             state = try await CatalogService(settings: settings).setRecognitionProviderEnabled(id: id, enabled: enabled)
             actionError = nil
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             await load()
         }
     }
@@ -51,7 +51,7 @@ final class RecognitionProvidersModel {
             state = try await CatalogService(settings: settings).reorderRecognitionProviders(order: order)
             actionError = nil
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             await load()
         }
     }
@@ -65,7 +65,7 @@ final class RecognitionProvidersModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -78,7 +78,7 @@ final class RecognitionProvidersModel {
             actionError = nil
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             await load()
             return false
         }
@@ -93,7 +93,7 @@ final class RecognitionProvidersModel {
             actionError = nil
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -106,7 +106,7 @@ final class RecognitionProvidersModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return nil
         } catch {
-            return (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return error.localizedForDisplay
         }
     }
 
@@ -118,7 +118,7 @@ final class RecognitionProvidersModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return nil
         } catch {
-            return (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            return error.localizedForDisplay
         }
     }
 
@@ -128,7 +128,7 @@ final class RecognitionProvidersModel {
             try await CatalogService(settings: settings).deleteCustomProvider(slug: slug)
             await load()
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
     }
 

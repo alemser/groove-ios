@@ -331,7 +331,7 @@ struct CustomProviderFormView: View {
             if isrcField.isEmpty { isrcField = fields?.isrc ?? isrcField }
             analyzeMessage = "Applied suggested field mapping."
         } catch {
-            analyzeMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            analyzeMessage = error.localizedForDisplay
         }
     }
 }

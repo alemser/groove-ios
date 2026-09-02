@@ -47,7 +47,7 @@ final class ManualIdentifyModel {
             results = try await CatalogService(settings: settings).identifySearch(query: q)
             phase = .loaded
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
         }
     }
 
@@ -66,7 +66,7 @@ final class ManualIdentifyModel {
             busyId = nil
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             busyId = nil
             return false
         }
@@ -79,7 +79,7 @@ final class ManualIdentifyModel {
             _ = try await CatalogService(settings: settings).manualIdentify(epoch: epoch, artist: artist, title: title, album: album)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -456,7 +456,7 @@ struct ReleaseTracklistPickerSheet: View {
         do {
             edition = try await CatalogService(settings: settings).confirmedEdition(source: source, releaseId: releaseId)
         } catch {
-            loadError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            loadError = error.localizedForDisplay
         }
     }
 
@@ -478,7 +478,7 @@ struct ReleaseTracklistPickerSheet: View {
             }
         } catch {
             submittingOrdinal = nil
-            submitError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            submitError = error.localizedForDisplay
         }
     }
 

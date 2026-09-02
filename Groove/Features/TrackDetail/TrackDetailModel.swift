@@ -31,7 +31,7 @@ final class TrackDetailModel {
             profile = try await CatalogService(settings: settings).trackProfile(id: trackId)
             phase = .loaded
         } catch {
-            if profile == nil { phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription) }
+            if profile == nil { phase = .error(error.localizedForDisplay) }
         }
     }
 
@@ -43,7 +43,7 @@ final class TrackDetailModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -59,7 +59,7 @@ final class TrackDetailModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -77,7 +77,7 @@ final class TrackDetailModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

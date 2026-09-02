@@ -38,24 +38,28 @@ final class AmplifierConfigModel {
     func load() async {
         guard let settings else { return }
         if config == nil { phase = .loading }
+        let service = CatalogService(settings: settings)
+        async let cfg = service.rigAmplifierConfig()
+        async let profs = service.rigAmplifierProfiles()
+        async let hint = service.rigFormatHint()
         do {
-            let service = CatalogService(settings: settings)
-            async let cfg = service.rigAmplifierConfig()
-            async let profs = service.rigAmplifierProfiles()
-            async let hint = service.rigFormatHint()
             config = try await cfg
-            let profResp = try await profs
-            profiles = profResp.profiles
-            activeProfileId = profResp.activeProfileId
-            // An older groove-rig has no such route; the setting defaults to on
-            // there, so a 404 must not block the rest of the screen.
-            useAmplifierInputForFormat = (try? await hint)?.useAmplifierInput ?? true
-            phase = .loaded
         } catch {
             if config == nil {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
+            return
         }
+        // Profiles and the format hint are supplementary — a failure fetching
+        // either shouldn't blank a screen that already has a real config to
+        // show. An older groove-rig has no format-hint route at all, so a 404
+        // there must not block the rest of the screen either.
+        if let profResp = try? await profs {
+            profiles = profResp.profiles
+            activeProfileId = profResp.activeProfileId
+        }
+        useAmplifierInputForFormat = (try? await hint)?.useAmplifierInput ?? true
+        phase = .loaded
     }
 
     @discardableResult
@@ -72,7 +76,7 @@ final class AmplifierConfigModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -116,7 +120,7 @@ final class AmplifierConfigModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -127,7 +131,7 @@ final class AmplifierConfigModel {
             try await CatalogService(settings: settings).rigDeleteProfile(id: id)
             await load()
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
     }
 
@@ -136,7 +140,7 @@ final class AmplifierConfigModel {
         do {
             return try await CatalogService(settings: settings).rigExportProfile(id: id)
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return nil
         }
     }
@@ -150,7 +154,7 @@ final class AmplifierConfigModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

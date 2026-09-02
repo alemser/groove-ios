@@ -23,18 +23,21 @@ final class StylusModel {
     func load() async {
         guard let settings else { return }
         if state == nil { phase = .loading }
+        let service = CatalogService(settings: settings)
+        async let stateTask = service.stylusState()
+        async let catalogTask = service.stylusCatalog()
         do {
-            let service = CatalogService(settings: settings)
-            async let stateTask = service.stylusState()
-            async let catalogTask = service.stylusCatalog()
             state = try await stateTask
-            catalog = try await catalogTask
-            phase = .loaded
         } catch {
             if state == nil {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
+            return
         }
+        // The reference catalog only feeds the picker list — a failure here
+        // shouldn't blank a screen that already has the current stylus state.
+        catalog = (try? await catalogTask) ?? catalog
+        phase = .loaded
     }
 
     @discardableResult
@@ -45,7 +48,7 @@ final class StylusModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -58,7 +61,7 @@ final class StylusModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

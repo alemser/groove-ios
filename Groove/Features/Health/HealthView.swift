@@ -86,7 +86,7 @@ struct HealthView: View {
             status = try await CatalogService(settings: settings).status()
             phase = .loaded
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
         }
     }
 }

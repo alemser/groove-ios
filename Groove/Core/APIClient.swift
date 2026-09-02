@@ -20,6 +20,16 @@ enum APIError: LocalizedError {
     }
 }
 
+extension Error {
+    /// User-facing message for any error surfaced from `CatalogService`/`APIClient`
+    /// — the one place this app decides how an error reads on screen, instead of
+    /// every call site repeating `(error as? APIError)?.localizedDescription ??
+    /// error.localizedDescription`.
+    var localizedForDisplay: String {
+        (self as? APIError)?.localizedDescription ?? localizedDescription
+    }
+}
+
 /// Thin async HTTP client for the groove-catalog management API. Stateless apart
 /// from the injected `AppSettings`, so it is cheap to construct per request.
 struct APIClient {
@@ -95,21 +105,7 @@ struct APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = jsonBody
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: req)
-        } catch {
-            throw APIError.transport(error.localizedDescription)
-        }
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.transport("Malformed server response.")
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            let text = String(data: data, encoding: .utf8) ?? ""
-            throw APIError.http(status: http.statusCode, body: text.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
+        let data = try await execute(req)
         do {
             return try Self.decoder.decode(T.self, from: data)
         } catch {
@@ -143,21 +139,7 @@ struct APIClient {
         body.append(fileData)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         req.httpBody = body
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: req)
-        } catch {
-            throw APIError.transport(error.localizedDescription)
-        }
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.transport("Malformed server response.")
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            let text = String(data: data, encoding: .utf8) ?? ""
-            throw APIError.http(status: http.statusCode, body: text.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
+        let data = try await execute(req)
         do {
             return try Self.decoder.decode(T.self, from: data)
         } catch {
@@ -200,22 +182,40 @@ struct APIClient {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try Self.encoder.encode(body)
         }
+        return try await execute(req)
+    }
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: req)
-        } catch {
-            throw APIError.transport(error.localizedDescription)
+    /// Single choke point every request runs through. GET is safe to repeat,
+    /// so a transient transport failure (timeout, dropped connection — the
+    /// LAN-to-Pi hop this app talks over is exactly where those happen) gets
+    /// one retry with a short backoff. Writes (POST/PATCH/PUT/DELETE) never
+    /// retry here: replaying one after an ambiguous failure could double-apply
+    /// it. A non-2xx HTTP response is a real answer from the server, not a
+    /// transient failure, and is never retried either way.
+    private func execute(_ req: URLRequest) async throws -> Data {
+        let maxAttempts = req.httpMethod == "GET" ? 2 : 1
+        var lastTransportError = APIError.transport("Unknown transport error.")
+        for attempt in 1...maxAttempts {
+            do {
+                let (data, response) = try await session.data(for: req)
+                guard let http = response as? HTTPURLResponse else {
+                    throw APIError.transport("Malformed server response.")
+                }
+                guard (200..<300).contains(http.statusCode) else {
+                    let text = String(data: data, encoding: .utf8) ?? ""
+                    throw APIError.http(status: http.statusCode, body: text.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                return data
+            } catch let error as APIError {
+                throw error
+            } catch {
+                lastTransportError = .transport(error.localizedDescription)
+                if attempt < maxAttempts {
+                    try? await Task.sleep(for: .milliseconds(400))
+                }
+            }
         }
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.transport("Malformed server response.")
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            let text = String(data: data, encoding: .utf8) ?? ""
-            throw APIError.http(status: http.statusCode, body: text.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-        return data
+        throw lastTransportError
     }
 }
 

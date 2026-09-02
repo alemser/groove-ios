@@ -32,18 +32,22 @@ final class EquipmentRemoteModel {
     func load() async {
         guard let settings else { return }
         if equipment.isEmpty { phase = .loading }
+        let service = CatalogService(settings: settings)
+        async let eq = service.rigEquipment()
+        async let snap = service.rigStatus()
         do {
-            let service = CatalogService(settings: settings)
-            async let eq = service.rigEquipment()
-            async let snap = service.rigStatus()
             equipment = try await eq
-            snapshot = try await snap
-            phase = .loaded
         } catch {
             if equipment.isEmpty {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
+            return
         }
+        // The learned-state snapshot is supplementary — isLearned() already
+        // degrades to false without it — so a failure here shouldn't blank a
+        // screen that already has a real equipment list to show.
+        snapshot = (try? await snap) ?? snapshot
+        phase = .loaded
     }
 
     func isLearned(targetId: String, action: String) -> Bool {
@@ -58,7 +62,7 @@ final class EquipmentRemoteModel {
             snapshot = try await CatalogService(settings: settings).rigAction(target: targetId, action: action)
             actionError = nil
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             // The tap was confirmed by a haptic before the request went out; a
             // failure has to be felt too, or the operator is left believing the
             // command reached the equipment.
@@ -73,7 +77,7 @@ final class EquipmentRemoteModel {
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
     }
 
@@ -86,7 +90,7 @@ final class EquipmentRemoteModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -97,7 +101,7 @@ final class EquipmentRemoteModel {
             try await CatalogService(settings: settings).rigDeleteEquipment(id: id)
             await load()
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
     }
 
@@ -127,7 +131,7 @@ final class EquipmentRemoteModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

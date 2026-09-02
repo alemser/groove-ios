@@ -31,7 +31,7 @@ final class EnrichJobDetailModel {
             detail = try await CatalogService(settings: settings).enrichJob(id: jobId)
             phase = .loaded
         } catch {
-            if detail == nil { phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription) }
+            if detail == nil { phase = .error(error.localizedForDisplay) }
         }
     }
 
@@ -43,7 +43,7 @@ final class EnrichJobDetailModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             await load()
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
         busyReleaseId = nil
     }
@@ -69,7 +69,7 @@ final class EnrichJobDetailModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

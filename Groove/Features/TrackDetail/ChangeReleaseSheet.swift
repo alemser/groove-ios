@@ -36,7 +36,7 @@ final class ChangeReleaseModel {
             results = try await CatalogService(settings: settings).identifySearch(query: q)
             phase = .loaded
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
         }
     }
 
@@ -54,7 +54,7 @@ final class ChangeReleaseModel {
             actionError = message
             return message
         } catch {
-            let message = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            let message = error.localizedForDisplay
             actionError = message
             return message
         }

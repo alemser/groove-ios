@@ -38,7 +38,7 @@ final class AmplifierModel {
             phase = .loaded
         } catch {
             if snapshot == nil {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
         }
     }
@@ -51,7 +51,7 @@ final class AmplifierModel {
             try await work()
             actionError = nil
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             // The tap was confirmed by a haptic before the request went out.
             // If it then failed, say so the same way — the error text sits at
             // the bottom of a scrolling screen and is easy to miss.
@@ -113,7 +113,7 @@ final class AmplifierModel {
                 self.snapshot = try await CatalogService(settings: settings).rigAction(action: "volume_\(direction)")
                 self.actionError = nil
             } catch {
-                self.actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+                self.actionError = error.localizedForDisplay
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
         }

@@ -64,7 +64,7 @@ final class AssociationReviewModel {
             phase = .loaded
         } catch {
             if associations.isEmpty {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
         }
     }

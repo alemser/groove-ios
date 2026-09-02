@@ -238,7 +238,7 @@ struct ConnectView: View {
             dismiss()
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-            probe = .failed((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            probe = .failed(error.localizedForDisplay)
         }
     }
 }

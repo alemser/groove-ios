@@ -76,7 +76,7 @@ final class EditReleaseModel {
             catalogTracks = (try? await service.releaseTracks(source: release.source, releaseId: release.releaseId)) ?? []
             phase = .loaded
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
         }
     }
 
@@ -108,7 +108,7 @@ final class EditReleaseModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -124,7 +124,7 @@ final class EditReleaseModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -142,7 +142,7 @@ final class EditReleaseModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -168,7 +168,7 @@ final class EditReleaseModel {
                 : "No linked tracks to detach."
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -187,7 +187,7 @@ final class EditReleaseModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -210,7 +210,7 @@ final class EditReleaseModel {
             }
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -236,7 +236,7 @@ final class EditReleaseModel {
             }
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }
@@ -255,7 +255,7 @@ final class EditReleaseModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

@@ -27,7 +27,7 @@ final class EnricherSettingsModel {
             phase = .loaded
         } catch {
             if chain.isEmpty {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
         }
     }
@@ -38,7 +38,7 @@ final class EnricherSettingsModel {
             try await CatalogService(settings: settings).setEnricherEnabled(id: id, enabled: enabled)
             await load()
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             await load()
         }
     }
@@ -49,7 +49,7 @@ final class EnricherSettingsModel {
             chain = try await CatalogService(settings: settings).reorderEnrichers(order: order).chain
             actionError = nil
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             await load()
         }
     }
@@ -63,7 +63,7 @@ final class EnricherSettingsModel {
             actionError = nil
             return true
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return false
         }
     }

@@ -34,7 +34,7 @@ final class AddReleaseModel {
                 results = try await CatalogService(settings: settings).identifySearch(artist: artist, album: album, limit: 40)
                 phase = .loaded
             } catch {
-                phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                phase = .error(error.localizedForDisplay)
             }
         }
     }
@@ -49,7 +49,7 @@ final class AddReleaseModel {
             let resp = try await CatalogService(settings: settings).createStandaloneUserRelease(from: hit)
             return (resp.job.id, resp.draft)
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return nil
         }
     }
@@ -64,7 +64,7 @@ final class AddReleaseModel {
             let resp = try await CatalogService(settings: settings).createStandaloneUserRelease(artist: artist, album: album)
             return (resp.job.id, resp.draft)
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
             return nil
         }
     }

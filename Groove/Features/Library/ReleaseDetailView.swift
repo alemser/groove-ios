@@ -34,7 +34,7 @@ final class ReleaseDetailModel {
             catalogTracks = (try? await tracksResult) ?? []
             phase = .loaded
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
         }
     }
 
@@ -279,7 +279,7 @@ struct ReleaseDetailView: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         } catch {
-            errorMessage = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            errorMessage = error.localizedForDisplay
             deleting = false
         }
     }

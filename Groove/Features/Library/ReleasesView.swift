@@ -45,7 +45,7 @@ final class ReleasesModel {
             let releaseList = try await service.releases(query: query)
             releases = releaseList.filter { $0.catalogTracks > 0 }
         } catch {
-            phase = .error((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            phase = .error(error.localizedForDisplay)
             return
         }
         // Pending tracks and the association badge are supplementary — a slow
@@ -68,7 +68,7 @@ final class ReleasesModel {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             await load(query: lastQuery)
         } catch {
-            actionError = (error as? APIError)?.localizedDescription ?? error.localizedDescription
+            actionError = error.localizedForDisplay
         }
     }
 

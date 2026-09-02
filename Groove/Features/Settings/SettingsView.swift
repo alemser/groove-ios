@@ -160,7 +160,7 @@ struct SettingsView: View {
             saved = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
-            probe = .failed((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+            probe = .failed(error.localizedForDisplay)
         }
     }
 }

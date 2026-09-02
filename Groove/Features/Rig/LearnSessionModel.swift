@@ -27,7 +27,7 @@ final class LearnSessionModel {
                 let summary = try await service.rigStartLearn(targetId: targetId, action: action)
                 await self.poll(sessionId: summary.id, service: service)
             } catch {
-                self.state = .failed((error as? APIError)?.localizedDescription ?? error.localizedDescription)
+                self.state = .failed(error.localizedForDisplay)
             }
         }
     }
