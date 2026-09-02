@@ -29,6 +29,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Oceano uses Bluetooth to set up a new device or reconfigure its WiFi before it's on your network.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>

@@ -6,12 +6,8 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
 
-    @State private var host = ""
-    @State private var port = "7073"
-    @State private var scheme = "http"
-    @State private var probe = ProbeState.idle
-    @State private var saved = false
     @State private var showSwitchServer = false
+    @State private var showBLEProvisioning = false
 
     var body: some View {
         NavigationStack {
@@ -56,42 +52,23 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Catalog Server") {
+                Section {
                     Button {
                         showSwitchServer = true
                     } label: {
-                        Label("Switch Server", systemImage: "dot.radiowaves.left.and.right")
+                        deviceCard
                     }
-                    TextField("Host or IP", text: $host)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                    TextField("Port", text: $port)
-                        .keyboardType(.numberPad)
-                    Picker("Scheme", selection: $scheme) {
-                        Text("http").tag("http")
-                        Text("https").tag("https")
-                    }
-                }
-
-                Section {
+                    .buttonStyle(.plain)
                     Button {
-                        Task { await testAndSave() }
+                        showBLEProvisioning = true
                     } label: {
-                        HStack {
-                            if probe.isProbing { ProgressView() }
-                            Text(probe.isProbing ? "Testing…" : "Test & Save")
-                            Spacer()
-                            if saved { Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.ok) }
-                        }
+                        Label("Reconfigure Wi-Fi via Bluetooth", systemImage: "wifi")
                     }
-                    .disabled(probe.isProbing)
+                } header: {
+                    Text("Catalog Server")
                 } footer: {
-                    if case let .failed(message) = probe {
-                        Text(message).foregroundStyle(Brand.err)
-                    } else if let url = settings.baseURL {
-                        Text("Connected to \(url.absoluteString)")
-                    }
+                    Text("Tap the device to switch to a different Oceano.")
+                        .foregroundStyle(Brand.muted)
                 }
 
                 Section {
@@ -108,8 +85,7 @@ struct SettingsView: View {
             .grooveScreenBackground()
             .navigationTitle("Settings")
         }
-        .onAppear(perform: loadFields)
-        .sheet(isPresented: $showSwitchServer, onDismiss: loadFields) {
+        .sheet(isPresented: $showSwitchServer) {
             NavigationStack {
                 ConnectView()
                     .toolbar {
@@ -118,6 +94,13 @@ struct SettingsView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showBLEProvisioning) {
+            // This device is presumably already configured (you're in
+            // Settings) -- always-advertise on the groove-provision side
+            // means "reconfigure" is the exact same flow as first-run, just
+            // reached from a different entry point.
+            BLEProvisioningView()
         }
     }
 
@@ -138,29 +121,35 @@ struct SettingsView: View {
         return "v\(v)"
     }
 
-    private func loadFields() {
-        host = settings.host
-        port = String(settings.port)
-        scheme = settings.scheme
-    }
-
-    private func testAndSave() async {
-        probe = .probing
-        saved = false
-        let trial = AppSettings()
-        trial.host = host.trimmingCharacters(in: .whitespaces)
-        trial.port = Int(port) ?? 7073
-        trial.scheme = scheme
-        do {
-            _ = try await CatalogService(settings: trial).status()
-            settings.host = trial.host
-            settings.port = trial.port
-            settings.scheme = trial.scheme
-            probe = .idle
-            saved = true
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            probe = .failed(error.localizedForDisplay)
+    /// The connected device, styled like ConnectView's discovered-host
+    /// cards so switching between "here's what you're connected to" and
+    /// "here's what else is available" reads as one consistent language.
+    private var deviceCard: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Brand.teal.opacity(0.15)).frame(width: 44, height: 44)
+                Image(systemName: "opticaldisc.fill")
+                    .foregroundStyle(Brand.teal)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(settings.deviceName.nonEmpty ?? "Oceano")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Brand.text)
+                if settings.baseURL != nil {
+                    Text(settings.host + ":" + String(settings.port))
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                } else {
+                    Text("Not connected")
+                        .font(.caption)
+                        .foregroundStyle(Brand.err)
+                }
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Brand.muted)
         }
+        .padding(.vertical, 4)
     }
 }

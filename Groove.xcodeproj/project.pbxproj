@@ -74,6 +74,9 @@
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
 		EF5FF29136C5323F50BA8F5C /* Poller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A21577707E88064BC0A24E1 /* Poller.swift */; };
+		14B11E9B766EC9DC611F2BAF /* BLEProvisioningClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87ACCE05420F02C67B917A1F /* BLEProvisioningClient.swift */; };
+		31A1A4958810D122107C4940 /* BLEProvisioningModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85DDAF1601504D81A4EF581B /* BLEProvisioningModel.swift */; };
+		A92D352DE1661AB841E94CC5 /* BLEProvisioningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC3F20C60A1403CE0609BE78 /* BLEProvisioningView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -135,6 +138,9 @@
 		CCA960A78CBB07569FF3BBCC /* RecognitionInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecognitionInfoSheet.swift; sourceTree = "<group>"; };
 		CFF1193157A2AE8C0D67BA94 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		3A21577707E88064BC0A24E1 /* Poller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Poller.swift; sourceTree = "<group>"; };
+		87ACCE05420F02C67B917A1F /* BLEProvisioningClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningClient.swift; sourceTree = "<group>"; };
+		85DDAF1601504D81A4EF581B /* BLEProvisioningModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningModel.swift; sourceTree = "<group>"; };
+		EC3F20C60A1403CE0609BE78 /* BLEProvisioningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningView.swift; sourceTree = "<group>"; };
 		D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteQuickAccessSheet.swift; sourceTree = "<group>"; };
 		D5EB40C22B18DFB61CAA5600 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB9253360D61A0BC5E0BE49D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -193,6 +199,7 @@
 			isa = PBXGroup;
 			children = (
 				CFF1193157A2AE8C0D67BA94 /* APIClient.swift */,
+				87ACCE05420F02C67B917A1F /* BLEProvisioningClient.swift */,
 				B328C114E82F254E4675A5AA /* AppSettings.swift */,
 				27254E509C0A5183FE8A30CB /* AttentionCenter.swift */,
 				4271F4F0D0D2FEC9D2446F75 /* CatalogDiscovery.swift */,
@@ -339,6 +346,7 @@
 				C54E931E24F903A85AE22D0B /* Home */,
 				BF333BC6F654A1A30AB948A1 /* Library */,
 				EC8C6464A0D482845918F00F /* NowPlaying */,
+				1E1C0BD267C76D939AD942E9 /* Onboarding */,
 				B60D6A97AA3CA7FE9B40E68C /* Review */,
 				59D40C2F6A9F6CE4F87C8E65 /* Rig */,
 				3AFD44C298DDDD643A1D43E3 /* Session */,
@@ -346,6 +354,15 @@
 				892C51F2879BB1FE0AAF7D34 /* TrackDetail */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		1E1C0BD267C76D939AD942E9 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				85DDAF1601504D81A4EF581B /* BLEProvisioningModel.swift */,
+				EC3F20C60A1403CE0609BE78 /* BLEProvisioningView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		EC8C6464A0D482845918F00F /* NowPlaying */ = {
@@ -432,6 +449,9 @@
 			files = (
 				FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */,
 				EF5FF29136C5323F50BA8F5C /* Poller.swift in Sources */,
+				14B11E9B766EC9DC611F2BAF /* BLEProvisioningClient.swift in Sources */,
+				31A1A4958810D122107C4940 /* BLEProvisioningModel.swift in Sources */,
+				A92D352DE1661AB841E94CC5 /* BLEProvisioningView.swift in Sources */,
 				C9D4BF7C12E77F859C6C00DD /* AddEquipmentView.swift in Sources */,
 				71BAC18D62D28ADD88BF0792 /* AddReleaseView.swift in Sources */,
 				F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */,

@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// First-run screen: point the app at a groove-catalog server. Leads with
-/// Bonjour discovery — a pulsing radar animation while searching, then the
-/// found server(s) as one-tap cards — and tucks manual host/IP entry behind
-/// a fallback link instead of showing input fields by default.
+/// First-run screen: find your Oceano. Two discovery paths run side by side
+/// from the moment this screen appears — Bonjour (silent, works when the
+/// device is already on this Wi-Fi) and Bluetooth (works even for a
+/// brand-new device that isn't on any network yet) — rather than hiding
+/// Bluetooth behind a timeout as a last resort. Manual host/IP entry is a
+/// fallback tucked behind a link.
 struct ConnectView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
@@ -14,8 +16,11 @@ struct ConnectView: View {
     @State private var probe = ProbeState.idle
     @State private var discovery = CatalogDiscovery()
     @State private var showManualEntry = false
-    @State private var showSlowHint = false
+    @State private var showBLEProvisioning = false
     @State private var autoConnectAttemptedIDs: Set<String> = []
+    /// Set by select() right before connect() when the host came from
+    /// discovery; nil for manual entry, where there's no discovered name.
+    @State private var pendingDeviceName: String?
 
     var body: some View {
         ScrollView {
@@ -49,11 +54,6 @@ struct ConnectView: View {
         .grooveScreenBackground()
         .task { discovery.startBrowsing() }
         .onDisappear { discovery.stopBrowsing() }
-        .task {
-            try? await Task.sleep(for: .seconds(3))
-            guard discovery.hosts.isEmpty, !showManualEntry else { return }
-            withAnimation { showSlowHint = true }
-        }
         .animation(.easeInOut(duration: 0.3), value: showManualEntry)
         .animation(.easeInOut(duration: 0.3), value: discovery.hosts.isEmpty)
         .onChange(of: discovery.hosts) { _, hosts in
@@ -99,33 +99,41 @@ struct ConnectView: View {
                 Text("Looking for your Oceano…")
                     .font(.headline)
                     .foregroundStyle(Brand.text)
-                Text("Make sure your phone and the Oceano server are on the same Wi-Fi.")
+                Text("Already on your Wi-Fi, it'll connect automatically. Brand new? Set it up over Bluetooth below.")
                     .font(.subheadline)
                     .foregroundStyle(Brand.muted)
                     .multilineTextAlignment(.center)
             }
 
-            if showSlowHint {
-                VStack(spacing: 12) {
-                    Text("Couldn't find it automatically — some networks block device discovery between phones and other devices.")
-                        .font(.footnote)
-                        .foregroundStyle(Brand.muted)
-                        .multilineTextAlignment(.center)
-                    Button {
-                        showManualEntry = true
-                    } label: {
-                        Label("Enter Server Manually", systemImage: "keyboard")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Brand.accent)
-                    .controlSize(.large)
+            VStack(spacing: 12) {
+                Button {
+                    showBLEProvisioning = true
+                } label: {
+                    Label("Set Up via Bluetooth", systemImage: "dot.radiowaves.left.and.right")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .buttonStyle(.borderedProminent)
+                .tint(Brand.teal)
+                .controlSize(.large)
+                Button {
+                    showManualEntry = true
+                } label: {
+                    Text("Enter Server Manually")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Brand.muted)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 8)
+        .sheet(isPresented: $showBLEProvisioning) {
+            // No extra handoff logic needed here: discovery.startBrowsing()
+            // is already running for the lifetime of this view, so once the
+            // device joins WiFi and starts advertising over mDNS instead,
+            // the existing Bonjour search picks it up on its own.
+            BLEProvisioningView()
+        }
     }
 
     // MARK: - Discovered hosts
@@ -180,6 +188,7 @@ struct ConnectView: View {
         host = discovered.host
         port = String(discovered.port)
         scheme = "http"
+        pendingDeviceName = discovered.displayName
         Task { await connect() }
     }
 
@@ -205,6 +214,7 @@ struct ConnectView: View {
 
     private var connectButton: some View {
         Button {
+            pendingDeviceName = nil // manual entry — no discovered name to carry over
             Task { await connect() }
         } label: {
             HStack {
@@ -231,6 +241,7 @@ struct ConnectView: View {
             settings.host = trial.host
             settings.port = trial.port
             settings.scheme = trial.scheme
+            settings.deviceName = pendingDeviceName ?? ""
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             probe = .idle
             // No-op on first run (nothing presenting this view yet); closes
