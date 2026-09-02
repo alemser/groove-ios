@@ -14,7 +14,14 @@ struct BLEProvisioningView: View {
 
     var body: some View {
         NavigationStack {
-            content
+            VStack(spacing: 0) {
+                content
+                // TEMPORARY diagnostic panel (2026-09-02, Phase 2 first
+                // field test) — remove once confirmed working.
+                if !model.debugLog.isEmpty {
+                    debugPanel
+                }
+            }
                 .grooveScreenBackground()
                 .navigationTitle("Set Up Oceano")
                 .navigationBarTitleDisplayMode(.inline)
@@ -29,6 +36,28 @@ struct BLEProvisioningView: View {
         }
         .task {
             model.start()
+        }
+    }
+
+    private var debugPanel: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(Array(model.debugLog.enumerated()), id: \.offset) { index, line in
+                        Text(line)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Brand.muted)
+                            .id(index)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+            }
+            .frame(height: 160)
+            .background(Brand.card)
+            .onChange(of: model.debugLog.count) { _, newCount in
+                proxy.scrollTo(newCount - 1, anchor: .bottom)
+            }
         }
     }
 

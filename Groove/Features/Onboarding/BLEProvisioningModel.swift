@@ -19,6 +19,9 @@ final class BLEProvisioningModel {
 
     var phase: Phase = .searching
     var networks: [BLEWiFiNetwork] = []
+    /// TEMPORARY diagnostic (2026-09-02, Phase 2 first field test) — see
+    /// BLEProvisioningClient.onDebugLog. Remove once confirmed working.
+    var debugLog: [String] = []
 
     private let client = BLEProvisioningClient()
 
@@ -34,6 +37,9 @@ final class BLEProvisioningModel {
             // advertisement after joining WiFi. Anything else mid-flow is a
             // real loss of connection, not part of the happy path.
             guard let self, case .success = self.phase else { return }
+        }
+        client.onDebugLog = { [weak self] line in
+            self?.debugLog.append(line)
         }
         Task {
             do {

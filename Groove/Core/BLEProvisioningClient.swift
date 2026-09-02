@@ -23,6 +23,21 @@ struct BLEProvisioningStatus: Decodable, Equatable {
     var ip: String?
 }
 
+extension CBManagerState {
+    /// TEMPORARY diagnostic helper — see `BLEProvisioningClient.onDebugLog`.
+    var diagnosticName: String {
+        switch self {
+        case .unknown: return "unknown"
+        case .resetting: return "resetting"
+        case .unsupported: return "unsupported"
+        case .unauthorized: return "unauthorized"
+        case .poweredOff: return "poweredOff"
+        case .poweredOn: return "poweredOn"
+        @unknown default: return "unrecognized(\(rawValue))"
+        }
+    }
+}
+
 enum BLEProvisioningError: LocalizedError {
     case bluetoothUnavailable(String)
     case timedOut
@@ -53,6 +68,15 @@ final class BLEProvisioningClient: NSObject {
     var onNetworksUpdated: (([BLEWiFiNetwork]) -> Void)?
     var onStatusUpdated: ((BLEProvisioningStatus) -> Void)?
     var onDisconnected: (() -> Void)?
+    /// TEMPORARY diagnostic hook (2026-09-02, Phase 2 first field test) —
+    /// surfaces what CoreBluetooth is actually seeing directly in the UI,
+    /// since there's no way to attach a console to a phone running a plain
+    /// Xcode-installed build. Remove once Phase 2 is confirmed working.
+    var onDebugLog: ((String) -> Void)?
+
+    private func log(_ message: String) {
+        onDebugLog?(message)
+    }
 
     private var central: CBCentralManager?
     private var peripheral: CBPeripheral?
@@ -69,6 +93,7 @@ final class BLEProvisioningClient: NSObject {
 
     func discoverAndConnect(timeout: Duration = .seconds(20)) async throws {
         readyFinished = false
+        log("Creating CBCentralManager…")
         let central = CBCentralManager(delegate: self, queue: nil)
         self.central = central
 
@@ -77,6 +102,7 @@ final class BLEProvisioningClient: NSObject {
             self.timeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: timeout)
                 guard !Task.isCancelled else { return }
+                self?.log("Timed out after \(timeout).")
                 self?.finishReady(.failure(BLEProvisioningError.timedOut))
             }
         }
@@ -126,9 +152,18 @@ final class BLEProvisioningClient: NSObject {
 extension BLEProvisioningClient: CBCentralManagerDelegate {
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         Task { @MainActor in
+            log("State: \(central.state.diagnosticName) (raw \(central.state.rawValue))")
             switch central.state {
             case .poweredOn:
-                central.scanForPeripherals(withServices: [BLEProvisioningProtocol.serviceUUID], options: nil)
+                // Scanning for *everything*, not filtered to our service UUID,
+                // is a temporary diagnostic: it lets a mismatch (wrong UUID,
+                // advertisement not actually reaching the phone, primary vs.
+                // scan-response packet placement) show up as "found other
+                // devices but never ours" instead of silent nothing. Narrow
+                // back to `withServices: [BLEProvisioningProtocol.serviceUUID]`
+                // once Phase 2 is confirmed working.
+                log("Scanning (unfiltered, diagnostic mode)…")
+                central.scanForPeripherals(withServices: nil, options: nil)
             case .poweredOff:
                 finishReady(.failure(BLEProvisioningError.bluetoothUnavailable("Bluetooth is off. Turn it on in Settings to set up an Oceano device.")))
             case .unauthorized:
@@ -145,7 +180,15 @@ extension BLEProvisioningClient: CBCentralManagerDelegate {
 
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         Task { @MainActor in
+            let name = peripheral.name ?? (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? "(no name)"
+            let uuids = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? []
+            let uuidList = uuids.map(\.uuidString).joined(separator: ", ")
+            let isTarget = uuids.contains(BLEProvisioningProtocol.serviceUUID)
+            log("Found: \(name) rssi=\(RSSI) uuids=[\(uuidList)]\(isTarget ? " ← MATCH" : "")")
+
+            guard isTarget else { return }
             central.stopScan()
+            log("Connecting to \(name)…")
             self.peripheral = peripheral
             peripheral.delegate = self
             central.connect(peripheral, options: nil)
@@ -154,18 +197,21 @@ extension BLEProvisioningClient: CBCentralManagerDelegate {
 
     nonisolated func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         Task { @MainActor in
+            log("Connected. Discovering services…")
             peripheral.discoverServices([BLEProvisioningProtocol.serviceUUID])
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         Task { @MainActor in
+            log("Failed to connect: \(error?.localizedDescription ?? "unknown error")")
             finishReady(.failure(error ?? BLEProvisioningError.disconnected))
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         Task { @MainActor in
+            log("Disconnected\(error.map { ": \($0.localizedDescription)" } ?? "").")
             teardown()
             onDisconnected?()
         }
@@ -175,6 +221,8 @@ extension BLEProvisioningClient: CBCentralManagerDelegate {
 extension BLEProvisioningClient: CBPeripheralDelegate {
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         Task { @MainActor in
+            let found = (peripheral.services ?? []).map(\.uuid.uuidString).joined(separator: ", ")
+            log("Services discovered: [\(found)]\(error.map { " error=\($0.localizedDescription)" } ?? "")")
             guard let service = peripheral.services?.first(where: { $0.uuid == BLEProvisioningProtocol.serviceUUID }) else {
                 finishReady(.failure(error ?? BLEProvisioningError.disconnected))
                 return
@@ -188,6 +236,8 @@ extension BLEProvisioningClient: CBPeripheralDelegate {
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         Task { @MainActor in
+            let found = (service.characteristics ?? []).map(\.uuid.uuidString).joined(separator: ", ")
+            log("Characteristics discovered: [\(found)]\(error.map { " error=\($0.localizedDescription)" } ?? "")")
             guard let chars = service.characteristics else {
                 finishReady(.failure(error ?? BLEProvisioningError.disconnected))
                 return
@@ -208,8 +258,10 @@ extension BLEProvisioningClient: CBPeripheralDelegate {
                 }
             }
             if networksChar != nil, statusChar != nil, controlChar != nil {
+                log("Ready — all 3 characteristics found.")
                 finishReady(.success(()))
             } else {
+                log("Missing characteristics: networks=\(networksChar != nil) status=\(statusChar != nil) control=\(controlChar != nil)")
                 finishReady(.failure(BLEProvisioningError.disconnected))
             }
         }
