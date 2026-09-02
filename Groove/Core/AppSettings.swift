@@ -9,6 +9,7 @@ final class AppSettings {
     private static let hostKey = "catalog.host"
     private static let portKey = "catalog.port"
     private static let schemeKey = "catalog.scheme"
+    private static let deviceNameKey = "catalog.deviceName"
 
     var host: String {
         didSet { defaults.set(host, forKey: Self.hostKey) }
@@ -19,12 +20,19 @@ final class AppSettings {
     var scheme: String {
         didSet { defaults.set(scheme, forKey: Self.schemeKey) }
     }
+    /// Friendly name from Bonjour discovery (e.g. "oceano"), shown on the
+    /// Settings device card instead of a raw IP. Empty when connected via
+    /// manual entry, where there's no discovered name to carry over.
+    var deviceName: String {
+        didSet { defaults.set(deviceName, forKey: Self.deviceNameKey) }
+    }
 
     init() {
         host = defaults.string(forKey: Self.hostKey) ?? ""
         let storedPort = defaults.integer(forKey: Self.portKey)
         port = storedPort == 0 ? 7073 : storedPort
         scheme = defaults.string(forKey: Self.schemeKey) ?? "http"
+        deviceName = defaults.string(forKey: Self.deviceNameKey) ?? ""
     }
 
     /// True once a host has been entered — gates the app onto the setup screen.
