@@ -78,6 +78,12 @@ final class BLEProvisioningClient: NSObject {
         onDebugLog?(message)
     }
 
+    /// True once `discoverAndConnect` has actually succeeded and the link is
+    /// still up — callers must check this before writing to Control (e.g.
+    /// requesting a rescan); writing after a disconnect silently no-ops
+    /// instead of failing loudly, since `controlChar` is nil.
+    var isReady: Bool { peripheral != nil && controlChar != nil }
+
     private var central: CBCentralManager?
     private var peripheral: CBPeripheral?
     private var networksChar: CBCharacteristic?

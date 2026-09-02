@@ -41,6 +41,20 @@ final class BLEProvisioningModel {
         client.onDebugLog = { [weak self] line in
             self?.debugLog.append(line)
         }
+        connectAndScan()
+    }
+
+    /// Runs the full scan → connect → discover-services → discover-
+    /// characteristics chain, then requests a WiFi scan once ready. Used for
+    /// the initial connection *and* every retry — previously `retry()` only
+    /// re-sent a Control write without reconnecting, which silently did
+    /// nothing after any disconnect (`controlChar` is nil once torn down, so
+    /// the write no-ops instead of failing loudly) and looked identical to
+    /// "device not found" from the UI.
+    private func connectAndScan() {
+        phase = .searching
+        networks = []
+        debugLog.append("── retry ──")
         Task {
             do {
                 try await client.discoverAndConnect()
@@ -70,7 +84,14 @@ final class BLEProvisioningModel {
         phase = .enteringPassword(network)
     }
 
+    /// If the BLE link is still up, just asks for a fresh network list.
+    /// Otherwise reconnects from scratch first — the link may well have
+    /// dropped while the operator was reading the list.
     func rescan() {
+        guard client.isReady else {
+            connectAndScan()
+            return
+        }
         phase = .pickingNetwork
         networks = []
         client.requestScan()
@@ -81,10 +102,11 @@ final class BLEProvisioningModel {
         client.connectToNetwork(ssid: network.ssid, psk: password)
     }
 
-    /// Back to the network list after a failed attempt — never re-derives
-    /// networks locally, just asks the device to scan again.
+    /// Retry after a failed attempt. Always reconnects from scratch —
+    /// unlike `rescan()`, a `.failed` phase means the link is essentially
+    /// guaranteed to already be down.
     func retry() {
-        rescan()
+        connectAndScan()
     }
 
     func cancel() {
