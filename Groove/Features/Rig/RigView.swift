@@ -8,6 +8,7 @@ struct RigView: View {
 
     @State private var stylusStatusText: String?
     @State private var ampStatusText: String?
+    @State private var streamingStatusText: String?
 
     var body: some View {
         NavigationStack {
@@ -33,6 +34,16 @@ struct RigView: View {
                             tint: Brand.teal
                         )
                     }
+                    NavigationLink {
+                        StreamingView()
+                    } label: {
+                        hardwareRow(
+                            title: "Streaming",
+                            subtitle: streamingStatusText ?? "Loading…",
+                            icon: "airplayaudio",
+                            tint: Brand.ok
+                        )
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -41,6 +52,7 @@ struct RigView: View {
         }
         .task { await loadStylusStatus() }
         .task { await loadAmpStatus() }
+        .task { await loadStreamingStatus() }
     }
 
     private func hardwareRow(title: String, subtitle: String, icon: String, tint: Color) -> some View {
@@ -82,6 +94,17 @@ struct RigView: View {
             ampStatusText = device.isEmpty ? power : "\(device) · \(power)"
         } catch {
             ampStatusText = "Unavailable"
+        }
+    }
+
+    private func loadStreamingStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let response = try await CatalogService(settings: settings).rigAudioOutputs()
+            let label = response.outputs.first { $0.id == response.selected }?.label
+            streamingStatusText = label ?? "Not set"
+        } catch {
+            streamingStatusText = "Unavailable"
         }
     }
 

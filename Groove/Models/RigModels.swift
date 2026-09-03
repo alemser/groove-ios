@@ -200,3 +200,20 @@ struct RigLearnRequest: Encodable {
     var action: String
     var timeoutSecs: Int?
 }
+
+// MARK: - Streaming (AirPlay output device — proxied `/rig/streaming/*` →
+// groove-rig → groove-detector's `/audio-outputs*`)
+
+struct RigAudioOutput: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+}
+
+struct RigAudioOutputsResponse: Decodable {
+    var selected: String
+    var outputs: [RigAudioOutput]
+}
+
+struct RigSelectAudioOutputRequest: Encodable {
+    var device: String
+}

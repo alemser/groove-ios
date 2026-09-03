@@ -43,6 +43,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
         NSLocalNetworkUsageDescription: Groove connects to your groove-catalog server on the local network to manage your library.
+        NSBluetoothAlwaysUsageDescription: Groove uses Bluetooth to set up a new device or reconfigure its WiFi before it's on your network.
         NSBonjourServices:
           - _http._tcp
         NSAppTransportSecurity:

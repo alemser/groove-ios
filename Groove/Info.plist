@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Oceano</string>
+	<string>Groove</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -30,13 +30,13 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Oceano uses Bluetooth to set up a new device or reconfigure its WiFi before it's on your network.</string>
+	<string>Groove uses Bluetooth to set up a new device or reconfigure its WiFi before it's on your network.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Oceano connects to your Oceano server on the local network to manage your library.</string>
+	<string>Groove connects to your groove-catalog server on the local network to manage your library.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

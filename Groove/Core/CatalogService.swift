@@ -490,6 +490,19 @@ struct CatalogService {
         try await api.delete("/rig/targets/\(target)/actions/\(action)")
     }
 
+    // MARK: Streaming (AirPlay output device — `/rig/streaming/*`, groove-rig's
+    // own reverse proxy to groove-detector's `/audio-outputs*`, chained through
+    // the same `/rig/*` hop everything else here goes through)
+
+    func rigAudioOutputs() async throws -> RigAudioOutputsResponse {
+        try await api.get("/rig/streaming/audio-outputs")
+    }
+
+    @discardableResult
+    func rigSelectAudioOutput(device: String) async throws -> RigAudioOutputsResponse {
+        try await api.post("/rig/streaming/audio-outputs/select", body: RigSelectAudioOutputRequest(device: device))
+    }
+
     // MARK: Recognition providers (proxied to groove-identity via `/identity/*`)
 
     func recognitionProviders() async throws -> RecognitionProvidersState {
