@@ -19,6 +19,7 @@ the enrichment review queue — all against your `groove-catalog` server on the 
 | **Review** | Pending associations (accept suggestion / dismiss) and enrich jobs; open a job to confirm or discard release candidates with tracklists. | `…/plays/pending-association`, `…/associate`, `…/enrich/jobs`, `…/enrich/releases/{id}/confirm` |
 | **Settings** | Connect to a server (with live test), toggle metadata enrichers, view stack health. | `GET /status`, `GET /enrich/providers`, `PATCH /enrich/providers/{id}` |
 | **Rig → Amplifier** | Model, inputs and profiles, plus whether the selected input may tell vinyl from digital. | `GET/PATCH /rig/amplifier`, `GET/PATCH /rig/amplifier/format-hint` |
+| **Rig → Streaming** | Which ALSA device AirPlay and Bluetooth both play through, out to the amplifier — one wire, one setting. Tap a device to select it. | `GET/POST /rig/streaming/audio-outputs(/select)` |
 
 ### Which pressing is playing
 
