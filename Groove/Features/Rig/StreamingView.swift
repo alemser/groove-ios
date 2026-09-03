@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Which ALSA device shairport-sync (AirPlay) plays through, out to the
-/// amplifier — the app-side counterpart to the web Studio's Streaming tab
-/// (groove-rig's `internal/api/static/studio.html`). Same reasoning there
-/// applies here: never trust a numeric card index across a reboot, only the
-/// stable `hw:CARD=NAME,DEV=N` ids groove-detector already resolves to.
+/// Which ALSA device AirPlay (shairport-sync) and Bluetooth (bluealsa-aplay)
+/// both play through, out to the amplifier — one wire, one setting, the
+/// app-side counterpart to the web Studio's Streaming tab (groove-rig's
+/// `internal/api/static/studio.html`). Same reasoning there applies here:
+/// never trust a numeric card index across a reboot, only the stable
+/// `hw:CARD=NAME,DEV=N` ids groove-detector already resolves to.
 struct StreamingView: View {
     @Environment(AppSettings.self) private var settings
 
@@ -39,7 +40,7 @@ struct StreamingView: View {
                         .foregroundStyle(Brand.muted)
                 }
             } footer: {
-                Text("Which device AirPlay plays through, out to the amplifier. Pick the one you can hear when you play something — if none of these are audible yet, none is wired to an amp input.")
+                Text("Which device AirPlay and Bluetooth both play through, out to the amplifier. Pick the one you can hear when you play something — if none of these are audible yet, none is wired to an amp input.")
                     .foregroundStyle(Brand.muted)
             }
         }
