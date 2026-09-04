@@ -44,6 +44,7 @@ struct RecognitionProvidersScreen: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .disabled(customProviderCount >= RecognitionProvidersScreen.maxCustomProviders)
                 .accessibilityLabel("Add Custom Provider")
             }
             ToolbarItem(placement: .topBarTrailing) { EditButton() }
@@ -58,7 +59,13 @@ struct RecognitionProvidersScreen: View {
         }
     }
 
+    /// groove-identity rejects a 4th custom provider (Oceano parity); mirrors
+    /// the web studio disabling its "Add custom provider" button at the same
+    /// count instead of letting the operator hit the 422.
+    static let maxCustomProviders = 3
+
     private var isAutonomous: Bool { model.state?.autonomous ?? false }
+    private var customProviderCount: Int { model.state?.customProviders.count ?? 0 }
 
     private var content: some View {
         List {
@@ -134,7 +141,9 @@ struct RecognitionProvidersScreen: View {
                 } header: {
                     Text("Custom Providers")
                 } footer: {
-                    Text("Any HTTP recognition service that returns JSON — tap + to add one.")
+                    Text(customProviderCount >= Self.maxCustomProviders
+                         ? "Maximum of \(Self.maxCustomProviders) custom providers reached — delete one to add another."
+                         : "Any HTTP recognition service that returns JSON — tap + to add one.")
                         .foregroundStyle(Brand.muted)
                 }
             }
@@ -235,8 +244,16 @@ struct RecognitionProvidersScreen: View {
         }
     }
 
+    /// ACRCloud/AudD always take host/key/secret, even before the operator has
+    /// saved anything — `state.builtins` only carries an entry once a provider
+    /// has been configured at least once (groove-identity only populates it from
+    /// already-persisted providers), so gating on that dict's presence would
+    /// make it impossible to ever open the form for a fresh install. Mirrors the
+    /// web studio, which hardcodes this same id set client-side.
+    private static let builtinProviderIDs: Set<String> = ["acrcloud", "audd"]
+
     private func hasCredentialsForm(_ id: String) -> Bool {
-        model.state?.builtins[id] != nil
+        Self.builtinProviderIDs.contains(id)
     }
 
     private func subtitle(_ slot: ProviderSlot) -> String {

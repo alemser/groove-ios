@@ -113,9 +113,34 @@ struct CustomProviderFormView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
+                .onChange(of: endpointUrl) { _, new in applyAudDHintsIfNeeded(for: new) }
+            if isAudDEndpoint(endpointUrl) {
+                Text("AudD: use Form token, param api_token, paths relative to result.")
+                    .font(.caption)
+                    .foregroundStyle(Brand.muted)
+            }
         } header: {
             Text("Identity")
         }
+    }
+
+    /// Mirrors the web studio's AudD auto-fill: detected from the endpoint host,
+    /// only ever fills fields the operator hasn't already touched.
+    private func isAudDEndpoint(_ url: String) -> Bool {
+        guard let host = URL(string: url)?.host?.lowercased() else { return false }
+        return host.contains("audd.io")
+    }
+
+    private func applyAudDHintsIfNeeded(for url: String) {
+        guard isAudDEndpoint(url) else { return }
+        if token.isEmpty, apiKey.isEmpty, apiSecret.isEmpty {
+            authMode = .formToken
+        }
+        if tokenField.isEmpty { tokenField = "api_token" }
+        if matchPath.isEmpty { matchPath = "result" }
+        if titleField.isEmpty { titleField = "title" }
+        if artistField.isEmpty { artistField = "artist" }
+        if albumField.isEmpty { albumField = "album" }
     }
 
     @ViewBuilder
