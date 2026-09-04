@@ -18,6 +18,9 @@ final class AttentionCenter {
     /// entry point the same way the web nav hides/shows "Catalog session" vs
     /// "Release matching" — reuses this poller instead of adding a second one.
     private(set) var autonomous = false
+    /// Mirrors `RecognitionProvidersState.suspended` — backs the quick-access
+    /// "pause recognition" toggle on Home, same reasoning as `autonomous`.
+    private(set) var suspended = false
 
     private var poller: Poller?
     private var settings: AppSettings?
@@ -36,7 +39,10 @@ final class AttentionCenter {
     }
 
     func refresh() async {
-        guard let settings, settings.isConfigured else { count = 0; rigAttentionCount = 0; autonomous = false; return }
+        guard let settings, settings.isConfigured else {
+            count = 0; rigAttentionCount = 0; autonomous = false; suspended = false
+            return
+        }
         let service = CatalogService(settings: settings)
         do {
             // Same sources that drive the Library grid's banner + "Needs Review"
@@ -51,8 +57,27 @@ final class AttentionCenter {
         } catch {
             // Leave the last known count on a transient failure.
         }
-        autonomous = (try? await service.recognitionProviders().autonomous) ?? autonomous
+        if let recognition = try? await service.recognitionProviders() {
+            autonomous = recognition.autonomous
+            suspended = recognition.suspended
+        }
         await refreshRigAttention(service)
+    }
+
+    /// Optimistically flips `suspended` so the Home toggle feels instant, then
+    /// reconciles with the server's actual value (same PATCH the Settings
+    /// screen's own toggle uses) — reverts on failure rather than leaving the
+    /// UI showing a state the backend never accepted.
+    func setSuspended(_ value: Bool) async {
+        guard let settings, settings.isConfigured else { return }
+        let previous = suspended
+        suspended = value
+        do {
+            let updated = try await CatalogService(settings: settings).setRecognitionSuspended(value)
+            suspended = updated.suspended
+        } catch {
+            suspended = previous
+        }
     }
 
     private func refreshRigAttention(_ service: CatalogService) async {

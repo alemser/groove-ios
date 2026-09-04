@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var equipmentModel = EquipmentRemoteModel()
     @State private var showRemoteSheet = false
     @State private var stylusState: StylusState?
+    @State private var togglingRecognition = false
 
     private var remoteAvailable: Bool {
         let ampLearned = ampModel.amplifierTarget?.actions.values.contains { $0.learned } ?? false
@@ -48,6 +49,9 @@ struct HomeView: View {
                 ToolbarItem(placement: .principal) {
                     OceanoWordmark(fontSize: 26, weight: .bold)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    recognitionPauseButton
+                }
             }
         }
         .task { ampModel.configure(settings) }
@@ -78,6 +82,27 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Recognition pause
+
+    /// Discreet top-of-Home quick toggle for "pause recognition, listen
+    /// freely / stop the noise on the kiosk when an album won't match" — the
+    /// use case doesn't fit burying this in Settings, unlike Autonomous Mode.
+    private var recognitionPauseButton: some View {
+        Button {
+            guard !togglingRecognition else { return }
+            togglingRecognition = true
+            Task {
+                await attention.setSuspended(!attention.suspended)
+                togglingRecognition = false
+            }
+        } label: {
+            Image(systemName: attention.suspended ? "waveform.slash" : "waveform")
+                .foregroundStyle(attention.suspended ? Brand.warn : Brand.muted)
+        }
+        .disabled(togglingRecognition)
+        .accessibilityLabel(attention.suspended ? "Resume recognition" : "Pause recognition")
     }
 
     // MARK: - Now Playing

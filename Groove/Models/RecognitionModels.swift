@@ -21,6 +21,10 @@ struct BuiltinProviderView: Decodable {
 }
 
 struct RecognitionProvidersState: Decodable {
+    /// When true, recognition is fully paused — groove-identity skips every
+    /// acoustic hint, not just the cloud/local chain (that's `autonomous`,
+    /// below). The user-facing "pause recognition" toggle.
+    var suspended: Bool
     /// When true, groove-identity never enters this chain at all — only the
     /// local fingerprint index runs. A miss is routed to the pending-
     /// association flow ("Needs Association" in Library) instead of retrying
