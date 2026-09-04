@@ -24,6 +24,13 @@ struct RecognitionProvidersState: Decodable {
     /// When true, recognition is fully paused — groove-identity skips every
     /// acoustic hint, not just the cloud/local chain (that's `autonomous`,
     /// below). The user-facing "pause recognition" toggle.
+    ///
+    /// Decoded leniently (defaults to false if the key is absent): older
+    /// deployed groove-identity builds — this field shipped 2026-09-05 —
+    /// don't send `suspended` at all, and a hard decode failure here would
+    /// break the entire Recognition Providers screen over a field that
+    /// screen doesn't even show, just because the server hasn't been
+    /// redeployed yet.
     var suspended: Bool
     /// When true, groove-identity never enters this chain at all — only the
     /// local fingerprint index runs. A miss is routed to the pending-
@@ -35,6 +42,21 @@ struct RecognitionProvidersState: Decodable {
     var chain: [ProviderSlot]
     var builtins: [String: BuiltinProviderView]
     var customProviders: [CustomProviderConfig]
+
+    enum CodingKeys: String, CodingKey {
+        case suspended, autonomous, chainMode, minConfidence, chain, builtins, customProviders
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        suspended = try c.decodeIfPresent(Bool.self, forKey: .suspended) ?? false
+        autonomous = try c.decode(Bool.self, forKey: .autonomous)
+        chainMode = try c.decode(String.self, forKey: .chainMode)
+        minConfidence = try c.decode(Double.self, forKey: .minConfidence)
+        chain = try c.decode([ProviderSlot].self, forKey: .chain)
+        builtins = try c.decode([String: BuiltinProviderView].self, forKey: .builtins)
+        customProviders = try c.decode([CustomProviderConfig].self, forKey: .customProviders)
+    }
 }
 
 struct ProviderEnabledRequest: Encodable {
