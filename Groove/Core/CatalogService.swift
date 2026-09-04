@@ -551,6 +551,12 @@ struct CatalogService {
     }
 
     @discardableResult
+    func setRecognitionSuspended(_ suspended: Bool) async throws -> RecognitionProvidersState {
+        struct Body: Encodable { let suspended: Bool }
+        return try await api.patch("/identity/recognition/settings", body: Body(suspended: suspended))
+    }
+
+    @discardableResult
     func createCustomProvider(_ req: CustomProviderCreateRequest) async throws -> RecognitionProvidersState {
         try await api.post("/identity/recognition/custom-providers", body: req)
     }
