@@ -13,13 +13,13 @@ final class AttentionCenter {
     /// surfaced as the Rig tab badge. Not a general count (there's only one hardware
     /// signal worth surfacing today); kept as an Int so the badge modifier stays simple.
     private(set) var rigAttentionCount = 0
-    /// Mirrors `RecognitionProvidersState.autonomous` app-wide so screens that
-    /// only make sense in autonomous mode (Catalog Session) can gate their
+    /// Mirrors `RecognitionProvidersState.offline` app-wide so screens that
+    /// only make sense in offline mode (Catalog Session) can gate their
     /// entry point the same way the web nav hides/shows "Catalog session" vs
     /// "Release matching" — reuses this poller instead of adding a second one.
-    private(set) var autonomous = false
+    private(set) var offline = false
     /// Mirrors `RecognitionProvidersState.suspended` — backs the quick-access
-    /// "pause recognition" toggle on Home, same reasoning as `autonomous`.
+    /// "pause recognition" toggle on Home, same reasoning as `offline`.
     private(set) var suspended = false
 
     private var poller: Poller?
@@ -40,7 +40,7 @@ final class AttentionCenter {
 
     func refresh() async {
         guard let settings, settings.isConfigured else {
-            count = 0; rigAttentionCount = 0; autonomous = false; suspended = false
+            count = 0; rigAttentionCount = 0; offline = false; suspended = false
             return
         }
         let service = CatalogService(settings: settings)
@@ -58,7 +58,7 @@ final class AttentionCenter {
             // Leave the last known count on a transient failure.
         }
         if let recognition = try? await service.recognitionProviders() {
-            autonomous = recognition.autonomous
+            offline = recognition.offline
             suspended = recognition.suspended
         }
         await refreshRigAttention(service)

@@ -28,7 +28,7 @@ struct HomeView: View {
                     connectionIssueSection(error)
                 }
                 nowPlayingSection
-                if attention.autonomous {
+                if attention.offline {
                     sessionSection
                 }
                 if remoteAvailable {
@@ -88,7 +88,7 @@ struct HomeView: View {
 
     /// Discreet top-of-Home quick toggle for "pause recognition, listen
     /// freely / stop the noise on the kiosk when an album won't match" — the
-    /// use case doesn't fit burying this in Settings, unlike Autonomous Mode.
+    /// use case doesn't fit burying this in Settings, unlike Offline Mode.
     private var recognitionPauseButton: some View {
         Button {
             guard !togglingRecognition else { return }
@@ -144,9 +144,9 @@ struct HomeView: View {
 
     // MARK: - Catalog session
 
-    /// Only shown once autonomous mode is on — mirrors the web nav's
+    /// Only shown once offline mode is on — mirrors the web nav's
     /// `studio-nav.js` gating (hides "Release matching", shows "Catalog
-    /// session" once `GET /identity/recognition/providers` reports autonomous).
+    /// session" once `GET /identity/recognition/providers` reports offline).
     private var sessionSection: some View {
         Section {
             NavigationLink {

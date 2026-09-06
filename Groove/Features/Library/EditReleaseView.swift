@@ -312,7 +312,7 @@ struct EditReleaseView: View {
                             .foregroundStyle(Brand.ok)
                     } else if linkedTrack != nil {
                         // groove-catalog materializes a placeholder row for
-                        // every confirmed tracklist position (so autonomous
+                        // every confirmed tracklist position (so offline
                         // mode has something to schedule against) — it looks
                         // like a normal track but nothing was ever actually
                         // played/recognized here yet.

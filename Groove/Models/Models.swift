@@ -427,7 +427,7 @@ struct ManualIdentifyResponse: Decodable {
     var fingerprintLearned: Bool
 }
 
-// MARK: - Library release picker (autonomous mode / groove-identity#32)
+// MARK: - Library release picker (offline mode / groove-identity#32)
 
 /// A release already in the user's own library — the picker's primary search
 /// surface, works fully offline (no enrichers required). Tracklist fetch and

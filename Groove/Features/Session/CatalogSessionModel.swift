@@ -1,7 +1,7 @@
 import SwiftUI
 import Observation
 
-/// Live "what's happening on the turntable right now" dashboard for autonomous
+/// Live "what's happening on the turntable right now" dashboard for offline
 /// mode — a direct behavioral port of the web studio's Catalog session page
 /// (`internal/api/static/catalog-studio-session.html`), state machine included.
 @MainActor

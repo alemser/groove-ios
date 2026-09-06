@@ -71,10 +71,10 @@ final class RecognitionProvidersModel {
     }
 
     @discardableResult
-    func setAutonomous(_ enabled: Bool) async -> Bool {
+    func setOffline(_ enabled: Bool) async -> Bool {
         guard let settings else { return false }
         do {
-            state = try await CatalogService(settings: settings).setRecognitionAutonomous(enabled)
+            state = try await CatalogService(settings: settings).setRecognitionOffline(enabled)
             actionError = nil
             return true
         } catch {
