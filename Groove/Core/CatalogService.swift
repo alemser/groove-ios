@@ -40,27 +40,6 @@ struct CatalogService {
         try await api.patch("/catalog/tracks/\(id)/display", body: patch)
     }
 
-    /// Toggles one playback hint (`TrackHint.Key.boundarySensitive` /
-    /// `.liveTrack`) on or off. groove-catalog rejects `enabled: true` unless
-    /// the track already has a `duration_ms` set (`ErrHintRequiresDuration`) —
-    /// callers should gate the UI control on `track.durationMs != nil`.
-    @discardableResult
-    func patchTrackHint(id: Int64, key: String, enabled: Bool) async throws -> [TrackHint] {
-        let patch = enabled ? TrackHintPatch(add: [key]) : TrackHintPatch(remove: [key])
-        return try await api.patch("/catalog/tracks/\(id)/hints", body: patch, as: TrackHintsResponse.self).hints
-    }
-
-    /// Sets boundary_sensitive/live_track on a release-tracklist ordinal
-    /// directly (release_tracklists.hints) — unlike patchTrackHint, this
-    /// needs no catalog Track to exist for the slot, so it works even when
-    /// nothing has been recognized/linked for that position yet.
-    func patchTracklistHint(source: String, releaseId: String, ordinal: Int, key: String, enabled: Bool) async throws -> [String] {
-        let s = pathSegment(source)
-        let r = pathSegment(releaseId)
-        let patch = enabled ? TrackHintPatch(add: [key]) : TrackHintPatch(remove: [key])
-        return try await api.patch("/catalog/releases/\(s)/\(r)/tracklist/\(ordinal)/hints", body: patch, as: TracklistHintsResponse.self).hints
-    }
-
     func deleteTrack(id: Int64) async throws {
         try await api.delete("/catalog/tracks/\(id)")
     }
