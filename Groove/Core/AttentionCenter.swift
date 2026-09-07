@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import UserNotifications
 
 /// Tracks how many items need the user's attention (pending associations plus
 /// tracks still awaiting a confirmed release), so the Library tab can carry a
@@ -24,10 +25,16 @@ final class AttentionCenter {
 
     private var poller: Poller?
     private var settings: AppSettings?
+    /// Epochs already notified about this app session — a still-open item
+    /// reminds again next launch (acceptable: this is a local, in-app-lifetime
+    /// notification, not a durable server-side push), but never repeats every
+    /// 30s while the app keeps running with the same unresolved item.
+    private var notifiedPendingEpochs: Set<UInt64> = []
 
     func start(_ settings: AppSettings) {
         self.settings = settings
         guard poller == nil else { return }
+        Task { await ensureNotificationPermissionIfNeeded() }
         let p = Poller(interval: .seconds(30)) { [weak self] in await self?.refresh() }
         poller = p
         p.start()
@@ -51,9 +58,10 @@ final class AttentionCenter {
             // track was confirmed some other way, so job status alone overcounts).
             async let assoc = service.pendingAssociations()
             async let pending = service.pendingReleaseTracks()
-            let associations = try await assoc.items.count
+            let associationItems = try await assoc.items
             let pendingTracks = try await pending.count
-            count = associations + pendingTracks
+            count = associationItems.count + pendingTracks
+            await notifyNewPendingAssociations(associationItems)
         } catch {
             // Leave the last known count on a transient failure.
         }
@@ -78,6 +86,46 @@ final class AttentionCenter {
         } catch {
             suspended = previous
         }
+    }
+
+    /// Fires one local notification per pending-association epoch not yet
+    /// notified about this session. Reported live 2026-09-06: a physical play
+    /// that never resolves acoustically left the operator with no signal
+    /// short of remembering to open the app and check the queue.
+    private func notifyNewPendingAssociations(_ items: [PendingAssociation]) async {
+        let unseen = items.filter { !notifiedPendingEpochs.contains($0.listenerEpoch) }
+        guard !unseen.isEmpty else { return }
+        for item in unseen {
+            notifiedPendingEpochs.insert(item.listenerEpoch)
+        }
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+
+        let content = UNMutableNotificationContent()
+        content.sound = .default
+        if unseen.count == 1, let only = unseen.first {
+            content.title = "Track needs identification"
+            let name = only.suggestedTitle?.nonEmpty ?? only.suggestion?.title?.nonEmpty
+            content.body = name.map { "\"\($0)\" couldn't be recognized automatically." }
+                ?? "A play couldn't be recognized automatically."
+        } else {
+            content.title = "\(unseen.count) tracks need identification"
+            content.body = "They couldn't be recognized automatically — open Groove to pick them from your library."
+        }
+        let request = UNNotificationRequest(
+            identifier: "pending-association-\(unseen.map { String($0.listenerEpoch) }.joined(separator: "-"))",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+        try? await center.add(request)
+    }
+
+    private func ensureNotificationPermissionIfNeeded() async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
     }
 
     private func refreshRigAttention(_ service: CatalogService) async {
