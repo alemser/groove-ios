@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Live dashboard for autonomous-mode listening sittings — the iOS counterpart
+/// Live dashboard for offline-mode listening sittings — the iOS counterpart
 /// to the web studio's "Catalog session" page. Own-owned polling model (started/
-/// stopped with this screen), presented from `HomeView` only while autonomous
-/// mode is on, mirroring the web nav's autonomous-only visibility.
+/// stopped with this screen), presented from `HomeView` only while offline
+/// mode is on, mirroring the web nav's offline-only visibility.
 struct CatalogSessionView: View {
     @Environment(AppSettings.self) private var settings
     @State private var model = CatalogSessionModel()

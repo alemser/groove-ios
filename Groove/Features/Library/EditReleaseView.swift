@@ -312,18 +312,13 @@ struct EditReleaseView: View {
                             .foregroundStyle(Brand.ok)
                     } else if linkedTrack != nil {
                         // groove-catalog materializes a placeholder row for
-                        // every confirmed tracklist position (so autonomous
+                        // every confirmed tracklist position (so offline
                         // mode has something to schedule against) — it looks
                         // like a normal track but nothing was ever actually
                         // played/recognized here yet.
                         Label("Not yet recognized", systemImage: "questionmark.circle")
                             .font(.caption2)
                             .foregroundStyle(Brand.muted)
-                    }
-                    if let linkedTrack {
-                        hintToggleRow(track: linkedTrack)
-                    } else {
-                        tracklistHintToggleRow(entry: $entry)
                     }
                 }
                 .padding(.vertical, 4)
@@ -377,71 +372,6 @@ struct EditReleaseView: View {
             Text("Drag to reorder; the play order is saved alongside position labels like \"A1\".")
                 .foregroundStyle(Brand.muted)
         }
-    }
-
-    /// Pauses/Live toggles for one linked catalog track — a recognized row
-    /// only, matching groove-catalog's own rule that a hint needs a real
-    /// `duration_ms` before it's accepted (`ErrHintRequiresDuration`).
-    @ViewBuilder
-    private func hintToggleRow(track: Track) -> some View {
-        let hasDuration = (track.durationMs ?? 0) > 0
-        HStack(spacing: 14) {
-            hintToggle(track: track, key: TrackHint.Key.boundarySensitive, label: "Pauses", hasDuration: hasDuration)
-            hintToggle(track: track, key: TrackHint.Key.liveTrack, label: "Live", hasDuration: hasDuration)
-            if !hasDuration {
-                Text("Set duration to enable").foregroundStyle(Brand.muted)
-            }
-        }
-        .font(.caption2)
-    }
-
-    @ViewBuilder
-    private func hintToggle(track: Track, key: String, label: String, hasDuration: Bool) -> some View {
-        let on = track.hasHint(key)
-        Button {
-            Task { await model.setTrackHint(track, key: key, enabled: !on) }
-        } label: {
-            Label(label, systemImage: on ? "checkmark.square.fill" : "square")
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(hasDuration ? (on ? Brand.teal : Brand.muted) : Brand.muted.opacity(0.5))
-        .disabled(!hasDuration)
-    }
-
-    /// Pauses/Live toggles for a tracklist ordinal with no linked catalog
-    /// track — release-tracklist-level hints (release_tracklists.hints),
-    /// so unlike hintToggleRow above this works whether or not anything's
-    /// ever been recognized/linked for this position. Live 2026-08-23:
-    /// deleting a track's catalog row wiped its track-scoped hint along
-    /// with it; this one survives that.
-    @ViewBuilder
-    private func tracklistHintToggleRow(entry: Binding<TracklistEntry>) -> some View {
-        let hasDuration = (entry.wrappedValue.durationMs ?? 0) > 0
-        HStack(spacing: 14) {
-            tracklistHintToggle(entry: entry, key: TrackHint.Key.boundarySensitive, label: "Pauses", hasDuration: hasDuration)
-            tracklistHintToggle(entry: entry, key: TrackHint.Key.liveTrack, label: "Live", hasDuration: hasDuration)
-            if !hasDuration {
-                Text("Set duration to enable").foregroundStyle(Brand.muted)
-            }
-        }
-        .font(.caption2)
-    }
-
-    @ViewBuilder
-    private func tracklistHintToggle(entry: Binding<TracklistEntry>, key: String, label: String, hasDuration: Bool) -> some View {
-        let on = entry.wrappedValue.hasHint(key)
-        Button {
-            // setTracklistHint already stores the server's returned hints into
-            // the draft entry. Recomputing them locally here would overwrite
-            // that with a guess and drop anything else the server reported.
-            let target = entry.wrappedValue
-            Task { await model.setTracklistHint(target, key: key, enabled: !on) }
-        } label: {
-            Label(label, systemImage: on ? "checkmark.square.fill" : "square")
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(hasDuration ? (on ? Brand.teal : Brand.muted) : Brand.muted.opacity(0.5))
-        .disabled(!hasDuration)
     }
 
     private func durationBinding(for entry: TracklistEntry) -> Binding<String> {

@@ -40,27 +40,6 @@ struct CatalogService {
         try await api.patch("/catalog/tracks/\(id)/display", body: patch)
     }
 
-    /// Toggles one playback hint (`TrackHint.Key.boundarySensitive` /
-    /// `.liveTrack`) on or off. groove-catalog rejects `enabled: true` unless
-    /// the track already has a `duration_ms` set (`ErrHintRequiresDuration`) —
-    /// callers should gate the UI control on `track.durationMs != nil`.
-    @discardableResult
-    func patchTrackHint(id: Int64, key: String, enabled: Bool) async throws -> [TrackHint] {
-        let patch = enabled ? TrackHintPatch(add: [key]) : TrackHintPatch(remove: [key])
-        return try await api.patch("/catalog/tracks/\(id)/hints", body: patch, as: TrackHintsResponse.self).hints
-    }
-
-    /// Sets boundary_sensitive/live_track on a release-tracklist ordinal
-    /// directly (release_tracklists.hints) — unlike patchTrackHint, this
-    /// needs no catalog Track to exist for the slot, so it works even when
-    /// nothing has been recognized/linked for that position yet.
-    func patchTracklistHint(source: String, releaseId: String, ordinal: Int, key: String, enabled: Bool) async throws -> [String] {
-        let s = pathSegment(source)
-        let r = pathSegment(releaseId)
-        let patch = enabled ? TrackHintPatch(add: [key]) : TrackHintPatch(remove: [key])
-        return try await api.patch("/catalog/releases/\(s)/\(r)/tracklist/\(ordinal)/hints", body: patch, as: TracklistHintsResponse.self).hints
-    }
-
     func deleteTrack(id: Int64) async throws {
         try await api.delete("/catalog/tracks/\(id)")
     }
@@ -134,7 +113,7 @@ struct CatalogService {
 
     /// Resolves a pending association against a picked release + tracklist position
     /// rather than an already-known track_id — the track may never have existed
-    /// before (groove-identity#32 autonomous mode's first-ever play of that position).
+    /// before (groove-identity#32 offline mode's first-ever play of that position).
     @discardableResult
     func associatePlayToReleaseRow(epoch: UInt64, source: String, releaseId: String, ordinal: Int) async throws -> EmptyResponse {
         struct Body: Encodable { let source: String; let releaseId: String; let ordinal: Int }
@@ -183,7 +162,7 @@ struct CatalogService {
         try await api.postNoContent("/catalog/enrich/releases/\(id)/discard")
     }
 
-    /// Turns an armed album-programme session user-confirmed so autonomous mode
+    /// Turns an armed album-programme session user-confirmed so offline mode
     /// assigns subsequent tracks from the tracklist automatically for the rest of
     /// this sitting. Best-effort: a 409 just means no session was armed.
     func confirmAlbumProgrammeSession() async throws {
@@ -545,9 +524,9 @@ struct CatalogService {
     }
 
     @discardableResult
-    func setRecognitionAutonomous(_ autonomous: Bool) async throws -> RecognitionProvidersState {
-        struct Body: Encodable { let autonomous: Bool }
-        return try await api.patch("/identity/recognition/settings", body: Body(autonomous: autonomous))
+    func setRecognitionOffline(_ offline: Bool) async throws -> RecognitionProvidersState {
+        struct Body: Encodable { let offline: Bool }
+        return try await api.patch("/identity/recognition/settings", body: Body(offline: offline))
     }
 
     @discardableResult

@@ -22,7 +22,7 @@ struct BuiltinProviderView: Decodable {
 
 struct RecognitionProvidersState: Decodable {
     /// When true, recognition is fully paused — groove-identity skips every
-    /// acoustic hint, not just the cloud/local chain (that's `autonomous`,
+    /// acoustic hint, not just the cloud/local chain (that's `offline`,
     /// below). The user-facing "pause recognition" toggle.
     ///
     /// Decoded leniently (defaults to false if the key is absent): older
@@ -36,7 +36,7 @@ struct RecognitionProvidersState: Decodable {
     /// local fingerprint index runs. A miss is routed to the pending-
     /// association flow ("Needs Association" in Library) instead of retrying
     /// through these providers.
-    var autonomous: Bool
+    var offline: Bool
     var chainMode: String
     var minConfidence: Double
     var chain: [ProviderSlot]
@@ -44,13 +44,13 @@ struct RecognitionProvidersState: Decodable {
     var customProviders: [CustomProviderConfig]
 
     enum CodingKeys: String, CodingKey {
-        case suspended, autonomous, chainMode, minConfidence, chain, builtins, customProviders
+        case suspended, offline, chainMode, minConfidence, chain, builtins, customProviders
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         suspended = try c.decodeIfPresent(Bool.self, forKey: .suspended) ?? false
-        autonomous = try c.decode(Bool.self, forKey: .autonomous)
+        offline = try c.decode(Bool.self, forKey: .offline)
         chainMode = try c.decode(String.self, forKey: .chainMode)
         minConfidence = try c.decode(Double.self, forKey: .minConfidence)
         chain = try c.decode([ProviderSlot].self, forKey: .chain)
