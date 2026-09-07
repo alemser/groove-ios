@@ -8,7 +8,7 @@ final class ManualIdentifyModel {
     var phase: Phase = .idle
     /// Library search runs independently of the enricher search above: it needs no
     /// enrichers configured, so it must not be blocked or hidden by an enricher error
-    /// (very common for offline-mode users with none configured at all).
+    /// (very common for autonomous-mode users with none configured at all).
     var libraryResults: [LibraryReleaseSearchHit] = []
     var busyId: String?
     var actionError: String?
@@ -377,7 +377,7 @@ struct LibraryReleaseHitRow: View {
 }
 
 /// Which track on a picked library release — the position may never have had a
-/// track row before (offline mode's first-ever play of it); the backend
+/// track row before (autonomous mode's first-ever play of it); the backend
 /// creates it the same way first acoustic recognition would.
 struct ReleaseTracklistPickerSheet: View {
     let epoch: UInt64
@@ -468,7 +468,7 @@ struct ReleaseTracklistPickerSheet: View {
             try await CatalogService(settings: settings).associatePlayToReleaseRow(epoch: epoch, source: source, releaseId: releaseId, ordinal: ordinal)
             submittingOrdinal = nil
             // A multi-track release is worth asking about — turning the session
-            // user-confirmed here lets offline mode assign the rest of the
+            // user-confirmed here lets autonomous mode assign the rest of the
             // tracklist automatically for the rest of this sitting, with no more
             // prompts. A single-track pick has nothing to auto-advance into.
             if (edition?.tracklist?.count ?? 0) >= 2 {

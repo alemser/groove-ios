@@ -23,6 +23,10 @@ struct Track: Decodable, Identifiable, Hashable {
     var durationMs: Int64?
     var artworkUrl: String?
     var providerName: String?
+    /// Catalog playback hints (`boundary_sensitive` / `live_track`) — requires
+    /// `durationMs` to be set before groove-catalog will accept one. See
+    /// `TrackHint.Key`.
+    var hints: [TrackHint]?
     /// Timestamp of the most recent real play, nil if this track has never
     /// actually been heard. NOT the same as `providerName == "album_programme"`:
     /// that field only records how the row was first materialized and is
@@ -41,6 +45,8 @@ struct Track: Decodable, Identifiable, Hashable {
     var displayArtist: String { artist?.nonEmpty ?? "Unknown artist" }
     var displayAlbum: String? { album?.nonEmpty }
 
+    func hasHint(_ key: String) -> Bool { (hints ?? []).contains { $0.key == key } }
+
     static func == (lhs: Track, rhs: Track) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
@@ -51,6 +57,44 @@ struct TrackDisplayPatch: Encodable {
     var displayAlbum: String?
     var releaseFormat: String?
     var reset: Bool?
+}
+
+// MARK: - Track hints
+
+/// A catalog playback hint on one track — mirrors groove-catalog's
+/// `hints.Entry` (`internal/hints/vocabulary.go`). `source` is `"manual"`
+/// when an operator set it directly, `"auto"` when groove-identity
+/// self-learned it after a live continuity miss.
+struct TrackHint: Decodable, Hashable {
+    var key: String
+    var source: String
+    var confidence: Double?
+
+    /// The two track-scoped keys groove-catalog's vocabulary defines today
+    /// (a third, `gapless`, is release-scoped — see `ReleaseHint`).
+    enum Key {
+        static let boundarySensitive = "boundary_sensitive"
+        static let liveTrack = "live_track"
+    }
+}
+
+/// Body for `PATCH /catalog/tracks/{id}/hints` — mirrors groove-catalog's
+/// `store.HintPatch`. Add and remove are independent; a key present in
+/// neither is left untouched.
+struct TrackHintPatch: Encodable {
+    var add: [String] = []
+    var remove: [String] = []
+}
+
+struct TrackHintsResponse: Decodable {
+    var hints: [TrackHint]
+}
+
+/// Response for `PATCH /catalog/releases/{source}/{release_id}/tracklist/{ordinal}/hints`.
+/// Unlike TrackHintsResponse, these are plain keys (no source/confidence) —
+/// release-tracklist-level hints have no "auto-learned" provenance today.
+struct TracklistHintsResponse: Decodable {
+    var hints: [String]
 }
 
 struct TrackProfile: Decodable {
@@ -211,8 +255,35 @@ struct TracklistEntry: Codable, Identifiable, Hashable {
     var isrc: String?
     var title: String?
     var durationMs: Int64?
+    /// Release-tracklist-level playback hints (boundary_sensitive, live_track)
+    /// — set on this ordinal directly (release_tracklists.hints), independent
+    /// of whether a catalog Track is linked to it. See EditReleaseModel.setTracklistHint.
+    var hints: [String]?
 
     var id: Int { ordinal }
+
+    func hasHint(_ key: String) -> Bool {
+        (hints ?? []).contains(key)
+    }
+
+    /// Decoded but never encoded. Hints have their own PATCH endpoint and
+    /// groove-catalog's replaceTracklistsTx only preserves an existing hint
+    /// when the incoming entry carries none — the web studio's Save omits
+    /// them for exactly that reason. Sending them back on a draft save would
+    /// let a screen opened before someone ticked a box elsewhere overwrite
+    /// that with its own stale view.
+    enum CodingKeys: String, CodingKey {
+        case position, ordinal, isrc, title, durationMs, hints
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(position, forKey: .position)
+        try c.encode(ordinal, forKey: .ordinal)
+        try c.encodeIfPresent(isrc, forKey: .isrc)
+        try c.encodeIfPresent(title, forKey: .title)
+        try c.encodeIfPresent(durationMs, forKey: .durationMs)
+    }
 }
 
 // MARK: - User release editing (draft/confirm cycle)
@@ -356,7 +427,7 @@ struct ManualIdentifyResponse: Decodable {
     var fingerprintLearned: Bool
 }
 
-// MARK: - Library release picker (offline mode / groove-identity#32)
+// MARK: - Library release picker (autonomous mode / groove-identity#32)
 
 /// A release already in the user's own library — the picker's primary search
 /// surface, works fully offline (no enrichers required). Tracklist fetch and

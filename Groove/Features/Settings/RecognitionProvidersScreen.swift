@@ -64,17 +64,17 @@ struct RecognitionProvidersScreen: View {
     /// count instead of letting the operator hit the 422.
     static let maxCustomProviders = 3
 
-    private var isOffline: Bool { model.state?.offline ?? false }
+    private var isAutonomous: Bool { model.state?.autonomous ?? false }
     private var customProviderCount: Int { model.state?.customProviders.count ?? 0 }
 
     private var content: some View {
         List {
             Section {
                 Toggle(
-                    "Offline Mode",
+                    "Autonomous Mode",
                     isOn: Binding(
-                        get: { isOffline },
-                        set: { newValue in Task { await model.setOffline(newValue) } }
+                        get: { isAutonomous },
+                        set: { newValue in Task { await model.setAutonomous(newValue) } }
                     )
                 )
                 .tint(Brand.accent)
@@ -83,7 +83,7 @@ struct RecognitionProvidersScreen: View {
                     .foregroundStyle(Brand.muted)
             }
 
-            if !isOffline {
+            if !isAutonomous {
                 Section {
                     Picker("Chain Mode", selection: $chainMode) {
                         Text("First Success").tag("first_success")

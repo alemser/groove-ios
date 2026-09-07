@@ -192,6 +192,55 @@ final class EditReleaseModel {
         }
     }
 
+    /// Toggles a playback hint (`TrackHint.Key.boundarySensitive` /
+    /// `.liveTrack`) on one catalog track and updates `catalogTracks` in
+    /// place so the row's checkbox reflects the server's actual state
+    /// (including any other hint an auto-learn pass may have added
+    /// concurrently). groove-catalog rejects this unless `track.durationMs`
+    /// is already set — callers gate the control on that, same as the web
+    /// studio's "Set track duration first" tooltip.
+    @discardableResult
+    func setTrackHint(_ track: Track, key: String, enabled: Bool) async -> Bool {
+        guard let settings else { return false }
+        actionError = nil
+        do {
+            let hints = try await CatalogService(settings: settings).patchTrackHint(id: track.id, key: key, enabled: enabled)
+            if let idx = catalogTracks.firstIndex(where: { $0.id == track.id }) {
+                catalogTracks[idx].hints = hints
+            }
+            return true
+        } catch {
+            actionError = error.localizedForDisplay
+            return false
+        }
+    }
+
+    /// Toggles a playback hint directly on a tracklist ordinal
+    /// (release_tracklists.hints) rather than a catalog track — usable when
+    /// `trackId(for:)` finds nothing (never recognized into this position
+    /// yet, or its catalog track was deleted). Live 2026-08-23: deleting a
+    /// track wiped its boundary_sensitive hint along with it, because that
+    /// was track-scoped metadata; this is release-scoped metadata instead,
+    /// so it survives. groove-catalog rejects this unless the tracklist
+    /// entry already has a duration, same as setTrackHint above.
+    @discardableResult
+    func setTracklistHint(_ entry: TracklistEntry, key: String, enabled: Bool) async -> Bool {
+        guard let settings, let source = draft?.source, let releaseId = draft?.releaseId else { return false }
+        actionError = nil
+        do {
+            let hints = try await CatalogService(settings: settings).patchTracklistHint(
+                source: source, releaseId: releaseId, ordinal: entry.ordinal, key: key, enabled: enabled
+            )
+            if let idx = draft?.tracklist?.firstIndex(where: { $0.ordinal == entry.ordinal }) {
+                draft?.tracklist?[idx].hints = hints
+            }
+            return true
+        } catch {
+            actionError = error.localizedForDisplay
+            return false
+        }
+    }
+
     /// Detaches ONE catalog track from this edition — the tracklist position
     /// survives, so the caller should leave the draft tracklist entry alone.
     @discardableResult
