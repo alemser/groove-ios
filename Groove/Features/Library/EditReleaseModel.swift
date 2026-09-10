@@ -71,7 +71,12 @@ final class EditReleaseModel {
                 let resp = try await service.forkUserReleaseFromLibrary(source: release.source, releaseId: release.releaseId)
                 jobId = resp.job.id
                 draft = resp.draft
-                isCopy = true
+                // The server edits an already-user-sourced release in place
+                // (same release_id) when it's reopened purely by name — only
+                // a genuinely foreign/reference release gets minted into a
+                // new copy. Reflect whichever actually happened rather than
+                // assuming every fork-from-library call produced a copy.
+                isCopy = resp.draft.releaseId != release.releaseId
             }
             catalogTracks = (try? await service.releaseTracks(source: release.source, releaseId: release.releaseId)) ?? []
             phase = .loaded
