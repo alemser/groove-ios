@@ -192,16 +192,18 @@ struct CatalogService {
 
     // MARK: User release editing (draft/confirm cycle for an owned release)
 
-    /// The confirmed-in-place edit path: only reachable when the release has
-    /// a `catalog_job_id` (`LibraryRelease.catalogJobId`).
-    func userReleaseDraft(jobId: Int64) async throws -> UserReleaseEditionResponse {
-        try await api.get("/catalog/enrich/jobs/\(jobId)/user-release/draft")
-    }
-
-    /// Fallback when `userReleaseDraft` 404s (no draft persisted yet) — primes one.
-    @discardableResult
-    func reviseUserRelease(jobId: Int64) async throws -> UserReleaseEditionResponse {
-        try await api.post("/catalog/enrich/jobs/\(jobId)/user-release/revise", body: Empty())
+    /// Opens the edit session from the LIBRARY RELEASE itself rather than
+    /// through its `catalog_job_id`. `catalog_job_id` names the job that
+    /// *created* the release — whose user-release draft has long since been
+    /// consumed — so resolving through it 404s (job gone) or, worse, races a
+    /// job GC into a dangling foreign key on save. groove-catalog's web
+    /// studio switched to this endpoint for exactly that reason (see
+    /// `PrepareUserReleaseForEditByRelease`'s doc comment server-side); this
+    /// is the only reliable way in.
+    func libraryReleaseEdition(source: String, releaseId: String) async throws -> UserReleaseEditionResponse {
+        let s = pathSegment(source)
+        let r = pathSegment(releaseId)
+        return try await api.get("/catalog/library/releases/\(s)/\(r)/edition")
     }
 
     @discardableResult
