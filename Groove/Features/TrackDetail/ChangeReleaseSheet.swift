@@ -6,6 +6,12 @@ import Observation
 final class ChangeReleaseModel {
     var results: [IdentifySearchHit] = []
     var phase: Phase = .idle
+    /// Library search runs independently of the enricher search below: it needs
+    /// no enrichers configured and no network beyond the LAN, so it must not be
+    /// blocked or hidden by an enricher error — same fix as `ManualIdentifySheet`
+    /// (groove-identity#32), applied here so re-matching a confirmed track also
+    /// works with enrichers unreachable (offline mode / cloud autônomo down).
+    var libraryResults: [LibraryReleaseSearchHit] = []
     var busyId: String?
     var actionError: String?
 
@@ -21,12 +27,19 @@ final class ChangeReleaseModel {
     func search(_ text: String) {
         searchTask?.cancel()
         let q = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { phase = .idle; results = []; return }
+        guard !q.isEmpty else { phase = .idle; results = []; libraryResults = []; return }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            await runSearch(q)
+            async let library: () = runLibrarySearch(q)
+            async let external: () = runSearch(q)
+            _ = await (library, external)
         }
+    }
+
+    private func runLibrarySearch(_ q: String) async {
+        guard let settings else { return }
+        libraryResults = (try? await CatalogService(settings: settings).searchLibraryReleases(query: q)) ?? []
     }
 
     private func runSearch(_ q: String) async {
@@ -58,6 +71,33 @@ final class ChangeReleaseModel {
             actionError = message
             return message
         }
+    }
+
+    /// Same as `apply(trackId:hit:)` but for a hit picked from the library
+    /// search — mapped onto the same `apply-release-from-search` wire shape
+    /// the web studio uses for its own library-edition results
+    /// (`searchHitFromLibrary` in release-matching.js).
+    func apply(trackId: Int64, libraryHit: LibraryReleaseSearchHit) async -> String? {
+        await apply(trackId: trackId, hit: IdentifySearchHit(
+            source: libraryHit.source ?? "",
+            artist: libraryHit.artist,
+            title: nil,
+            album: libraryHit.album,
+            isrc: nil,
+            recordingId: nil,
+            releaseId: libraryHit.releaseId,
+            releaseGroupId: nil,
+            releaseType: nil,
+            releaseFormat: nil,
+            trackNumber: nil,
+            trackTotal: nil,
+            discNumber: nil,
+            durationMs: nil,
+            releaseDate: libraryHit.year,
+            country: nil,
+            label: nil,
+            artworkUrl: libraryHit.artworkUrl
+        ))
     }
 }
 
@@ -110,46 +150,96 @@ struct ChangeReleaseSheet: View {
         }
     }
 
+    /// Library results render regardless of `model.phase` — that phase only
+    /// tracks the enricher search, which needs neither enrichers configured
+    /// nor cloud reachability, so a library-only match (the common offline-mode
+    /// case) must never be hidden behind an enricher error or idle state.
     @ViewBuilder
     private var resultsArea: some View {
-        switch model.phase {
-        case .idle:
-            EmptyStateView(
-                icon: "arrow.triangle.2.circlepath",
-                title: "Search for the right edition",
-                message: "Look up the exact release you own — e.g. the vinyl pressing instead of a digital match."
-            )
-        case .loading:
-            LoadingView()
-        case let .error(message):
-            ErrorStateView(message: message) { model.search(query) }
-        case .loaded:
-            if model.results.isEmpty {
-                EmptyStateView(icon: "questionmark.circle", title: "No matches", message: "Try a different search.")
-            } else {
-                List {
-                    ForEach(model.results) { hit in
+        List {
+            if !model.libraryResults.isEmpty {
+                Section("Your Library") {
+                    ForEach(model.libraryResults) { hit in
                         Button {
-                            Task { await apply(hit) }
+                            Task { await apply(libraryHit: hit) }
                         } label: {
-                            IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
+                            LibraryReleaseHitRow(hit: hit)
                         }
                         .buttonStyle(.plain)
                         .disabled(model.busyId != nil)
                         .listRowBackground(Brand.surface)
                     }
-                    if let err = model.actionError {
-                        Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
-                    }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+            }
+            Section(model.libraryResults.isEmpty ? "" : "Enrichers") {
+                enricherRows
+            }
+            if let err = model.actionError {
+                Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .overlay {
+            if model.libraryResults.isEmpty && query.trimmingCharacters(in: .whitespaces).isEmpty {
+                EmptyStateView(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Search for the right edition",
+                    message: "Look up the exact release you own — e.g. the vinyl pressing instead of a digital match."
+                )
+            }
+        }
+    }
+
+    /// Enricher-search rows only — no List wrapper, no idle/empty state (the
+    /// parent List and its overlay own those, since library results share the
+    /// same screen and must not be hidden behind an enricher-only switch).
+    @ViewBuilder
+    private var enricherRows: some View {
+        switch model.phase {
+        case .idle:
+            EmptyView()
+        case .loading:
+            if model.libraryResults.isEmpty {
+                LoadingView()
+            }
+        case let .error(message):
+            if model.libraryResults.isEmpty {
+                ErrorStateView(message: message) { model.search(query) }
+            } else {
+                Text("Enrichers: \(message)").font(.caption).foregroundStyle(Brand.muted)
+            }
+        case .loaded:
+            if model.results.isEmpty {
+                if model.libraryResults.isEmpty {
+                    EmptyStateView(icon: "questionmark.circle", title: "No matches", message: "Try a different search.")
+                }
+            } else {
+                ForEach(model.results) { hit in
+                    Button {
+                        Task { await apply(hit) }
+                    } label: {
+                        IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(model.busyId != nil)
+                    .listRowBackground(Brand.surface)
+                }
             }
         }
     }
 
     private func apply(_ hit: IdentifySearchHit) async {
         let error = await model.apply(trackId: trackId, hit: hit)
+        if error == nil {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onApplied()
+            dismiss()
+        }
+    }
+
+    private func apply(libraryHit hit: LibraryReleaseSearchHit) async {
+        let error = await model.apply(trackId: trackId, libraryHit: hit)
         if error == nil {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onApplied()
