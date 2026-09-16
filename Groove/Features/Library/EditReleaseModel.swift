@@ -53,30 +53,29 @@ final class EditReleaseModel {
         phase = .loading
         let service = CatalogService(settings: settings)
         do {
-            if let catalogJobId = release.catalogJobId, catalogJobId > 0 {
-                do {
-                    let resp = try await service.userReleaseDraft(jobId: catalogJobId)
-                    jobId = catalogJobId
-                    draft = resp.draft
-                    isCopy = false
-                } catch let error as APIError {
-                    guard case let .http(status, _) = error, status == 404 else { throw error }
-                    // No draft persisted yet for this job — prime one.
-                    let resp = try await service.reviseUserRelease(jobId: catalogJobId)
-                    jobId = catalogJobId
-                    draft = resp.draft
-                    isCopy = false
-                }
-            } else {
-                let resp = try await service.forkUserReleaseFromLibrary(source: release.source, releaseId: release.releaseId)
+            // Resolved from the durable library release, never from
+            // `catalog_job_id` — that field names the job that *created* the
+            // release, whose draft has long since been consumed, so opening
+            // through it 404s (job gone) or races a job GC into a dangling
+            // foreign key on save. `libraryReleaseEdition` is the same fix
+            // the web studio already shipped for this.
+            let resp = try await service.libraryReleaseEdition(source: release.source, releaseId: release.releaseId)
+            if resp.job.id > 0 {
                 jobId = resp.job.id
                 draft = resp.draft
+                isCopy = false
+            } else {
+                // No enrich job ever attached to this release — nothing for
+                // a save to write through yet; mint one.
+                let forkResp = try await service.forkUserReleaseFromLibrary(source: release.source, releaseId: release.releaseId)
+                jobId = forkResp.job.id
+                draft = forkResp.draft
                 // The server edits an already-user-sourced release in place
                 // (same release_id) when it's reopened purely by name — only
                 // a genuinely foreign/reference release gets minted into a
                 // new copy. Reflect whichever actually happened rather than
                 // assuming every fork-from-library call produced a copy.
-                isCopy = resp.draft.releaseId != release.releaseId
+                isCopy = forkResp.draft.releaseId != release.releaseId
             }
             catalogTracks = (try? await service.releaseTracks(source: release.source, releaseId: release.releaseId)) ?? []
             phase = .loaded

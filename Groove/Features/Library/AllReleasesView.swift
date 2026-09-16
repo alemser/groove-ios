@@ -165,7 +165,6 @@ struct AllReleasesView: View {
                                     Label(release.owned ? "Edit" : "Adopt", systemImage: "pencil")
                                 }
                                 .tint(Brand.accent)
-                                .disabled(!(!release.owned || (release.catalogJobId ?? 0) > 0))
                             }
                     }
                     if let err = model.actionError {
