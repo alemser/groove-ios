@@ -107,6 +107,21 @@ struct ReleasesView: View {
     var body: some View {
         content
             .task { model.configure(settings) }
+            // configure() only loads once (guarded on settings == nil), and
+            // none of the reload triggers below fire for a release edited via
+            // ReleaseDetailView — reached by pushing onto the tab's own
+            // NavigationStack (LibraryView's navigationDestination), not one
+            // of the three sheets this screen already reloads on dismiss.
+            // ReleaseDetailView reloads its own local model after a save, but
+            // this root list is a separate ReleasesModel instance and never
+            // hears about it, so popping back showed the stale list — a
+            // release confirmed there simply never appeared here, no matter
+            // how long you waited short of a tab switch or the next 30s
+            // attention poll. onAppear fires every time this view becomes
+            // visible again, including on such a pop, unlike .task above
+            // (tied to this view's identity, so it never reruns once the
+            // instance survives underneath a push) — reported 2026-09-16.
+            .onAppear { Task { await model.load(query: search) } }
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search releases")
             .onChange(of: search) { _, q in model.search(q) }
             // `AttentionCenter` polls independently of this screen, so the tab
