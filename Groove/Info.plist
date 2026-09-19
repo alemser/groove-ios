@@ -35,6 +35,8 @@
 	<array>
 		<string>_http._tcp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Groove uses the camera to scan a disc's barcode when adding a release.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Groove connects to your groove-catalog server on the local network to manage your library.</string>
 	<key>UILaunchScreen</key>

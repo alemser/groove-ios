@@ -46,7 +46,14 @@ final class ChangeReleaseModel {
         guard let settings else { return }
         phase = .loading
         do {
-            results = try await CatalogService(settings: settings).identifySearch(query: q)
+            // A query that is nothing but 8-14 digits reads as a barcode, not
+            // free text — route it to the exact-edition lookup instead of a
+            // artist/title text search that would never match a GTIN.
+            let barcodeDigits = Barcode.digits(from: q)
+            let service = CatalogService(settings: settings)
+            results = barcodeDigits.isEmpty
+                ? try await service.identifySearch(query: q)
+                : try await service.identifySearch(barcode: barcodeDigits)
             phase = .loaded
         } catch {
             phase = .error(error.localizedForDisplay)
@@ -140,7 +147,7 @@ struct ChangeReleaseSheet: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 }
-                .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Artist, album, or track")
+                .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Artist, album, track, or barcode")
                 .onChange(of: query) { _, q in model.search(q) }
                 .grooveScreenBackground()
         }

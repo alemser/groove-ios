@@ -16,6 +16,7 @@
 		0FEC380873CA3EF6C35DE7FF /* EnricherSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66653264D1692CBEA90FB2AC /* EnricherSettingsView.swift */; };
 		102F9509A73736397BBEBEFA /* AmplifierEquipmentTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98EFCEA58EE319666D979B2A /* AmplifierEquipmentTab.swift */; };
 		10728624876A84B1BDF41511 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07D707E80C5DEF8D824443B /* HealthView.swift */; };
+		1AD0CBCE8EFE905E329CA062 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */; };
 		1E60AA21BFA1FD60CE4E8877 /* StreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C54B427D95192B93FFCA854 /* StreamingView.swift */; };
 		1E7FFD6EB3A48BA130D0BB71 /* BLEProvisioningClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */; };
 		25EF7E2728396EBAD1F9762B /* RecognitionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBA85AF898CC46578F41CD6 /* RecognitionModels.swift */; };
@@ -49,6 +50,7 @@
 		9436589215B9A9DAE6659F23 /* StylusModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354361FA261048E456288AB8 /* StylusModels.swift */; };
 		99D2880D1FB1BEC67D7D43A0 /* RigModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A2E76DD3C03EACA8571DDA /* RigModels.swift */; };
 		9B9FBC5A7BE2AB51DC3FB3E4 /* EquipmentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1419E86CA4A3D1E5BD3CBEC2 /* EquipmentDetailView.swift */; };
+		A516116BA4E48D5F5B3269C5 /* Barcode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3634CDA0BB984B61C55ADD18 /* Barcode.swift */; };
 		A5C8565C906430EC7A80EA7E /* RigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672B702C305D95A110E0B197 /* RigView.swift */; };
 		A5D7CD5275C59AD65C8F7403 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F2A1EC6AA9160C8B6AB11 /* Formatters.swift */; };
 		A743408658EE946E7330A391 /* Poller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C08861DABACCD203B79E1B /* Poller.swift */; };
@@ -96,9 +98,11 @@
 		27ED92912FF018764F1314A9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		29A0CECF61D4276DD41099F9 /* ChangeReleaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeReleaseSheet.swift; sourceTree = "<group>"; };
 		354361FA261048E456288AB8 /* StylusModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylusModels.swift; sourceTree = "<group>"; };
+		3634CDA0BB984B61C55ADD18 /* Barcode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Barcode.swift; sourceTree = "<group>"; };
 		38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningClient.swift; sourceTree = "<group>"; };
 		3A9BAD5549550DECAB6614F5 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
+		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4271F4F0D0D2FEC9D2446F75 /* CatalogDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDiscovery.swift; sourceTree = "<group>"; };
 		431A7B81109A3032AF631217 /* StylusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylusModel.swift; sourceTree = "<group>"; };
 		4E4B6394B0A202EEC5CC67D1 /* ManualIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualIdentifySheet.swift; sourceTree = "<group>"; };
@@ -212,6 +216,7 @@
 				CFF1193157A2AE8C0D67BA94 /* APIClient.swift */,
 				B328C114E82F254E4675A5AA /* AppSettings.swift */,
 				27254E509C0A5183FE8A30CB /* AttentionCenter.swift */,
+				3634CDA0BB984B61C55ADD18 /* Barcode.swift */,
 				38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */,
 				4271F4F0D0D2FEC9D2446F75 /* CatalogDiscovery.swift */,
 				BC847C6CED4853F2D4663F1D /* CatalogService.swift */,
@@ -323,6 +328,7 @@
 				96B9E98CBF953C34911F2F68 /* AddReleaseView.swift */,
 				65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */,
 				E1413AC3F7F93EB3B0926AD2 /* AssociationReviewSheet.swift */,
+				4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */,
 				9B7842CB9B4E1728D1B27D1A /* EditReleaseModel.swift */,
 				A373873E7A0F33DEB4004BBC /* EditReleaseView.swift */,
 				DB9253360D61A0BC5E0BE49D /* LibraryView.swift */,
@@ -411,6 +417,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					183CFA358C610AC48FAF527E = {
+						DevelopmentTeam = VNTRG9Q6BU;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -468,6 +475,8 @@
 				1E7FFD6EB3A48BA130D0BB71 /* BLEProvisioningClient.swift in Sources */,
 				4BDD17BF4D62826ED588D229 /* BLEProvisioningModel.swift in Sources */,
 				6BBF79442ECCF21D368D2B49 /* BLEProvisioningView.swift in Sources */,
+				A516116BA4E48D5F5B3269C5 /* Barcode.swift in Sources */,
+				1AD0CBCE8EFE905E329CA062 /* BarcodeScannerView.swift in Sources */,
 				C7548DCF759A391565A438A1 /* CatalogDiscovery.swift in Sources */,
 				AE367722C2E95FFDA2CDD01B /* CatalogService.swift in Sources */,
 				69F57183E5AEC209CA3D6E72 /* CatalogSessionModel.swift in Sources */,
@@ -661,7 +670,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = V3SNV627ZD;
 				INFOPLIST_FILE = Groove/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -679,7 +687,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = V3SNV627ZD;
 				INFOPLIST_FILE = Groove/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

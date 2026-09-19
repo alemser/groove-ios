@@ -20,18 +20,26 @@ final class AddReleaseModel {
 
     /// Explicit lookup, fired only when the user taps Search (or submits a
     /// field) — not per keystroke. Mirrors the web studio's "Lookup using
-    /// enrichers": separate Artist/Album fields, one deliberate search.
-    func search(artist: String, album: String) {
+    /// enrichers": a barcode (typed or scanned) names one exact pressing and
+    /// wins outright — same precedence identify/search itself applies server
+    /// side — otherwise falls back to the separate Artist/Album fields.
+    func search(artist: String, album: String, barcode: String) {
         let artist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let album = album.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !artist.isEmpty || !album.isEmpty, let settings else { phase = .idle; results = []; return }
+        let barcodeDigits = Barcode.digits(from: barcode)
+        guard !barcodeDigits.isEmpty || !artist.isEmpty || !album.isEmpty, let settings else {
+            phase = .idle; results = []; return
+        }
         Task {
             phase = .loading
             do {
                 // A wider net than the default 25: the filters below only ever
                 // narrow what came back, so a pressing that fell outside the
                 // page can never be filtered into view.
-                results = try await CatalogService(settings: settings).identifySearch(artist: artist, album: album, limit: 40)
+                let service = CatalogService(settings: settings)
+                results = barcodeDigits.isEmpty
+                    ? try await service.identifySearch(artist: artist, album: album, limit: 40)
+                    : try await service.identifySearch(barcode: barcodeDigits, limit: 40)
                 phase = .loaded
             } catch {
                 phase = .error(error.localizedForDisplay)
@@ -84,14 +92,18 @@ struct AddReleaseView: View {
     @State private var model = AddReleaseModel()
     @State private var artist = ""
     @State private var album = ""
+    @State private var barcode = ""
+    @State private var showScanner = false
     @State private var created: CreatedDraft?
     @State private var selectedFormat: String?
     @State private var selectedCountry: String?
 
-    private enum Field { case artist, album }
+    private enum Field { case artist, album, barcode }
 
     private var hasQuery: Bool {
-        !artist.trimmingCharacters(in: .whitespaces).isEmpty || !album.trimmingCharacters(in: .whitespaces).isEmpty
+        !Barcode.digits(from: barcode).isEmpty
+            || !artist.trimmingCharacters(in: .whitespaces).isEmpty
+            || !album.trimmingCharacters(in: .whitespaces).isEmpty
     }
     private var canCreate: Bool {
         !artist.trimmingCharacters(in: .whitespaces).isEmpty && !album.trimmingCharacters(in: .whitespaces).isEmpty
@@ -101,6 +113,20 @@ struct AddReleaseView: View {
         NavigationStack {
             Form {
                 Section {
+                    HStack {
+                        TextField("Barcode (EAN/UPC)", text: $barcode)
+                            .keyboardType(.numberPad)
+                            .focused($focusedField, equals: .barcode)
+                            .submitLabel(.search)
+                            .onSubmit { search() }
+                        Button {
+                            focusedField = nil
+                            showScanner = true
+                        } label: {
+                            Image(systemName: "barcode.viewfinder")
+                        }
+                        .buttonStyle(.borderless)
+                    }
                     TextField("Artist", text: $artist)
                         .focused($focusedField, equals: .artist)
                         .submitLabel(.next)
@@ -121,7 +147,7 @@ struct AddReleaseView: View {
                     }
                     .disabled(!hasQuery || model.phase == .loading)
                 } footer: {
-                    Text("Search looks up artist and album against your enrichers to prefill format, tracklist, and artwork.")
+                    Text("A barcode names the exact pressing and skips artist/album — type it, scan it, or search by artist and album instead.")
                         .foregroundStyle(Brand.muted)
                 }
 
@@ -161,9 +187,15 @@ struct AddReleaseView: View {
                     dismiss()
                 }
             }
+            .sheet(isPresented: $showScanner) {
+                BarcodeScannerSheet { scanned in
+                    barcode = scanned
+                    search()
+                }
+            }
         }
         .task { model.configure(settings) }
-        .onAppear { focusedField = .artist }
+        .onAppear { focusedField = .barcode }
     }
 
     @ViewBuilder
@@ -280,7 +312,7 @@ struct AddReleaseView: View {
         // would silently hide most of it.
         selectedFormat = nil
         selectedCountry = nil
-        model.search(artist: artist, album: album)
+        model.search(artist: artist, album: album, barcode: barcode)
     }
 
     private func createFromHit(_ hit: IdentifySearchHit) async {
