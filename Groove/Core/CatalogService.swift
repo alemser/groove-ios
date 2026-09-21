@@ -289,6 +289,17 @@ struct CatalogService {
         ], as: IdentifySearchResponse.self).items
     }
 
+    /// Exact-edition lookup by EAN/UPC — mirrors the web studio's dedicated
+    /// barcode field. One barcode names one pressing, so this always wins
+    /// over a pinned/artist+album search server-side (domain.EnrichRequest.
+    /// PrimaryBarcode); a typed or scanned barcode alone is enough to search.
+    func identifySearch(barcode: String, limit: Int = 25) async throws -> [IdentifySearchHit] {
+        try await api.get("/catalog/identify/search", query: [
+            .init(name: "barcode", value: barcode),
+            .init(name: "limit", value: String(limit)),
+        ], as: IdentifySearchResponse.self).items
+    }
+
     /// Identifies a play from scratch — creates the track, records the play, and queues
     /// enrichment — either from a picked search hit or fully typed-in metadata.
     @discardableResult
