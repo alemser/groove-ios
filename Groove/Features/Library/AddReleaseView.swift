@@ -7,7 +7,6 @@ final class AddReleaseModel {
     var results: [IdentifySearchHit] = []
     var phase: Phase = .idle
     var busyId: String?
-    var creating = false
     var actionError: String?
 
     enum Phase: Equatable { case idle, loading, loaded, error(String) }
@@ -47,30 +46,16 @@ final class AddReleaseModel {
         }
     }
 
-    /// Creates a release prefilled from a picked search hit's metadata + tracklist.
-    func create(from hit: IdentifySearchHit) async -> (jobId: Int64, draft: PendingRelease)? {
+    /// The form for a new release, prefilled from a picked search hit's
+    /// metadata and tracklist. Writes nothing — the release is created when
+    /// the editor saves.
+    func prefill(from hit: IdentifySearchHit) async -> PendingRelease? {
         guard let settings else { return nil }
         busyId = hit.id
         actionError = nil
         defer { busyId = nil }
         do {
-            let resp = try await CatalogService(settings: settings).createStandaloneUserRelease(from: hit)
-            return (resp.job.id, resp.draft)
-        } catch {
-            actionError = error.localizedForDisplay
-            return nil
-        }
-    }
-
-    /// Creates a blank release from just the typed artist/album, skipping the lookup.
-    func create(artist: String, album: String) async -> (jobId: Int64, draft: PendingRelease)? {
-        guard let settings else { return nil }
-        creating = true
-        actionError = nil
-        defer { creating = false }
-        do {
-            let resp = try await CatalogService(settings: settings).createStandaloneUserRelease(artist: artist, album: album)
-            return (resp.job.id, resp.draft)
+            return try await CatalogService(settings: settings).prefillUserRelease(from: hit)
         } catch {
             actionError = error.localizedForDisplay
             return nil
@@ -80,9 +65,9 @@ final class AddReleaseModel {
 
 /// The "cadastro" entry point: Artist + Album fields up front, mirroring the
 /// web studio's "New release" dialog — Search looks the pair up against
-/// enrichers (only on an explicit tap, never per keystroke), or Save creates
-/// directly from what's typed. Either path hands off into `EditReleaseView`
-/// to fill in format, tracklist, and artwork before publish.
+/// enrichers (only on an explicit tap, never per keystroke), or continue with
+/// just what's typed. Either path hands off into `EditReleaseView` to fill in
+/// format, tracklist, and artwork; nothing is written until it saves.
 struct AddReleaseView: View {
     let onCreated: () -> Void
 
@@ -94,7 +79,7 @@ struct AddReleaseView: View {
     @State private var album = ""
     @State private var barcode = ""
     @State private var showScanner = false
-    @State private var created: CreatedDraft?
+    @State private var newRelease: NewRelease?
     @State private var selectedFormat: String?
     @State private var selectedCountry: String?
 
@@ -156,16 +141,15 @@ struct AddReleaseView: View {
 
                 Section {
                     Button {
-                        Task { await createManual() }
+                        continueManually()
                     } label: {
                         HStack {
                             Spacer()
-                            if model.creating { ProgressView() }
-                            Text("Save Without Searching")
+                            Text("Continue Without Searching")
                             Spacer()
                         }
                     }
-                    .disabled(!canCreate || model.creating)
+                    .disabled(!canCreate)
                 }
 
                 if let err = model.actionError {
@@ -181,8 +165,8 @@ struct AddReleaseView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
-            .sheet(item: $created) { item in
-                EditReleaseView(jobId: item.jobId, draft: item.draft) {
+            .sheet(item: $newRelease) { item in
+                EditReleaseView(newRelease: item.prefill, from: item.hit) {
                     onCreated()
                     dismiss()
                 }
@@ -210,13 +194,13 @@ struct AddReleaseView: View {
         case .loaded:
             if model.results.isEmpty {
                 Section {
-                    Text("No matches. You can still save with just artist and album below.")
+                    Text("No matches. You can still continue with just artist and album below.")
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
                 }
             } else if filteredResults.isEmpty {
                 Section {
-                    Text("No result matches those filters. The pressing you want may not be in the providers — clear the filters to see everything that came back, or save with just artist and album below.")
+                    Text("No result matches those filters. The pressing you want may not be in the providers — clear the filters to see everything that came back, or continue with just artist and album below.")
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
                     Button("Clear filters") { selectedFormat = nil; selectedCountry = nil }
@@ -316,18 +300,24 @@ struct AddReleaseView: View {
     }
 
     private func createFromHit(_ hit: IdentifySearchHit) async {
-        guard let result = await model.create(from: hit) else { return }
-        created = CreatedDraft(jobId: result.jobId, draft: result.draft)
+        guard let prefill = await model.prefill(from: hit) else { return }
+        newRelease = NewRelease(prefill: prefill, hit: hit)
     }
 
-    private func createManual() async {
-        guard let result = await model.create(artist: artist, album: album) else { return }
-        created = CreatedDraft(jobId: result.jobId, draft: result.draft)
+    private func continueManually() {
+        let prefill = PendingRelease(
+            id: 0, jobId: 0, status: "",
+            artist: artist.trimmingCharacters(in: .whitespacesAndNewlines),
+            album: album.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        newRelease = NewRelease(prefill: prefill, hit: nil)
     }
 }
 
-private struct CreatedDraft: Identifiable {
-    let jobId: Int64
-    let draft: PendingRelease
-    var id: Int64 { jobId }
+/// The form a new release opens with. Not stored anywhere — the release
+/// exists once the editor saves it.
+private struct NewRelease: Identifiable {
+    let id = UUID()
+    let prefill: PendingRelease
+    let hit: IdentifySearchHit?
 }

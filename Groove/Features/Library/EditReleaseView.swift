@@ -6,11 +6,14 @@ import PhotosUI
 /// when the release has a `catalog_job_id`; otherwise the only backend path
 /// is a fresh editable copy, which this screen discloses up front. Also
 /// doubles as the second half of "Add Release" (`AddReleaseView`), opened via
-/// `init(jobId:draft:)` once a scratch release has been created.
+/// `init(newRelease:from:)` with a form that is written only when saved.
+///
+/// Save is the only way anything is written, and it is definitive: the
+/// release is in the library when it returns. Cancel writes nothing.
 struct EditReleaseView: View {
-    /// `nil` when editing a release just created from scratch through the
-    /// standalone "Add Release" flow — nothing to detach tracks from, and no
-    /// "editing creates a copy" caveat applies.
+    /// `nil` for a new release and for the catalog session's current release
+    /// — nothing to detach tracks from, and no "editing creates a copy"
+    /// caveat applies.
     let release: LibraryRelease?
     var onSaved: () -> Void = {}
 
@@ -32,7 +35,7 @@ struct EditReleaseView: View {
     @State private var artworkPreview: Image?
 
     @State private var showDetachConfirm = false
-    @State private var showForcePublish = false
+    @State private var showForceSave = false
     @State private var didSeed = false
 
     private enum PendingTrackAction: Identifiable {
@@ -54,12 +57,21 @@ struct EditReleaseView: View {
         _model = State(initialValue: EditReleaseModel(release: release))
     }
 
-    /// Opens straight into a release just created from scratch — the "cadastro"
-    /// path from `AddReleaseView`, which already has a draft + jobId in hand.
-    init(jobId: Int64, draft: PendingRelease, onSaved: @escaping () -> Void = {}) {
+    /// Edits the release behind an existing job — the catalog session's
+    /// current release.
+    init(jobId: Int64, edition: PendingRelease, onSaved: @escaping () -> Void = {}) {
         self.release = nil
         self.onSaved = onSaved
-        _model = State(initialValue: EditReleaseModel(jobId: jobId, draft: draft))
+        _model = State(initialValue: EditReleaseModel(jobId: jobId, edition: edition))
+    }
+
+    /// A new release — the "cadastro" path from `AddReleaseView`. The form
+    /// starts from `prefill` (a search hit's fields, or just a typed artist
+    /// and album) and nothing is written until Save.
+    init(newRelease prefill: PendingRelease, from hit: IdentifySearchHit? = nil, onSaved: @escaping () -> Void = {}) {
+        self.release = nil
+        self.onSaved = onSaved
+        _model = State(initialValue: EditReleaseModel(newRelease: prefill, from: hit))
     }
 
     var body: some View {
@@ -75,41 +87,31 @@ struct EditReleaseView: View {
                 }
             }
             .grooveScreenBackground()
-            .navigationTitle(release == nil ? "New Release" : "Edit Release")
+            .navigationTitle(model.isNew ? "New Release" : "Edit Release")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        Task {
+                            await model.discardUnsaved()
+                            dismiss()
+                        }
+                    }
                 }
-                if release != nil {
-                    // Editing an existing release: it's already definitive,
-                    // there's no draft state worth exposing — one action
-                    // saves the fields and commits them together (`publish`
-                    // already does save-then-confirm internally).
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(model.isSaving || model.isPublishing ? "Saving…" : "Save") { Task { await publish() } }
-                            .disabled(model.isSaving || model.isPublishing)
-                    }
-                } else {
-                    // From-scratch creation: genuinely provisional until the
-                    // first confirm, so the two-step stays.
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(model.isSaving ? "Saving…" : "Save Draft") { Task { await saveDraft() } }
-                            .disabled(model.isSaving || model.isPublishing)
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(model.isPublishing ? "Publishing…" : "Publish") { Task { await publish() } }
-                            .disabled(model.isSaving || model.isPublishing)
-                    }
+                // One action, new release or not: Save writes the release and
+                // puts it in the library.
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(model.isSaving ? "Saving…" : "Save") { Task { await save() } }
+                        .disabled(model.isSaving || model.isUploadingArtwork)
                 }
             }
         }
         .task { model.configure(settings) }
-        // `init(jobId:draft:)` starts with `model.draft` already set — no
-        // transition ever happens for `onChange` below to catch, so the form
-        // would stay blank without this explicit first pass.
-        .task { seed(from: model.draft) }
-        .onChange(of: model.draft) { _, new in seed(from: new) }
+        // The `jobId`/`newRelease` inits start with `model.edition` already
+        // set — no transition ever happens for `onChange` below to catch, so
+        // the form would stay blank without this explicit first pass.
+        .task { seed(from: model.edition) }
+        .onChange(of: model.edition) { _, new in seed(from: new) }
         .onChange(of: artworkItem) { _, item in
             guard let item else { return }
             Task { await uploadPickedArtwork(item) }
@@ -169,9 +171,9 @@ struct EditReleaseView: View {
             if let error = model.actionError {
                 Section {
                     Text(error).foregroundStyle(Brand.err)
-                    if showForcePublish {
-                        Button("Force Publish Anyway", role: .destructive) {
-                            Task { await publish(force: true) }
+                    if showForceSave {
+                        Button("Save Anyway", role: .destructive) {
+                            Task { await save(force: true) }
                         }
                     }
                 }
@@ -256,7 +258,7 @@ struct EditReleaseView: View {
                 if let artworkPreview {
                     artworkPreview.resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    Artwork(raw: model.draft?.artworkUrl, cornerRadius: 10)
+                    Artwork(raw: model.edition?.artworkUrl, cornerRadius: 10)
                 }
             }
             .frame(width: 64, height: 64)
@@ -340,7 +342,7 @@ struct EditReleaseView: View {
                         .tint(Brand.teal)
                     } else {
                         // Nothing recognized here yet — this only edits the
-                        // draft's tracklist metadata, no catalog track to
+                        // release.s tracklist metadata, no catalog track to
                         // affect, so a plain local removal is honest.
                         Button(role: .destructive) {
                             tracklist.removeAll { $0.id == entry.id }
@@ -449,36 +451,36 @@ struct EditReleaseView: View {
         }
     }
 
-    private func seed(from draft: PendingRelease?) {
-        guard let draft, !didSeed else { return }
+    private func seed(from edition: PendingRelease?) {
+        guard let edition, !didSeed else { return }
         didSeed = true
-        album = draft.album ?? ""
-        artist = draft.artist ?? ""
-        label = draft.label ?? ""
-        country = draft.country ?? ""
-        releaseDate = draft.releaseDate ?? ""
-        releaseType = draft.releaseType ?? ""
-        releaseFormat = draft.releaseFormat?.lowercased().nonEmpty ?? "vinyl"
-        tracklist = (draft.tracklist ?? []).sorted { $0.ordinal < $1.ordinal }
+        album = edition.album ?? ""
+        artist = edition.artist ?? ""
+        label = edition.label ?? ""
+        country = edition.country ?? ""
+        releaseDate = edition.releaseDate ?? ""
+        releaseType = edition.releaseType ?? ""
+        releaseFormat = edition.releaseFormat?.lowercased().nonEmpty ?? "vinyl"
+        tracklist = (edition.tracklist ?? []).sorted { $0.ordinal < $1.ordinal }
     }
 
-    private func buildPatch() -> UserReleaseDraftPatch {
-        var patch = UserReleaseDraftPatch()
-        patch.album = album
-        patch.artist = artist
-        patch.label = label
-        patch.country = country
-        patch.releaseDate = releaseDate
-        patch.releaseType = releaseType
-        patch.releaseFormat = releaseFormat
-        patch.notes = notes
-        patch.tracklist = tracklist
-        return patch
+    private func formFields() -> UserReleaseFields {
+        var fields = UserReleaseFields()
+        fields.album = album
+        fields.artist = artist
+        fields.label = label
+        fields.country = country
+        fields.releaseDate = releaseDate
+        fields.releaseType = releaseType
+        fields.releaseFormat = releaseFormat
+        fields.notes = notes
+        fields.tracklist = tracklist
+        return fields
     }
 
     /// Tracks with no duration.
     ///
-    /// Every track needs one before a release can be saved or published: the
+    /// Every track needs one before a release can be saved: the
     /// album programme schedules a whole side from cumulative durations, so one
     /// blank row breaks the clock for every track after it — and it surfaces
     /// hours later as a mislabelled track, never as anything pointing back here.
@@ -499,16 +501,7 @@ struct EditReleaseView: View {
             + "Every track needs a duration before the release can be saved."
     }
 
-    private func saveDraft() async {
-        guard tracksMissingDuration.isEmpty else {
-            model.actionError = missingDurationMessage
-            showForcePublish = false
-            return
-        }
-        await model.saveDraft(buildPatch())
-    }
-
-    private func publish(force: Bool = false) async {
+    private func save(force: Bool = false) async {
         // Checked here as well as on the server so the operator is told which
         // tracks, in the screen where the fields are, rather than being handed a
         // refusal after a round trip.
@@ -516,16 +509,14 @@ struct EditReleaseView: View {
             model.actionError = missingDurationMessage
             // Never offered for this: a missing duration is not a judgement call
             // the operator can overrule — the schedule simply cannot be built.
-            showForcePublish = false
+            showForceSave = false
             return
         }
-        _ = await model.saveDraft(buildPatch())
-        let ok = await model.publish(force: force)
-        if ok {
+        if await model.save(formFields(), force: force) {
             onSaved()
             dismiss()
         } else {
-            showForcePublish = true
+            showForceSave = true
         }
     }
 

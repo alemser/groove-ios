@@ -86,8 +86,8 @@ struct APIClient {
     }
 
     @discardableResult
-    func put<Body: Encodable, T: Decodable>(_ path: String, body: Body, as type: T.Type = T.self) async throws -> T {
-        try await send(path, method: "PUT", body: body)
+    func put<Body: Encodable, T: Decodable>(_ path: String, query: [URLQueryItem] = [], body: Body, as type: T.Type = T.self) async throws -> T {
+        try await send(path, method: "PUT", query: query, body: body)
     }
 
     func delete(_ path: String) async throws {

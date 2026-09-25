@@ -24,7 +24,7 @@ final class CatalogSessionModel {
     var livePlayback: Playback?
     var tracklist: [TracklistEntry] = []
     var currentJobId: Int64?
-    var currentDraft: PendingRelease?
+    var currentEdition: PendingRelease?
     var confirmedHistory: [ConfirmedTrack] = []
     var pending: [PendingAssociation] = []
     private(set) var everActive = false
@@ -116,11 +116,11 @@ final class CatalogSessionModel {
         guard let resp = try? await service.confirmedEdition(trackId: trackId) else {
             tracklist = []
             currentJobId = nil
-            currentDraft = nil
+            currentEdition = nil
             return
         }
         tracklist = resp.edition.tracklist ?? []
-        currentDraft = resp.edition
+        currentEdition = resp.edition
         currentJobId = resp.job?.id
     }
 
