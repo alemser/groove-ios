@@ -4,7 +4,10 @@ import Observation
 @MainActor
 @Observable
 final class EditReleaseModel {
-    var draft: PendingRelease?
+    /// The release as last loaded or saved — what the form is seeded from.
+    var edition: PendingRelease?
+    /// The job saves go through. `nil` for a new release until its first
+    /// save creates it.
     var jobId: Int64?
     /// True when this edit landed on a *new* copy (no `catalog_job_id` to
     /// edit in place through) rather than the original release.
@@ -12,33 +15,52 @@ final class EditReleaseModel {
     var phase: Phase = .loading
     var actionError: String?
     var isSaving = false
-    var isPublishing = false
     var isUploadingArtwork = false
     var isDetaching = false
     var detachMessage: String?
 
     /// The actual catalog tracks pinned to this release (real IDs) — separate
-    /// from the draft's tracklist, which is provider reference data
+    /// from the release's tracklist, which is provider reference data
     /// (position/title/isrc) with no track ID of its own. Matched to
     /// tracklist entries by ISRC/title in `trackId(for:)`, mirroring
-    /// `ReleaseDetailModel`. Empty for the from-scratch creation flow (no
-    /// `release` to load real tracks from yet).
+    /// `ReleaseDetailModel`. Empty for a new release (no `release` to load
+    /// real tracks from yet).
     var catalogTracks: [Track] = []
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
+    var isNew: Bool { jobId == nil }
+
     private let release: LibraryRelease?
     private var settings: AppSettings?
+    /// The search hit a new release was prefilled from, sent with its first
+    /// save so the release keeps its origin.
+    private var prefilledFrom: IdentifySearchHit?
+    /// A cover picked before a new release's first save — there is nothing to
+    /// attach it to until the save creates the release, so it goes up then.
+    private var pendingArtwork: Data?
+    /// The copy `load()` made of a reference release so there was something
+    /// to edit. It is not in the library until saved; Cancel discards it.
+    private var unsavedCopyId: Int64?
 
     init(release: LibraryRelease) { self.release = release }
 
-    /// Editing a release created moments ago via the standalone "Add Release"
-    /// flow — draft + jobId already in hand from the create call, no library
-    /// release to load from or detach tracks from.
-    init(jobId: Int64, draft: PendingRelease) {
+    /// Editing the release behind an existing job (the catalog session's
+    /// current release) — no library release to load from or detach tracks
+    /// from.
+    init(jobId: Int64, edition: PendingRelease) {
         self.release = nil
         self.jobId = jobId
-        self.draft = draft
+        self.edition = edition
+        self.phase = .loaded
+    }
+
+    /// A release that does not exist yet: the form starts from `prefill` and
+    /// nothing is written until Save.
+    init(newRelease prefill: PendingRelease, from hit: IdentifySearchHit?) {
+        self.release = nil
+        self.edition = prefill
+        self.prefilledFrom = hit
         self.phase = .loaded
     }
 
@@ -62,20 +84,21 @@ final class EditReleaseModel {
             let resp = try await service.libraryReleaseEdition(source: release.source, releaseId: release.releaseId)
             if resp.job.id > 0 {
                 jobId = resp.job.id
-                draft = resp.draft
+                edition = resp.draft
                 isCopy = false
             } else {
                 // No enrich job ever attached to this release — nothing for
                 // a save to write through yet; mint one.
                 let forkResp = try await service.forkUserReleaseFromLibrary(source: release.source, releaseId: release.releaseId)
                 jobId = forkResp.job.id
-                draft = forkResp.draft
+                edition = forkResp.draft
                 // The server edits an already-user-sourced release in place
                 // (same release_id) when it's reopened purely by name — only
                 // a genuinely foreign/reference release gets minted into a
                 // new copy. Reflect whichever actually happened rather than
                 // assuming every fork-from-library call produced a copy.
                 isCopy = forkResp.draft.releaseId != release.releaseId
+                unsavedCopyId = isCopy ? forkResp.draft.id : nil
             }
             catalogTracks = (try? await service.releaseTracks(source: release.source, releaseId: release.releaseId)) ?? []
             phase = .loaded
@@ -84,7 +107,7 @@ final class EditReleaseModel {
         }
     }
 
-    /// Best-effort match from a draft tracklist entry to a real catalog track
+    /// Best-effort match from a tracklist entry to a real catalog track
     /// — mirrors `ReleaseDetailModel.trackId(for:)`. Returns nil when nothing
     /// has been recognized into this position yet, or (for the from-scratch
     /// flow) there's no release to match against at all.
@@ -100,15 +123,32 @@ final class EditReleaseModel {
         return catalogTracks.first { ($0.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == title }?.id
     }
 
+    /// Saves the form: the release is written and in the library when this
+    /// returns true. A new release is created by this call, with every field.
     @discardableResult
-    func saveDraft(_ patch: UserReleaseDraftPatch) async -> Bool {
-        guard let settings, let jobId else { return false }
+    func save(_ fields: UserReleaseFields, force: Bool = false) async -> Bool {
+        guard let settings else { return false }
         isSaving = true
         defer { isSaving = false }
+        let service = CatalogService(settings: settings)
         do {
-            let resp = try await CatalogService(settings: settings).saveUserReleaseDraft(jobId: jobId, patch)
-            draft = resp.draft
+            let resp: SavedUserReleaseResponse
+            if let jobId {
+                resp = try await service.saveUserRelease(jobId: jobId, fields, force: force)
+            } else {
+                resp = try await service.saveNewUserRelease(fields, from: prefilledFrom, force: force)
+            }
+            jobId = resp.job.id
+            edition = resp.release
+            unsavedCopyId = nil
             actionError = nil
+            if let data = pendingArtwork {
+                pendingArtwork = nil
+                if !(await uploadArtwork(data, filename: "artwork.jpg", mimeType: "image/jpeg")) {
+                    actionError = "Release saved, but the cover failed: \(actionError ?? "unknown error")"
+                    return false
+                }
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
@@ -117,32 +157,29 @@ final class EditReleaseModel {
         }
     }
 
-    @discardableResult
-    func publish(force: Bool = false) async -> Bool {
-        guard let settings, let draft else { return false }
-        isPublishing = true
-        defer { isPublishing = false }
-        do {
-            _ = try await CatalogService(settings: settings).confirmRelease(id: draft.id, force: force)
-            actionError = nil
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+    /// Leaving without saving: drops the copy `load()` made, which nobody
+    /// saved. A new release needs nothing — it was never written.
+    func discardUnsaved() async {
+        guard let settings, let id = unsavedCopyId else { return }
+        unsavedCopyId = nil
+        try? await CatalogService(settings: settings).discardRelease(id: id)
     }
 
     @discardableResult
     func uploadArtwork(_ data: Data, filename: String, mimeType: String) async -> Bool {
-        guard let settings, let jobId else { return false }
+        guard let settings else { return false }
+        guard let jobId else {
+            // Nothing to attach it to until the first save; it goes up then.
+            pendingArtwork = data
+            return true
+        }
         isUploadingArtwork = true
         defer { isUploadingArtwork = false }
         do {
             let resp = try await CatalogService(settings: settings).uploadUserReleaseArtwork(
                 jobId: jobId, imageData: data, filename: filename, mimeType: mimeType
             )
-            draft = resp.draft
+            edition = resp.draft
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
@@ -180,7 +217,7 @@ final class EditReleaseModel {
     /// Deletes ONE catalog track outright (fingerprints, enrich jobs, play
     /// history) — destructive, and (unlike detach) also drops this track's
     /// tracklist position, so the caller must remove `entry` from the local
-    /// draft tracklist on success.
+    /// tracklist on success.
     @discardableResult
     func deleteTrack(_ track: Track) async -> Bool {
         guard let settings else { return false }
@@ -197,7 +234,7 @@ final class EditReleaseModel {
     }
 
     /// Detaches ONE catalog track from this edition — the tracklist position
-    /// survives, so the caller should leave the draft tracklist entry alone.
+    /// survives, so the caller should leave the tracklist entry alone.
     @discardableResult
     func detachTrack(_ track: Track) async -> Bool {
         guard let settings, let release else { return false }

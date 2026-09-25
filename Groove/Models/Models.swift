@@ -215,13 +215,13 @@ struct TracklistEntry: Codable, Identifiable, Hashable {
     var id: Int { ordinal }
 }
 
-// MARK: - User release editing (draft/confirm cycle)
+// MARK: - User release editing
 
-/// Body for `PUT /catalog/enrich/jobs/{id}/user-release/draft`. Blank string
-/// fields and a `nil` tracklist are "leave untouched" server-side — there's
-/// no way to explicitly clear a field through this endpoint, so these are
-/// plain (non-Optional) values that always carry the current+edited state.
-struct UserReleaseDraftPatch: Encodable {
+/// The whole release form, sent on every save. Blank string fields and a
+/// `nil` tracklist are "leave untouched" server-side — there's no way to
+/// explicitly clear a field, so these are plain (non-Optional) values that
+/// always carry the current+edited state.
+struct UserReleaseFields: Encodable {
     var artist = ""
     var title = ""
     var album = ""
@@ -242,9 +242,31 @@ struct UserReleaseEditionResponse: Decodable {
     var libraryConfirmed: Bool?
 }
 
-struct UserReleaseDraftResponse: Decodable {
-    var draft: PendingRelease
-    var libraryConfirmed: Bool?
+/// Answer to both saves: the release as the library now holds it, and the
+/// job later saves go through.
+struct SavedUserReleaseResponse: Decodable {
+    var release: PendingRelease
+    var job: EnrichJob
+    var trackId: Int64?
+}
+
+/// Body for `POST /catalog/user-releases/save`: the form's fields at the top
+/// level, plus the search hit it was prefilled from.
+struct NewUserReleaseRequest: Encodable {
+    var fields: UserReleaseFields
+    var from: IdentifySearchHit?
+
+    private enum CodingKeys: String, CodingKey { case from }
+
+    func encode(to encoder: Encoder) throws {
+        try fields.encode(to: encoder)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(from, forKey: .from)
+    }
+}
+
+struct PrefillUserReleaseResponse: Decodable {
+    var release: PendingRelease
 }
 
 struct LibraryForkRequest: Encodable {
@@ -261,20 +283,6 @@ struct LibraryForkResponse: Decodable {
 struct UserReleaseArtworkResponse: Decodable {
     var draft: PendingRelease
     var tracksUpdated: Int
-}
-
-/// Body for `POST /catalog/user-releases` — creates a scratch release from
-/// nothing, the "cadastro" entry point mirroring the web studio's blank
-/// "New release" form.
-struct StandaloneUserReleaseRequest: Encodable {
-    var artist: String
-    var album: String
-}
-
-struct StandaloneUserReleaseResponse: Decodable {
-    var draft: PendingRelease
-    var job: EnrichJob
-    var trackId: Int64
 }
 
 // MARK: - Pending associations (review queue)

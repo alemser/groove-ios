@@ -190,7 +190,10 @@ struct CatalogService {
         try await api.postNoContent("/identity/album-programme/dismiss-edition-question")
     }
 
-    // MARK: User release editing (draft/confirm cycle for an owned release)
+    // MARK: User release editing
+    //
+    // A save is one request that writes the release and puts it in the
+    // library. There is no intermediate state to carry between calls.
 
     /// Opens the edit session from the LIBRARY RELEASE itself rather than
     /// through its `catalog_job_id`. `catalog_job_id` names the job that
@@ -206,13 +209,39 @@ struct CatalogService {
         return try await api.get("/catalog/library/releases/\(s)/\(r)/edition")
     }
 
+    /// Saves the release behind `jobId` — written and in the library when
+    /// this returns.
     @discardableResult
-    func saveUserReleaseDraft(jobId: Int64, _ patch: UserReleaseDraftPatch) async throws -> UserReleaseDraftResponse {
-        try await api.put("/catalog/enrich/jobs/\(jobId)/user-release/draft", body: patch)
+    func saveUserRelease(jobId: Int64, _ fields: UserReleaseFields, force: Bool = false) async throws -> SavedUserReleaseResponse {
+        try await api.put("/catalog/enrich/jobs/\(jobId)/user-release", query: forceQuery(force), body: fields)
     }
 
-    /// Always creates a *new* `user`-sourced copy — the only path available when
-    /// the release has no `catalog_job_id` to edit in place through.
+    /// Creates a release from the whole form in one request. `hit` is the
+    /// search result the form was prefilled from, kept as the release's origin.
+    @discardableResult
+    func saveNewUserRelease(_ fields: UserReleaseFields, from hit: IdentifySearchHit?, force: Bool = false) async throws -> SavedUserReleaseResponse {
+        try await api.post(
+            "/catalog/user-releases/save", query: forceQuery(force),
+            body: NewUserReleaseRequest(fields: fields, from: hit), as: SavedUserReleaseResponse.self
+        )
+    }
+
+    /// A search hit's metadata and tracklist, for prefilling a new release.
+    /// Creates nothing — the release exists only once it is saved.
+    func prefillUserRelease(from hit: IdentifySearchHit) async throws -> PendingRelease {
+        let resp = try await api.post(
+            "/catalog/user-releases/prefill-from-search", body: hit, as: PrefillUserReleaseResponse.self
+        )
+        return resp.release
+    }
+
+    private func forceQuery(_ force: Bool) -> [URLQueryItem] {
+        force ? [.init(name: "force", value: "1")] : []
+    }
+
+    /// Makes an editable `user` copy of a reference release that has no job
+    /// to edit through. The copy is not in the library until it is saved; the
+    /// editor discards it if left without saving.
     @discardableResult
     func forkUserReleaseFromLibrary(source: String, releaseId: String) async throws -> LibraryForkResponse {
         try await api.post("/catalog/user-releases/fork-from-library", body: LibraryForkRequest(source: source, releaseId: releaseId))
@@ -223,21 +252,6 @@ struct CatalogService {
             "/catalog/enrich/jobs/\(jobId)/user-release/artwork",
             fieldName: "artwork", filename: filename, mimeType: mimeType, data: imageData
         )
-    }
-
-    /// The "cadastro" entry point — creates a release from nothing but a typed
-    /// artist/album, ready to be filled out through the same draft/publish cycle
-    /// as any other user release.
-    func createStandaloneUserRelease(artist: String, album: String) async throws -> StandaloneUserReleaseResponse {
-        try await api.post("/catalog/user-releases", body: StandaloneUserReleaseRequest(artist: artist, album: album))
-    }
-
-    /// Creates a release prefilled from a picked enricher search hit — the
-    /// autofilled counterpart to `createStandaloneUserRelease(artist:album:)`,
-    /// mirroring the web studio's "Lookup using enrichers" pick-to-create flow.
-    @discardableResult
-    func createStandaloneUserRelease(from hit: IdentifySearchHit) async throws -> LibraryForkResponse {
-        try await api.post("/catalog/user-releases/fork-from-search", body: hit)
     }
 
     // MARK: Pending associations

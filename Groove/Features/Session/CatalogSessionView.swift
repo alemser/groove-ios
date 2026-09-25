@@ -25,8 +25,8 @@ struct CatalogSessionView: View {
         .task { model.configure(settings) }
         .onDisappear { model.stop() }
         .sheet(isPresented: $showEditRelease) {
-            if let jobId = model.currentJobId, let draft = model.currentDraft {
-                EditReleaseView(jobId: jobId, draft: draft)
+            if let jobId = model.currentJobId, let edition = model.currentEdition {
+                EditReleaseView(jobId: jobId, edition: edition)
             }
         }
         .sheet(item: $resolving) { item in
