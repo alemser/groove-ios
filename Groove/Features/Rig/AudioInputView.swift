@@ -61,7 +61,7 @@ struct AudioInputView: View {
             ))
             .tint(Brand.teal)
         } footer: {
-            Text("Turn this on if Oceano is connected to a line or pre out whose level follows your amplifier's volume knob. Leave it off for a fixed-level REC OUT or Tape Out.")
+            Text("Turn this on if Oceano is connected to a line or pre out whose level follows your amplifier's volume knob. Leave it off for a fixed-level REC OUT or Tape Out. Each setting keeps its own input gain, so switching back restores the gain you had before.")
                 .foregroundStyle(Brand.muted)
         }
     }

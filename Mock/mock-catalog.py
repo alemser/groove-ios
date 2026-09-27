@@ -241,8 +241,16 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_PUT(self):
         if self.path=="/catalog/stylus": return self._json(stylus_state())
         if self.path=="/rig/capture/input-level":
-            CAPTURE["input_level"]=self._body().get("input_level","fixed")
-            return self._json({"input_level":CAPTURE["input_level"]})
+            import time
+            to=self._body().get("input_level","fixed"); frm=CAPTURE["input_level"]
+            restored=False
+            if to!=frm:
+                # Each mode keeps its own gain, like the real detector.
+                CAPTURE[frm+"_step"]=CAPTURE["step"]
+                if to+"_step" in CAPTURE and CAPTURE[to+"_step"]!=CAPTURE["step"]:
+                    CAPTURE["step"]=CAPTURE[to+"_step"]; CAPTURE["changed_at"]=time.time(); restored=True
+                CAPTURE["input_level"]=to
+            return self._json({"input_level":to,"capture_gain_pct":round(CAPTURE["step"]*100/28),"gain_restored":restored})
         if self.path=="/rig/capture/gain":
             import time
             step=int(self._body().get("capture_gain_step",CAPTURE["step"]))

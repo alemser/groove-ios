@@ -62,8 +62,13 @@ final class AudioInputModel {
         }
     }
 
+    /// Switching mode also swaps the gain server-side (each mode keeps its
+    /// own), so a −/+ still waiting in the debounce belongs to the mode being
+    /// left and must not land on the gain just restored.
     func setVariable(_ variable: Bool) async {
         guard let settings else { return }
+        if !isApplying { applyTask?.cancel() }
+        pendingStep = nil
         let mode: CaptureInputLevel = variable ? .variable : .fixed
         let previous = level?.inputLevel
         level?.inputLevel = mode
