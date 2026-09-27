@@ -80,33 +80,43 @@ struct StylusView: View {
     // MARK: - Metrics
 
     private func metricsSection(_ m: StylusMetrics) -> some View {
-        Section("Usage") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Condition").font(.subheadline).foregroundStyle(Brand.muted)
-                    Spacer()
-                    Badge(text: conditionTitle(m.state), color: conditionColor(m.state), filled: true)
+        Section {
+            VStack(alignment: .leading, spacing: 0) {
+                if let p = model.state?.profile {
+                    Text("CARTRIDGE")
+                        .font(.system(.footnote, design: .monospaced))
+                        .tracking(2)
+                        .foregroundStyle(Brand.ok)
+                    Text("\(p.brand) \(p.model)")
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(Brand.text)
+                        .padding(.top, 8)
+                    Text("Rated lifetime · \(p.lifetimeHours.formatted()) h")
+                        .font(.system(.footnote, design: .monospaced))
+                        .foregroundStyle(Brand.muted)
+                        .padding(.top, 4)
                 }
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4).fill(Brand.border)
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(wearGradient)
-                            .frame(width: max(4, geo.size.width * min(CGFloat(m.wearPercent) / 100, 1)))
-                    }
-                    .frame(height: 8)
-                }
-                .frame(height: 8)
-                Text(String(format: "%.1f%% worn", m.wearPercent))
-                    .font(.caption)
-                    .foregroundStyle(Brand.muted)
-            }
-            .padding(.vertical, 4)
-            .listRowBackground(Color.clear)
 
-            InfoRow(label: "Vinyl hours (this stylus)", value: String(format: "%.1f h", m.vinylHoursSinceInstall))
-            InfoRow(label: "Total stylus hours", value: String(format: "%.1f h", m.stylusHoursTotal))
-            InfoRow(label: "Remaining", value: String(format: "%.1f h", m.remainingHours))
+                WearRing(percent: m.wearPercent, color: conditionColor(m.state))
+                    .frame(width: 200, height: 200)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 36)
+
+                VStack(spacing: 12) {
+                    StatRow(label: "PLAYED", value: String(format: "%.0f h", m.stylusHoursTotal))
+                    StatRow(label: "REMAINING", value: String(format: "%.0f h", m.remainingHours))
+                    StatRow(label: "STATUS", value: conditionTitle(m.state), valueColor: conditionColor(m.state))
+                }
+
+                Text("Counted automatically from recognized vinyl plays. No manual log.")
+                    .font(.system(.footnote, design: .monospaced))
+                    .foregroundStyle(Brand.muted)
+                    .lineSpacing(4)
+                    .padding(.top, 20)
+            }
+            .padding(.vertical, 12)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
         }
     }
 
@@ -126,10 +136,6 @@ struct StylusView: View {
         case "plan": return Brand.gold
         default: return Brand.ok
         }
-    }
-
-    private var wearGradient: LinearGradient {
-        LinearGradient(colors: [Brand.ok, Brand.gold, Brand.warn, Brand.err], startPoint: .leading, endPoint: .trailing)
     }
 
     // MARK: - Stylus definition
@@ -381,6 +387,60 @@ struct StylusView: View {
         }
         isNew = p.initialUsedHours <= 0
         initialHoursText = p.initialUsedHours > 0 ? String(format: "%.1f", p.initialUsedHours) : ""
+    }
+}
+
+/// Wear gauge: a track circle with the worn fraction drawn clockwise from 12 o'clock.
+private struct WearRing: View {
+    var percent: Double
+    var color: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Brand.cardElevated, lineWidth: 14)
+            Circle()
+                .trim(from: 0, to: min(max(percent, 0), 100) / 100)
+                .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            VStack(spacing: 6) {
+                Text(String(format: "%.1f%%", percent))
+                    .font(.system(size: 44, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Brand.text)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text("WORN")
+                    .font(.system(.footnote, design: .monospaced))
+                    .tracking(1.5)
+                    .foregroundStyle(Brand.muted)
+            }
+            .padding(.horizontal, 24)
+        }
+    }
+}
+
+private struct StatRow: View {
+    var label: String
+    var value: String
+    var valueColor: Color = Brand.text
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.system(.subheadline, design: .monospaced))
+                .tracking(1.5)
+                .foregroundStyle(Brand.muted)
+            Spacer()
+            Text(value)
+                .font(.system(.title3, design: .monospaced))
+                .foregroundStyle(valueColor)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Brand.text.opacity(0.85), lineWidth: 1.5)
+        )
     }
 }
 
