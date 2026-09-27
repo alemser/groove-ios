@@ -84,7 +84,7 @@ struct AudioInputView: View {
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
                 }
-                Text(programme.band.guidance)
+                Text(guidance(level))
                     .font(.footnote)
                     .foregroundStyle(Brand.muted)
             }
@@ -149,9 +149,19 @@ struct AudioInputView: View {
     private func measuringCaption(_ level: CaptureLevel) -> String {
         let p = level.programme
         if p.band == .unknown {
-            guard level.isPlaying else { return "Waiting for music" }
             return String(format: "%.0f of %.0f s", min(p.seconds, p.minSeconds), p.minSeconds)
         }
         return String(format: "last %.0f s", p.seconds)
+    }
+
+    /// The meter reads everything that arrives, so a low reading with the
+    /// gate still closed means either nothing is playing or the music is too
+    /// quiet to be heard at all — the case calibration exists for.
+    private func guidance(_ level: CaptureLevel) -> String {
+        let band = level.programme.band
+        if !level.isPlaying, band == .tooLow || band == .low {
+            return "No music detected. If something is playing, it's too quiet for Oceano to hear — raise the input gain."
+        }
+        return band.guidance
     }
 }

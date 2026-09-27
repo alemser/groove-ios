@@ -130,8 +130,10 @@ struct RigView: View {
             case .fixed:
                 audioInputStatusText = "Fixed level (REC OUT)"
             case .variable:
+                // The meter also reads silence; only a band measured over
+                // music says anything about the calibration.
                 let band = level.programme.band
-                audioInputStatusText = band == .unknown
+                audioInputStatusText = band == .unknown || !level.isPlaying
                     ? "Variable line out"
                     : "Variable line out · Level \(band.title.lowercased())"
             }
