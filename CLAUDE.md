@@ -31,16 +31,15 @@ Respond in **English**. Code, comments, commit messages, and docs are English re
 
 ## Hard rules specific to this repo
 
-1. **No iOS Simulator.** Boot + install is too heavy on the dev Mac, and the real target
-   (Bonjour/mDNS behavior, CoreBluetooth, LAN connectivity) differs from the simulator anyway.
-   Verify with a compile-only build instead:
+1. **Simulator is fine; real-device behavior still needs the operator.** Build and run in
+   the iOS Simulator freely. It shares the Mac's network, so it reaches the catalog on
+   oceano; preset the server to skip the Connect screen:
    ```bash
-   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
-     -project Groove.xcodeproj -scheme Groove \
-     -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+   xcrun simctl spawn booted defaults write com.alemser.groove catalog.host 192.168.178.105
    ```
-   Nothing is tested live until the operator rebuilds and reinstalls from Xcode themselves —
-   there is no CI/OTA path. Say so explicitly rather than claiming something works.
+   Bonjour discovery, CoreBluetooth provisioning and the camera still need a real device, and
+   nothing reaches the phone until the operator rebuilds and reinstalls from Xcode themselves —
+   there is no CI/OTA path. Say which of the two you verified rather than claiming it works.
 2. **Don't mirror a web Studio UI decision onto iOS sight-unseen.** What reads as decluttering
    on a wide settings page can read as "everything vanished" on a phone screen even when the
    code does exactly what was asked — this has been wrong before and only caught once the
