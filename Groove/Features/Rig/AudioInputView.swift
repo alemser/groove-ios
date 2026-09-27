@@ -61,7 +61,7 @@ struct AudioInputView: View {
             ))
             .tint(Brand.teal)
         } footer: {
-            Text("Turn this on if Oceano is connected to a line or pre out whose level follows your amplifier's volume knob. Leave it off for a fixed-level REC OUT or Tape Out. Each setting keeps its own input gain, so switching back restores the gain you had before.")
+            Text("For a line or pre out that follows your amplifier's volume. Leave off for REC OUT or Tape Out. Each setting keeps its own input gain.")
                 .foregroundStyle(Brand.muted)
         }
     }
@@ -69,12 +69,11 @@ struct AudioInputView: View {
     private func calibrationSection(_ level: CaptureLevel) -> some View {
         let programme = level.programme
         return Section {
-            Text("Play music at the volume you usually listen at, then adjust the input gain until the meter sits in the green.")
-                .font(.subheadline)
-                .foregroundStyle(Brand.text)
-
             VStack(alignment: .leading, spacing: 10) {
-                LevelMeterView(programme: programme)
+                Text("Play music at your usual volume and bring the level into the green.")
+                    .font(.subheadline)
+                    .foregroundStyle(Brand.text)
+                LevelMeterView(programme: programme, previewRMS: model.previewRMS)
                 HStack(alignment: .firstTextBaseline) {
                     Text(programme.band.title)
                         .font(.headline)
@@ -87,10 +86,14 @@ struct AudioInputView: View {
                 Text(guidance(level))
                     .font(.footnote)
                     .foregroundStyle(Brand.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.vertical, 4)
 
             if let gain = level.gain {
+                if model.suggestedStep != nil {
+                    suggestionButton
+                }
                 gainRow(gain)
             } else {
                 Text("This capture device has no adjustable gain.")
@@ -99,9 +102,29 @@ struct AudioInputView: View {
         } header: {
             Text("Calibration")
         } footer: {
-            Text("Each change restarts the measurement and briefly re-learns the silence between tracks — step a few times, then let the meter settle.")
+            Text("After each change Oceano briefly re-learns the silence between tracks.")
                 .foregroundStyle(Brand.muted)
         }
+    }
+
+    /// One tap to the level the detector computed from what is playing now.
+    private var suggestionButton: some View {
+        Button {
+            model.applySuggestion()
+        } label: {
+            HStack {
+                Image(systemName: "wand.and.stars")
+                Text("Set suggested gain")
+                Spacer()
+                if let delta = model.suggestedDeltaDB {
+                    Text(String(format: "%+.1f dB", delta))
+                        .monospacedDigit()
+                }
+            }
+            .font(.body.weight(.semibold))
+        }
+        .foregroundStyle(Brand.teal)
+        .disabled(model.pendingStep != nil)
     }
 
     private func gainRow(_ gain: CaptureGain) -> some View {
@@ -139,8 +162,7 @@ struct AudioInputView: View {
     private func gainCaption(_ gain: CaptureGain) -> String {
         let step = model.displayedStep ?? gain.step
         var caption = "Step \(step) of \(gain.maxStep)"
-        // dB is only known for the applied step, not one still pending.
-        if model.pendingStep == nil, let db = gain.db {
+        if let db = model.displayedDB {
             caption += String(format: " · %+.1f dB", db)
         }
         return caption
@@ -151,7 +173,7 @@ struct AudioInputView: View {
         if p.band == .unknown {
             return String(format: "%.0f of %.0f s", min(p.seconds, p.minSeconds), p.minSeconds)
         }
-        return String(format: "last %.0f s", p.seconds)
+        return String(format: "over %.0f s", p.seconds)
     }
 
     /// The meter reads everything that arrives, so a low reading with the

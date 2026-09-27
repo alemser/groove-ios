@@ -122,27 +122,43 @@ def stylus_catalog():
 
 # Fake groove-detector /capture/* behind /rig/capture/*: a quiet variable line
 # out whose level follows the gain step (28 steps, -12..+30 dB, like oceano's
-# USB card). Each gain change restarts the measurement, as the real one does.
-CAPTURE={"input_level":"fixed","step":5,"changed_at":0.0}
+# USB card). Like the real meter, a gain change rescales the reading at once
+# (no re-measuring); the live needle wobbles around the window level.
+CAPTURE={"input_level":"fixed","step":5}
 CAPTURE_TARGET={"too_low_below":0.035,"low_below":0.09,"high_above":0.40,"high_peak":0.89,"clip_peak":0.98}
 
+def capture_band(rms,peak):
+    t=CAPTURE_TARGET
+    if peak>=t["clip_peak"]: return "clipping"
+    if peak>=t["high_peak"] or rms>t["high_above"]: return "high"
+    if rms<t["too_low_below"]: return "too_low"
+    if rms<t["low_below"]: return "low"
+    return "good"
+
+def capture_suggest(step,rms,peak,band):
+    # Same rule as groove-detector's level.Suggest.
+    import math
+    if band=="good" or rms<=0: return None
+    t=CAPTURE_TARGET; target=math.sqrt(t["low_below"]*t["high_above"])
+    delta=min(20*math.log10(target/rms),12.0)
+    if peak>0: delta=min(delta,20*math.log10(0.8/peak))
+    s=max(0,min(28,step+math.floor(delta/1.5)))
+    return None if s==step else s
+
 def capture_level():
-    import time, math
+    import math, random
     step=CAPTURE["step"]; db=-12+1.5*step
     rms=0.02*10**((db+4.5)/20); peak=min(1.0,rms*3.2)
-    seconds=round(min(20.0,time.time()-CAPTURE["changed_at"]),1)
-    t=CAPTURE_TARGET
-    if seconds<5: band="unknown"
-    elif peak>=t["clip_peak"]: band="clipping"
-    elif peak>=t["high_peak"] or rms>t["high_above"]: band="high"
-    elif rms<t["too_low_below"]: band="too_low"
-    elif rms<t["low_below"]: band="low"
-    else: band="good"
-    prog={"band":band,"rms_p95":round(rms,4),"peak_max":round(peak,4),
-        "seconds":seconds,"min_seconds":5.0,"window_seconds":20.0,"target":t}
+    band=capture_band(rms,peak)
+    prog={"band":band,"live_rms":round(rms*random.uniform(0.6,1.1),4),
+        "rms_p95":round(rms,4),"peak_max":round(peak,4),
+        "seconds":20.0,"min_seconds":5.0,"window_seconds":20.0,"target":CAPTURE_TARGET}
     if peak>0: prog["headroom_db"]=round(20*math.log10(1/peak),1)
+    s=capture_suggest(step,rms,peak,band)
+    if s is not None: prog["suggested_step"]=s
     return {"input_level":CAPTURE["input_level"],"gate":"programme",
-        "gain":{"pct":round(step*100/28),"step":step,"max_step":28,"db":db,"control":"Mic"},
+        "gain":{"pct":round(step*100/28),"step":step,"max_step":28,"db":db,
+            "db_per_step":1.5,"control":"Mic"},
         "programme":prog}
 
 class H(http.server.BaseHTTPRequestHandler):
@@ -241,21 +257,18 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_PUT(self):
         if self.path=="/catalog/stylus": return self._json(stylus_state())
         if self.path=="/rig/capture/input-level":
-            import time
             to=self._body().get("input_level","fixed"); frm=CAPTURE["input_level"]
             restored=False
             if to!=frm:
                 # Each mode keeps its own gain, like the real detector.
                 CAPTURE[frm+"_step"]=CAPTURE["step"]
                 if to+"_step" in CAPTURE and CAPTURE[to+"_step"]!=CAPTURE["step"]:
-                    CAPTURE["step"]=CAPTURE[to+"_step"]; CAPTURE["changed_at"]=time.time(); restored=True
+                    CAPTURE["step"]=CAPTURE[to+"_step"]; restored=True
                 CAPTURE["input_level"]=to
             return self._json({"input_level":to,"capture_gain_pct":round(CAPTURE["step"]*100/28),"gain_restored":restored})
         if self.path=="/rig/capture/gain":
-            import time
             step=int(self._body().get("capture_gain_step",CAPTURE["step"]))
             if not 0<=step<=28: return self._json({"error":"capture_gain_step must be 0–28"},400)
-            if step!=CAPTURE["step"]: CAPTURE["changed_at"]=time.time()
             CAPTURE["step"]=step; g=capture_level()["gain"]
             return self._json({"capture_gain_pct":g["pct"],"capture_gain_step":step,
                 "capture_gain_max_step":28,"capture_gain_db":g["db"],"capture_gain_control":"Mic"})

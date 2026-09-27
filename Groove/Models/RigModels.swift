@@ -260,11 +260,18 @@ struct CaptureGain: Decodable, Equatable {
     var maxStep: Int
     /// Absent on cards that don't report dB.
     var db: Double?
+    /// dB one step adds; absent without a dB range (no preview then).
+    var dbPerStep: Double?
     var control: String?
 }
 
 struct ProgrammeLevel: Decodable {
     var band: CaptureLevelBand
+    /// RMS of the last ~0.5 s — the needle that follows the music.
+    var liveRms: Double
+    /// The step that centres the level in the good band; absent when there
+    /// is nothing to suggest.
+    var suggestedStep: Int?
     /// 95th percentile of frame RMS over the window, 0–1 full scale.
     var rmsP95: Double
     var peakMax: Double

@@ -48,11 +48,19 @@ struct LevelMeterScale {
     }
 }
 
-/// A horizontal meter: coloured zones from the detector's band edges and a
-/// needle at the current programme level.
+/// A horizontal meter over coloured zones (from the detector's band edges):
+///
+/// - a white needle for the live level, which follows the music;
+/// - a marker under the track for the level the verdict is based on
+///   (the window's P95), in the band's colour;
+/// - an outlined marker for where a pending gain step will put that level.
 struct LevelMeterView: View {
     let programme: ProgrammeLevel
+    var previewRMS: Double?
     var scale = LevelMeterScale()
+
+    private let trackHeight: CGFloat = 12
+    private let height: CGFloat = 34
 
     var body: some View {
         GeometryReader { geo in
@@ -61,7 +69,7 @@ struct LevelMeterView: View {
             let tooLow = scale.position(forRMS: t.tooLowBelow)
             let low = scale.position(forRMS: t.lowBelow)
             let high = scale.position(forRMS: t.highAbove)
-            ZStack(alignment: .leading) {
+            ZStack(alignment: .topLeading) {
                 HStack(spacing: 0) {
                     zone(Brand.err, width: w * tooLow)
                     zone(Brand.warn, width: w * (low - tooLow))
@@ -69,23 +77,42 @@ struct LevelMeterView: View {
                     zone(Brand.warn, width: w * (1 - high))
                 }
                 .clipShape(Capsule())
-                if programme.band != .unknown {
+                .offset(y: 5)
+
+                if let preview = previewRMS {
                     Capsule()
-                        .fill(Brand.text)
-                        .frame(width: 4, height: 22)
-                        .offset(x: max(0, w * scale.position(forRMS: programme.rmsP95) - 2))
+                        .stroke(Brand.teal, lineWidth: 2)
+                        .frame(width: 8, height: 22)
+                        .offset(x: x(preview, in: w) - 4)
+                        .animation(.easeOut(duration: 0.15), value: preview)
+                }
+
+                Capsule()
+                    .fill(Brand.text)
+                    .frame(width: 3, height: 22)
+                    .offset(x: x(programme.liveRms, in: w) - 1.5)
+                    .animation(.linear(duration: 0.25), value: programme.liveRms)
+
+                if programme.band != .unknown {
+                    Image(systemName: "arrowtriangle.up.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(programme.band.color)
+                        .offset(x: x(programme.rmsP95, in: w) - 5, y: 23)
                         .animation(.easeOut(duration: 0.4), value: programme.rmsP95)
                 }
             }
-            .frame(height: 22)
         }
-        .frame(height: 22)
+        .frame(height: height)
         .accessibilityElement()
         .accessibilityLabel("Input level")
         .accessibilityValue(programme.band.title)
     }
 
+    private func x(_ rms: Double, in width: Double) -> Double {
+        width * scale.position(forRMS: rms)
+    }
+
     private func zone(_ color: Color, width: Double) -> some View {
-        color.opacity(0.35).frame(width: max(0, width), height: 12)
+        color.opacity(0.35).frame(width: max(0, width), height: trackHeight)
     }
 }
