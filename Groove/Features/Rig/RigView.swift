@@ -9,6 +9,7 @@ struct RigView: View {
     @State private var stylusStatusText: String?
     @State private var ampStatusText: String?
     @State private var streamingStatusText: String?
+    @State private var audioInputStatusText: String?
 
     var body: some View {
         NavigationStack {
@@ -35,6 +36,16 @@ struct RigView: View {
                         )
                     }
                     NavigationLink {
+                        AudioInputView()
+                    } label: {
+                        hardwareRow(
+                            title: "Audio Input",
+                            subtitle: audioInputStatusText ?? "Loading…",
+                            icon: "waveform",
+                            tint: Brand.teal
+                        )
+                    }
+                    NavigationLink {
                         StreamingView()
                     } label: {
                         hardwareRow(
@@ -53,6 +64,7 @@ struct RigView: View {
         .task { await loadStylusStatus() }
         .task { await loadAmpStatus() }
         .task { await loadStreamingStatus() }
+        .task { await loadAudioInputStatus() }
     }
 
     private func hardwareRow(title: String, subtitle: String, icon: String, tint: Color) -> some View {
@@ -105,6 +117,26 @@ struct RigView: View {
             streamingStatusText = label ?? "Not set"
         } catch {
             streamingStatusText = "Unavailable"
+        }
+    }
+
+    /// On a variable line out the band is the headline — a persistently low
+    /// level should be visible here without opening the screen.
+    private func loadAudioInputStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let level = try await CatalogService(settings: settings).rigCaptureLevel()
+            switch level.inputLevel {
+            case .fixed:
+                audioInputStatusText = "Fixed level (REC OUT)"
+            case .variable:
+                let band = level.programme.band
+                audioInputStatusText = band == .unknown
+                    ? "Variable line out"
+                    : "Variable line out · Level \(band.title.lowercased())"
+            }
+        } catch {
+            audioInputStatusText = "Unavailable"
         }
     }
 

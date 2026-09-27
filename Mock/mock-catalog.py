@@ -120,6 +120,31 @@ def stylus_catalog():
             "min_hours":800,"max_hours":1200,"recommended_hours":1000,"confidence":"low"},
     ]}
 
+# Fake groove-detector /capture/* behind /rig/capture/*: a quiet variable line
+# out whose level follows the gain step (28 steps, -12..+30 dB, like oceano's
+# USB card). Each gain change restarts the measurement, as the real one does.
+CAPTURE={"input_level":"fixed","step":5,"changed_at":0.0}
+CAPTURE_TARGET={"too_low_below":0.035,"low_below":0.09,"high_above":0.40,"high_peak":0.89,"clip_peak":0.98}
+
+def capture_level():
+    import time, math
+    step=CAPTURE["step"]; db=-12+1.5*step
+    rms=0.02*10**((db+4.5)/20); peak=min(1.0,rms*3.2)
+    seconds=round(min(20.0,time.time()-CAPTURE["changed_at"]),1)
+    t=CAPTURE_TARGET
+    if seconds<5: band="unknown"
+    elif peak>=t["clip_peak"]: band="clipping"
+    elif peak>=t["high_peak"] or rms>t["high_above"]: band="high"
+    elif rms<t["too_low_below"]: band="too_low"
+    elif rms<t["low_below"]: band="low"
+    else: band="good"
+    prog={"band":band,"rms_p95":round(rms,4),"peak_max":round(peak,4),
+        "seconds":seconds,"min_seconds":5.0,"window_seconds":20.0,"target":t}
+    if peak>0: prog["headroom_db"]=round(20*math.log10(1/peak),1)
+    return {"input_level":CAPTURE["input_level"],"gate":"programme",
+        "gain":{"pct":round(step*100/28),"step":step,"max_step":28,"db":db,"control":"Mic"},
+        "programme":prog}
+
 class H(http.server.BaseHTTPRequestHandler):
     def log_message(self,*a): pass
     def _json(self,obj,code=200):
@@ -183,6 +208,8 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._json(rig_status())
         if path=="/rig/equipment":
             return self._json(rig_equipment())
+        if path=="/rig/capture/level":
+            return self._json(capture_level())
         if path=="/identity/recognition/providers":
             return self._json(recognition_providers())
         m=re.match(r"/rig/sessions/(.+)",path)
@@ -208,8 +235,22 @@ class H(http.server.BaseHTTPRequestHandler):
                 "actions":["power_toggle"],"role":"physical_media","physical_format":"cd",
                 "has_remote":True},201)
         self._json({"ok":True})
+    def _body(self):
+        n=int(self.headers.get("Content-Length") or 0)
+        return json.loads(self.rfile.read(n) or b"{}")
     def do_PUT(self):
         if self.path=="/catalog/stylus": return self._json(stylus_state())
+        if self.path=="/rig/capture/input-level":
+            CAPTURE["input_level"]=self._body().get("input_level","fixed")
+            return self._json({"input_level":CAPTURE["input_level"]})
+        if self.path=="/rig/capture/gain":
+            import time
+            step=int(self._body().get("capture_gain_step",CAPTURE["step"]))
+            if not 0<=step<=28: return self._json({"error":"capture_gain_step must be 0–28"},400)
+            if step!=CAPTURE["step"]: CAPTURE["changed_at"]=time.time()
+            CAPTURE["step"]=step; g=capture_level()["gain"]
+            return self._json({"capture_gain_pct":g["pct"],"capture_gain_step":step,
+                "capture_gain_max_step":28,"capture_gain_db":g["db"],"capture_gain_control":"Mic"})
         if self.path.startswith("/identity/recognition/providers"):
             return self._json(recognition_providers())
         self._json({"ok":True})
@@ -219,6 +260,10 @@ class H(http.server.BaseHTTPRequestHandler):
         self._json(track(0))
     def do_DELETE(self): self._json({"ok":True})
 
-socketserver.TCPServer.allow_reuse_address=True
-with socketserver.TCPServer(("127.0.0.1",7073),H) as s:
+# Threaded: the app fires several requests at once (and URLSession may hold
+# an idle connection open), which a single-threaded server serialises into a
+# screen full of "Loading…".
+socketserver.ThreadingTCPServer.allow_reuse_address=True
+socketserver.ThreadingTCPServer.daemon_threads=True
+with socketserver.ThreadingTCPServer(("127.0.0.1",7073),H) as s:
     print("mock catalog on :7073"); s.serve_forever()
