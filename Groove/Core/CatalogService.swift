@@ -509,6 +509,23 @@ struct CatalogService {
         try await api.post("/rig/streaming/audio-outputs/select", body: RigSelectAudioOutputRequest(device: device))
     }
 
+    // MARK: Audio input (`/rig/capture/*`, groove-rig's reverse proxy to
+    // groove-detector's `/capture/*` — input mode, capture gain, level meter)
+
+    func rigCaptureLevel() async throws -> CaptureLevel {
+        try await api.get("/rig/capture/level")
+    }
+
+    @discardableResult
+    func rigSetCaptureGain(step: Int) async throws -> CaptureGainApplied {
+        try await api.put("/rig/capture/gain", body: CaptureGainStepRequest(captureGainStep: step))
+    }
+
+    @discardableResult
+    func rigSetCaptureInputLevel(_ level: CaptureInputLevel) async throws -> CaptureInputLevelBody {
+        try await api.put("/rig/capture/input-level", body: CaptureInputLevelBody(inputLevel: level))
+    }
+
     // MARK: Recognition providers (proxied to groove-identity via `/identity/*`)
 
     func recognitionProviders() async throws -> RecognitionProvidersState {

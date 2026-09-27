@@ -217,3 +217,89 @@ struct RigAudioOutputsResponse: Decodable {
 struct RigSelectAudioOutputRequest: Encodable {
     var device: String
 }
+
+// MARK: - Audio input (capture level calibration — proxied `/rig/capture/*` →
+// groove-rig → groove-detector's `/capture/*`)
+
+/// Whether the recognition tap is a fixed-level output (REC OUT / Tape Out)
+/// or a line / pre out that follows the amplifier's volume knob.
+enum CaptureInputLevel: String, Codable {
+    case fixed
+    case variable
+}
+
+/// The detector's verdict on the recent programme level. Decided server-side
+/// so every client agrees; an unrecognised value decodes as `.unknown`.
+enum CaptureLevelBand: String, Decodable {
+    case unknown
+    case tooLow = "too_low"
+    case low
+    case good
+    case high
+    case clipping
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = CaptureLevelBand(rawValue: raw) ?? .unknown
+    }
+}
+
+struct CaptureLevel: Decodable {
+    var inputLevel: CaptureInputLevel
+    var gate: String
+    /// Absent when the detector has no ALSA capture device.
+    var gain: CaptureGain?
+    var programme: ProgrammeLevel
+
+    var isPlaying: Bool { gate == "programme" }
+}
+
+struct CaptureGain: Decodable, Equatable {
+    var pct: Int
+    var step: Int
+    var maxStep: Int
+    /// Absent on cards that don't report dB.
+    var db: Double?
+    /// dB one step adds; absent without a dB range (no preview then).
+    var dbPerStep: Double?
+    var control: String?
+}
+
+struct ProgrammeLevel: Decodable {
+    var band: CaptureLevelBand
+    /// RMS of the last ~0.5 s — the needle that follows the music.
+    var liveRms: Double
+    /// The step that centres the level in the good band; absent when there
+    /// is nothing to suggest.
+    var suggestedStep: Int?
+    /// 95th percentile of frame RMS over the window, 0–1 full scale.
+    var rmsP95: Double
+    var peakMax: Double
+    var headroomDb: Double?
+    /// Programme seconds in the window; `band` stays `.unknown` below `minSeconds`.
+    var seconds: Double
+    var minSeconds: Double
+    var windowSeconds: Double
+    var target: CaptureLevelTarget
+}
+
+/// Band edges (frame-RMS P95), for drawing the meter scale.
+struct CaptureLevelTarget: Decodable {
+    var tooLowBelow: Double
+    var lowBelow: Double
+    var highAbove: Double
+}
+
+struct CaptureGainStepRequest: Encodable {
+    var captureGainStep: Int
+}
+
+struct CaptureGainApplied: Decodable {
+    var captureGainStep: Int
+    var captureGainMaxStep: Int
+    var captureGainDb: Double?
+}
+
+struct CaptureInputLevelBody: Codable {
+    var inputLevel: CaptureInputLevel
+}
