@@ -84,15 +84,15 @@ struct StylusView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let p = model.state?.profile {
                     Text("CARTRIDGE")
-                        .font(.system(.footnote, design: .monospaced))
-                        .tracking(2)
+                        .font(.footnote.weight(.semibold))
+                        .tracking(0.6)
                         .foregroundStyle(Brand.ok)
                     Text("\(p.brand) \(p.model)")
-                        .font(.title2.weight(.medium))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(Brand.text)
                         .padding(.top, 8)
                     Text("Rated lifetime · \(p.lifetimeHours.formatted()) h")
-                        .font(.system(.footnote, design: .monospaced))
+                        .font(.subheadline.monospacedDigit())
                         .foregroundStyle(Brand.muted)
                         .padding(.top, 4)
                 }
@@ -109,9 +109,8 @@ struct StylusView: View {
                 }
 
                 Text("Counted automatically from recognized vinyl plays. No manual log.")
-                    .font(.system(.footnote, design: .monospaced))
+                    .font(.footnote)
                     .foregroundStyle(Brand.muted)
-                    .lineSpacing(4)
                     .padding(.top, 20)
             }
             .padding(.vertical, 12)
@@ -405,13 +404,13 @@ private struct WearRing: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 6) {
                 Text(String(format: "%.1f%%", percent))
-                    .font(.system(size: 44, weight: .medium, design: .monospaced))
+                    .font(.system(size: 44, weight: .semibold).monospacedDigit())
                     .foregroundStyle(Brand.text)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                 Text("WORN")
-                    .font(.system(.footnote, design: .monospaced))
-                    .tracking(1.5)
+                    .font(.caption.weight(.semibold))
+                    .tracking(0.6)
                     .foregroundStyle(Brand.muted)
             }
             .padding(.horizontal, 24)
@@ -427,12 +426,12 @@ private struct StatRow: View {
     var body: some View {
         HStack {
             Text(label)
-                .font(.system(.subheadline, design: .monospaced))
-                .tracking(1.5)
+                .font(.footnote.weight(.semibold))
+                .tracking(0.6)
                 .foregroundStyle(Brand.muted)
             Spacer()
             Text(value)
-                .font(.system(.title3, design: .monospaced))
+                .font(.title3.weight(.semibold).monospacedDigit())
                 .foregroundStyle(valueColor)
         }
         .padding(.horizontal, 20)
