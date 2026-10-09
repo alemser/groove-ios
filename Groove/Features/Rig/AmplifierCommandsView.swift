@@ -40,6 +40,9 @@ struct AmplifierCommandsView: View {
         Form {
             EquipmentButtonsSection(
                 item: currentItem, model: model, excludeInputActions: true,
+                // A tone-mode profile (e.g. SP103) needs its Bass/Treble keys
+                // for the remote's Tone control — standard, not optional.
+                extraStandard: ampConfig?.tone?.mode == "select_then_volume" ? ["bass", "treble"] : [],
                 onLearn: { learnRequest = LearnRequestItem(steps: $0) },
                 onAddButton: { showAddButton = true }
             )

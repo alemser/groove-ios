@@ -504,6 +504,12 @@ struct CatalogService {
         try await api.get("/rig/sessions/\(id)")
     }
 
+    /// Steps bass/treble on a tone-mode amplifier (Bass/Treble key + Volume ±).
+    @discardableResult
+    func rigTone(control: String, direction: String) async throws -> RigSnapshot {
+        try await api.post("/rig/targets/amplifier/tone", body: RigToneRequest(control: control, direction: direction))
+    }
+
     /// Stops a running learn; a press arriving afterwards is discarded.
     func rigCancelSession(id: String) async throws {
         try await api.delete("/rig/sessions/\(id)")

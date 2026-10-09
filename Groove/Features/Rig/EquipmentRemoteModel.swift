@@ -51,9 +51,12 @@ final class EquipmentRemoteModel {
     /// ones a remote of this kind is expected to have. Optional extras
     /// (Mute, Display, number keys…) aren't "unfinished work", so they
     /// never drive the "Teach the Remote" prompt; they stay suggestions.
-    func missingStandardButtons(for item: RigEquipmentItem) -> [String] {
-        guard let t = template(for: item) else { return [] }
-        return missing(t.actions, for: item)
+    /// `extra`: buttons standard for this particular device beyond its
+    /// template — the Bass/Treble keys of an amplifier whose profile has
+    /// remote tone control.
+    func missingStandardButtons(for item: RigEquipmentItem, extra: [String] = []) -> [String] {
+        let standard = (template(for: item)?.actions ?? []) + extra
+        return missing(standard, for: item)
     }
 
     private func missing(_ actions: [String], for item: RigEquipmentItem) -> [String] {

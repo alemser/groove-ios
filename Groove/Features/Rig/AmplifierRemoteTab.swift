@@ -233,7 +233,7 @@ struct AmplifierRemoteTab: View {
     /// show, as before. A panel with nothing to show isn't drawn.
     private func isShown(_ c: RigLayoutControl) -> Bool {
         switch c.widget {
-        case "input_select", "volume":
+        case "input_select", "volume", "tone":
             return true
         case "power":
             return c.target == "amplifier" || resolvedPower(c.target) != nil
@@ -282,12 +282,61 @@ struct AmplifierRemoteTab: View {
         case "input_select":
             inputControls
         case "volume":
-            volumeControls
+            VStack(alignment: .leading, spacing: 6) {
+                volumeControls
+                toneCountdown
+            }
+        case "tone":
+            toneControls
         default:
             remoteButton(c.label, icon: c.icon) {
                 Task { await equipmentModel.fire(targetId: c.target, action: c.action ?? "") }
             }
         }
+    }
+
+    // MARK: - Tone (Bass/Treble key + Volume ±, e.g. the SP103)
+
+    /// While the amp is in bass/treble mode its Volume ± adjusts that
+    /// control, so groove-rig holds volume presses until the mode expires —
+    /// say so, or a held volume tap just looks broken.
+    private var toneCountdown: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if let tone = model.activeTone(at: context.date) {
+                Text("Volume keys are on \(tone.control) — back to volume in \(tone.seconds)s")
+                    .font(.caption)
+                    .foregroundStyle(Brand.warn)
+            }
+        }
+    }
+
+    private var toneControls: some View {
+        let volumeOK = equipmentModel.isLearned(targetId: "amplifier", action: "volume_up")
+            && equipmentModel.isLearned(targetId: "amplifier", action: "volume_down")
+        return TimelineView(.periodic(from: .now, by: 1)) { context in
+            let active = model.activeTone(at: context.date)?.control
+            VStack(spacing: 8) {
+                toneRow("bass", label: "Bass", icon: "dial.low", enabled: volumeOK, active: active == "bass")
+                toneRow("treble", label: "Treble", icon: "dial.high", enabled: volumeOK, active: active == "treble")
+            }
+        }
+    }
+
+    private func toneRow(_ control: String, label: String, icon: String, enabled: Bool, active: Bool) -> some View {
+        let learned = enabled && equipmentModel.isLearned(targetId: "amplifier", action: control)
+        return HStack(spacing: 12) {
+            Label(label, systemImage: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(active ? Brand.accent : Brand.muted)
+                .frame(width: 96, alignment: .leading)
+            stepButton("minus", accessibilityLabel: "\(label) down") { Task { await model.tone(control: control, direction: "down") } }
+                .frame(maxWidth: .infinity)
+                .disabled(!learned)
+            stepButton("plus", accessibilityLabel: "\(label) up") { Task { await model.tone(control: control, direction: "up") } }
+                .frame(maxWidth: .infinity)
+                .disabled(!learned)
+        }
+        .opacity(learned ? 1 : 0.45)
     }
 
     private func remoteButton(_ label: String, icon: String?, action: @escaping () -> Void) -> some View {

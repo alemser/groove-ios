@@ -17,6 +17,9 @@ struct EquipmentButtonsSection: View {
     /// The amplifier's input buttons have their own section, driven by its
     /// profile — leave them out of this list.
     var excludeInputActions = false
+    /// Buttons standard for this device beyond its template (see
+    /// `EquipmentRemoteModel.missingStandardButtons`).
+    var extraStandard: [String] = []
     let onLearn: ([LearnStep]) -> Void
     let onAddButton: () -> Void
 
@@ -60,7 +63,7 @@ struct EquipmentButtonsSection: View {
             // Only standard buttons still missing prompt a walkthrough —
             // optional extras are offered under Add Button instead, so a
             // complete remote never looks unfinished.
-            let missing = model.missingStandardButtons(for: item)
+            let missing = model.missingStandardButtons(for: item, extra: extraStandard)
             if !missing.isEmpty {
                 Button {
                     onLearn(missing.map { LearnStep(action: $0, label: model.vocabularyLabel($0)) })

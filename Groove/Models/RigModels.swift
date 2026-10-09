@@ -26,6 +26,28 @@ struct RigAmplifierStatus: Decodable {
     var activeInputLabel: String?
     var inputs: [RigInputStatus]?
     var power: RigPowerStatus?
+    /// Set when the profile has remote tone control.
+    var tone: RigToneStatus?
+}
+
+/// `active`/`activeUntil` are set while the amp is in bass/treble mode
+/// (Volume ± adjusts that control; groove-rig holds volume presses).
+struct RigToneStatus: Decodable {
+    var mode: String
+    var active: String?
+    var activeUntil: String?
+}
+
+/// How this amplifier's remote adjusts bass/treble (profile `tone`).
+struct RigToneConfig: Codable, Hashable {
+    var mode: String
+    var settleMs: Int?
+    var timeoutMs: Int?
+}
+
+struct RigToneRequest: Encodable {
+    var control: String
+    var direction: String
 }
 
 struct RigTargetActionStatus: Decodable {
@@ -233,6 +255,7 @@ struct RigAmplifierConfig: Codable, Hashable {
     var standbyTimeoutMins: Int?
     var cycle: RigCycleConfig?
     var inputs: [RigInputConfig]?
+    var tone: RigToneConfig?
 }
 
 /// Whether the amplifier's selected input may be read as evidence of which
