@@ -1,23 +1,34 @@
 import SwiftUI
 
-/// Live control: amplifier power/input/volume, plus a fire-button card per
-/// piece of equipment that has a remote — the day-to-day "use it" screen,
-/// as opposed to Configuration (device attributes) or Equipment (teaching
-/// commands). Only reachable when there's actually something learned.
+/// Live control: the day-to-day "use it" screen, as opposed to
+/// Configuration (device attributes) or Equipment (teaching commands).
+/// What's on it and where comes from the remote layout groove-rig keeps
+/// (shared with the web remote, arranged via "Arrange"); against an older
+/// groove-rig without layouts it falls back to fixed amplifier cards plus
+/// one card per piece of equipment.
 struct AmplifierRemoteTab: View {
     let model: AmplifierModel
     let equipmentModel: EquipmentRemoteModel
+    @Environment(AppSettings.self) private var settings
+    @State private var layoutModel = RemoteLayoutModel()
     @State private var showResyncDialog = false
+    @State private var showArrange = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
                 header
-                powerCard
-                inputCard
-                volumeCard
-                ForEach(remoteEquipment) { item in
-                    equipmentCard(item)
+                if let layout = layoutModel.layout {
+                    ForEach(layout.panels) { panel in
+                        panelCard(panel)
+                    }
+                } else {
+                    powerCard
+                    inputCard
+                    volumeCard
+                    ForEach(remoteEquipment) { item in
+                        equipmentCard(item)
+                    }
                 }
                 if let error = model.actionError {
                     Text(error)
@@ -32,6 +43,23 @@ struct AmplifierRemoteTab: View {
             if model.isPerformingAction {
                 ToolbarItem(placement: .topBarTrailing) { ProgressView().tint(Brand.accent) }
             }
+            if layoutModel.layout != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Arrange") { showArrange = true }
+                }
+            }
+        }
+        .task {
+            layoutModel.configure(settings)
+            await layoutModel.load()
+        }
+        // A button learned or removed elsewhere changes what the layout
+        // holds (new buttons are appended server-side) — refetch.
+        .onChange(of: equipmentModel.equipment) { _, _ in
+            Task { await layoutModel.load() }
+        }
+        .sheet(isPresented: $showArrange, onDismiss: { Task { await layoutModel.load() } }) {
+            ArrangeRemoteView(model: layoutModel, equipmentModel: equipmentModel)
         }
         .confirmationDialog(
             "Resync current physical input",
@@ -126,6 +154,14 @@ struct AmplifierRemoteTab: View {
     private var inputCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Input")
+            inputControls
+        }
+        .padding(14)
+        .grooveCard()
+    }
+
+    private var inputControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 if cycleMode {
                     navButton("chevron.left", accessibilityLabel: "Previous input") { Task { await model.prevInput() } }
@@ -162,8 +198,6 @@ struct AmplifierRemoteTab: View {
             .buttonStyle(.plain)
             .disabled(model.isPerformingAction || model.visibleInputs.isEmpty)
         }
-        .padding(14)
-        .grooveCard()
     }
 
     private var currentInputLabel: String {
@@ -175,17 +209,107 @@ struct AmplifierRemoteTab: View {
     private var volumeCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Volume")
-            HStack(spacing: 12) {
-                Image(systemName: "speaker.wave.1.fill").foregroundStyle(Brand.muted).frame(width: 22)
-                stepButton("minus", accessibilityLabel: "Volume down") { Task { await model.volume(direction: "down") } }
-                    .frame(maxWidth: .infinity)
-                stepButton("plus", accessibilityLabel: "Volume up") { Task { await model.volume(direction: "up") } }
-                    .frame(maxWidth: .infinity)
-                Image(systemName: "speaker.wave.3.fill").foregroundStyle(Brand.muted).frame(width: 22)
-            }
+            volumeControls
         }
         .padding(14)
         .grooveCard()
+    }
+
+    private var volumeControls: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "speaker.wave.1.fill").foregroundStyle(Brand.muted).frame(width: 22)
+            stepButton("minus", accessibilityLabel: "Volume down") { Task { await model.volume(direction: "down") } }
+                .frame(maxWidth: .infinity)
+            stepButton("plus", accessibilityLabel: "Volume up") { Task { await model.volume(direction: "up") } }
+                .frame(maxWidth: .infinity)
+            Image(systemName: "speaker.wave.3.fill").foregroundStyle(Brand.muted).frame(width: 22)
+        }
+    }
+
+    // MARK: - Layout panels
+
+    /// Unlearned buttons are left off — they do nothing here (teach them on
+    /// the equipment's screen). The amplifier's power/input/volume always
+    /// show, as before. A panel with nothing to show isn't drawn.
+    private func isShown(_ c: RigLayoutControl) -> Bool {
+        switch c.widget {
+        case "input_select", "volume":
+            return true
+        case "power":
+            return c.target == "amplifier" || resolvedPower(c.target) != nil
+        default:
+            return equipmentModel.isLearned(targetId: c.target, action: c.action ?? "")
+        }
+    }
+
+    /// The one Power button's action: power_toggle if learned, else
+    /// whichever of power_on/power_off is.
+    private func resolvedPower(_ target: String) -> String? {
+        ["power_toggle", "power_on", "power_off"].first { equipmentModel.isLearned(targetId: target, action: $0) }
+    }
+
+    @ViewBuilder
+    private func panelCard(_ panel: RigLayoutPanel) -> some View {
+        let controls = panel.controls.filter(isShown)
+        if !controls.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionLabel(text: panel.label)
+                SpanGrid(columns: layoutModel.layout?.columns ?? 4) {
+                    ForEach(controls) { c in
+                        controlView(c).gridSpan(c.span)
+                    }
+                }
+            }
+            .padding(14)
+            .grooveCard()
+        }
+    }
+
+    @ViewBuilder
+    private func controlView(_ c: RigLayoutControl) -> some View {
+        switch c.widget {
+        case "power":
+            if c.target == "amplifier" {
+                stateButton("Power", systemImage: "power", isActive: isOn, iconOnly: true) { Task { await model.togglePower() } }
+                    .accessibilityLabel("Power")
+            } else {
+                remoteButton(c.label, icon: "power") {
+                    if let action = resolvedPower(c.target) {
+                        Task { await equipmentModel.fire(targetId: c.target, action: action) }
+                    }
+                }
+            }
+        case "input_select":
+            inputControls
+        case "volume":
+            volumeControls
+        default:
+            remoteButton(c.label, icon: c.icon) {
+                Task { await equipmentModel.fire(targetId: c.target, action: c.action ?? "") }
+            }
+        }
+    }
+
+    private func remoteButton(_ label: String, icon: String?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                if let icon {
+                    Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+                }
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(Brand.cardElevated)
+            .foregroundStyle(Brand.text)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(equipmentModel.isPerformingAction)
+        .accessibilityLabel(label)
     }
 
     // MARK: - Equipment

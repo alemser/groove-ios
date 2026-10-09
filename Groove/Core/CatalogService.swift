@@ -489,16 +489,60 @@ struct CatalogService {
 
     // MARK: Rig sessions (IR learn / pair)
 
+    /// Learns a button and, with `register`, adds it to the target only once
+    /// the code is captured. `action` nil + `label` = a custom-named button.
     @discardableResult
-    func rigStartLearn(targetId: String, action: String) async throws -> RigSessionSummary {
+    func rigStartLearn(targetId: String, action: String?, label: String? = nil, register: Bool = true) async throws -> RigSessionSummary {
         try await api.post(
             "/rig/sessions/learn",
-            body: RigLearnRequest(backendId: nil, targetId: targetId, action: action, timeoutSecs: 30)
+            body: RigLearnRequest(backendId: nil, targetId: targetId, action: action, timeoutSecs: 30,
+                                  register: register, label: label)
         )
     }
 
     func rigSession(id: String) async throws -> RigSessionSummary {
         try await api.get("/rig/sessions/\(id)")
+    }
+
+    /// Stops a running learn; a press arriving afterwards is discarded.
+    func rigCancelSession(id: String) async throws {
+        try await api.delete("/rig/sessions/\(id)")
+    }
+
+    // MARK: Button vocabulary, templates, per-button edits
+
+    func rigActionVocabulary() async throws -> RigActionVocabulary {
+        try await api.get("/rig/actions")
+    }
+
+    func rigEquipmentTemplates() async throws -> [RigEquipmentTemplate] {
+        try await api.get("/rig/equipment/templates", as: RigEquipmentTemplateList.self).items
+    }
+
+    /// Renames a button; an empty label restores its default name.
+    @discardableResult
+    func rigRenameEquipmentAction(target: String, action: String, label: String) async throws -> RigEquipmentItem {
+        try await api.patch("/rig/equipment/\(target)/actions/\(action)", body: RigEquipmentActionRequest(label: label))
+    }
+
+    /// Removes a button and its learned code.
+    func rigRemoveEquipmentAction(target: String, action: String) async throws {
+        try await api.delete("/rig/equipment/\(target)/actions/\(action)")
+    }
+
+    // MARK: Remote layout
+
+    func rigRemoteLayout() async throws -> RigRemoteLayout {
+        try await api.get("/rig/remote/layout")
+    }
+
+    @discardableResult
+    func rigSaveRemoteLayout(_ layout: RigRemoteLayout) async throws -> RigRemoteLayout {
+        try await api.put("/rig/remote/layout", body: layout)
+    }
+
+    func rigResetRemoteLayout() async throws {
+        try await api.delete("/rig/remote/layout")
     }
 
     func rigUnlearn(target: String, action: String) async throws {

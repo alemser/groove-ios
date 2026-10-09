@@ -1,29 +1,19 @@
 import SwiftUI
 
-/// One IR device: its registered commands (tap a learned one to send it, an
-/// unlearned one to teach it), and equipment removal.
+/// One IR device: its buttons (send, teach, add by learning), and
+/// equipment removal.
 struct EquipmentDetailView: View {
     let item: RigEquipmentItem
     let model: EquipmentRemoteModel
 
     @Environment(\.dismiss) private var dismiss
-    @State private var learnTarget: LearnTarget?
+    @State private var learnRequest: LearnRequestItem?
+    @State private var showAddButton = false
     @State private var showDeleteConfirm = false
     @State private var showEditSheet = false
 
     private var currentItem: RigEquipmentItem {
         model.equipment.first { $0.id == item.id } ?? item
-    }
-
-    /// Carries the action to teach atomically into `.sheet(item:)` — setting
-    /// a separate `@State` string and a `Bool` flag in two steps let the
-    /// sheet occasionally present with the *previous* action still in place
-    /// (SwiftUI can batch the flag flip ahead of the string update), which
-    /// sent an empty `action` to `/rig/sessions/learn` and the server
-    /// rejected it. A single identifiable value can't be "half updated".
-    private struct LearnTarget: Identifiable {
-        var id: String { action }
-        let action: String
     }
 
     var body: some View {
@@ -35,15 +25,17 @@ struct EquipmentDetailView: View {
                 }
             }
 
-            Section {
-                ForEach(currentItem.actions ?? [], id: \.self) { action in
-                    actionRow(action)
+            if currentItem.hasRemote {
+                EquipmentButtonsSection(
+                    item: currentItem, model: model,
+                    onLearn: { learnRequest = LearnRequestItem(steps: $0) },
+                    onAddButton: { showAddButton = true }
+                )
+            } else {
+                Section {
+                    Text("No remote — registered for input mapping only. Turn on “Show on Remote” in Edit to add buttons.")
+                        .foregroundStyle(Brand.muted)
                 }
-            } header: {
-                Text("Commands")
-            } footer: {
-                Text("Tap a learned command to send it. Tap an unlearned one to teach it from your remote. Swipe or long-press for more options.")
-                    .foregroundStyle(Brand.muted)
             }
 
             if let error = model.actionError {
@@ -71,9 +63,21 @@ struct EquipmentDetailView: View {
                 Button("Edit") { showEditSheet = true }
             }
         }
-        .sheet(item: $learnTarget) { target in
-            LearnSessionSheet(targetId: currentItem.id, action: target.action) {
+        .sheet(item: $learnRequest) { req in
+            LearnSessionSheet(
+                targetId: currentItem.id, equipmentLabel: currentItem.label, steps: req.steps,
+                labelFor: { currentItem.label(for: $0) }
+            ) {
                 Task { await model.load() }
+            }
+        }
+        .sheet(isPresented: $showAddButton) {
+            AddButtonSheet(item: currentItem, model: model) { steps in
+                // Present the learn sheet once the picker has gone.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    learnRequest = LearnRequestItem(steps: steps)
+                }
             }
         }
         .sheet(isPresented: $showEditSheet) {
@@ -92,55 +96,6 @@ struct EquipmentDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-    }
-
-    private func actionRow(_ action: String) -> some View {
-        let learned = model.isLearned(targetId: currentItem.id, action: action)
-        return Button {
-            if learned {
-                Task { await model.fire(targetId: currentItem.id, action: action) }
-            } else {
-                teach(action)
-            }
-        } label: {
-            HStack {
-                Text(action.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .foregroundStyle(Brand.text)
-                Spacer()
-                if learned {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.ok)
-                } else {
-                    Text("Not learned").font(.caption).foregroundStyle(Brand.muted)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(model.isPerformingAction)
-        .swipeActions(edge: .trailing) {
-            if learned {
-                Button("Clear", role: .destructive) {
-                    Task { await model.unlearn(targetId: currentItem.id, action: action) }
-                }
-            }
-        }
-        .contextMenu {
-            Button {
-                teach(action)
-            } label: {
-                Label(learned ? "Re-teach" : "Teach", systemImage: "wand.and.stars")
-            }
-            if learned {
-                Button(role: .destructive) {
-                    Task { await model.unlearn(targetId: currentItem.id, action: action) }
-                } label: {
-                    Label("Clear", systemImage: "xmark.circle")
-                }
-            }
-        }
-    }
-
-    private func teach(_ action: String) {
-        learnTarget = LearnTarget(action: action)
     }
 }
 

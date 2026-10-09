@@ -67,10 +67,94 @@ struct RigEquipmentItem: Decodable, Identifiable, Hashable {
     var physicalFormat: String
     var inputIds: [String]?
     var hasRemote: Bool
+    /// Resolved display name for every entry in `actions` (custom label →
+    /// server vocabulary → title-cased id). Use `label(for:)`.
+    var actionLabels: [String: String]?
+    /// The equipment template it was created from, if any — drives which
+    /// buttons are suggested ("Common on CD player remotes").
+    var templateId: String?
+    /// Wiring per amplifier profile id; `inputIds` is the active one's.
+    var inputsByProfile: [String: [String]]?
+
+    func label(for action: String) -> String {
+        if ["power_toggle", "power_on", "power_off"].contains(action) { return "Power" }
+        return actionLabels?[action] ?? action.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 }
 
 struct RigEquipmentListResponse: Decodable {
     var items: [RigEquipmentItem]
+}
+
+// MARK: - Button vocabulary, equipment templates (GET /rig/actions, /rig/equipment/templates)
+
+/// A well-known remote button. `icon` is an SF Symbol name.
+struct RigActionDef: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var group: String
+    var icon: String?
+}
+
+struct RigActionVocabulary: Decodable {
+    var groups: [String]
+    var items: [RigActionDef]
+}
+
+/// A starting point for new equipment: IR can't report which buttons a
+/// remote has, so this is the "typical" set plus optional extras.
+struct RigEquipmentTemplate: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var role: String
+    var physicalFormat: String
+    var hasRemote: Bool
+    var actions: [String]
+    var optionalActions: [String]
+}
+
+struct RigEquipmentTemplateList: Decodable {
+    var items: [RigEquipmentTemplate]
+}
+
+struct RigEquipmentActionRequest: Encodable {
+    var label: String
+}
+
+// MARK: - Remote layout (GET/PUT/DELETE /rig/remote/layout)
+
+/// One placed control. `widget` is power | input_select | volume | action;
+/// `key`, `label`, `icon` are server-resolved display hints (read-only).
+struct RigLayoutControl: Codable, Identifiable, Hashable {
+    var widget: String
+    var target: String
+    var action: String?
+    var span: Int
+    var key: String
+    var label: String
+    var icon: String?
+    var id: String { key }
+}
+
+struct RigLayoutPanel: Codable, Identifiable, Hashable {
+    var id: String
+    /// Stored override; "" means "use the target's label".
+    var title: String?
+    /// What to show: title, else the owning target's label.
+    var label: String
+    var target: String?
+    var controls: [RigLayoutControl]
+}
+
+/// The remote's arrangement — the same one the web remote draws. Saving
+/// sends it straight back; the server ignores the display-hint fields and
+/// reads `hidden` controls by key.
+struct RigRemoteLayout: Codable, Hashable {
+    var version: Int
+    var columns: Int
+    var customised: Bool
+    var panels: [RigLayoutPanel]
+    var hidden: [RigLayoutControl]
 }
 
 struct RigEquipmentSaveRequest: Encodable {
@@ -82,6 +166,8 @@ struct RigEquipmentSaveRequest: Encodable {
     var physicalFormat: String?
     var inputIds: [String]?
     var hasRemote: Bool?
+    /// Seeds role/format and the suggested buttons (GET /rig/equipment/templates).
+    var templateId: String?
 }
 
 /// Edits an existing piece of equipment. Distinct from `RigEquipmentSaveRequest`
@@ -202,13 +288,21 @@ struct RigSessionSummary: Decodable, Identifiable {
     var action: String?
     var message: String?
     var code: String?
+    /// Learn only: other buttons on the same target whose learned code is
+    /// the same press as this capture — usually the wrong button pressed.
+    var duplicateOf: [String]?
 }
 
 struct RigLearnRequest: Encodable {
     var backendId: String?
     var targetId: String
-    var action: String
+    /// nil with `register` + `label` = a custom button, id slugged server-side.
+    var action: String?
     var timeoutSecs: Int?
+    /// Add the button (with `label`) to the target only once a code is
+    /// captured — cancel/timeout leaves nothing behind.
+    var register: Bool?
+    var label: String?
 }
 
 // MARK: - Streaming (AirPlay output device — proxied `/rig/streaming/*` →

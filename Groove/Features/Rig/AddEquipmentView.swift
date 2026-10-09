@@ -1,75 +1,44 @@
 import SwiftUI
 
-/// Registers a new IR-controlled device. Individual commands are taught
-/// afterward, one at a time, from the device's detail screen.
+/// Registers a new IR-controlled device. Its kind (a groove-rig equipment
+/// template) sets type/format and which buttons get suggested — IR can't
+/// tell the app what a remote has. Buttons themselves are added afterward
+/// by learning them, from the device's screen ("Teach the Remote").
 struct AddEquipmentView: View {
     let model: EquipmentRemoteModel
 
     @Environment(\.dismiss) private var dismiss
     @State private var label = ""
-    @State private var role: RoleOption = .physicalMedia
-    @State private var physicalFormat: FormatOption = .cd
-    @State private var selectedActions: Set<String> = ["power_toggle", "play", "pause", "stop", "next", "previous"]
+    @State private var templateId = ""
     @State private var isSaving = false
 
-    private static let availableActions = ["power_toggle", "play", "pause", "stop", "next", "previous", "eject"]
-
-    enum RoleOption: String, CaseIterable, Identifiable {
-        case physicalMedia = "physical_media"
-        case streaming
-        case other
-
-        var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .physicalMedia: return "Physical Media"
-            case .streaming: return "Streaming"
-            case .other: return "Other"
-            }
-        }
+    /// The amplifier template describes the amplifier itself, not new gear.
+    private var choices: [RigEquipmentTemplate] {
+        model.templates.filter { $0.id != "amplifier" }
     }
 
-    enum FormatOption: String, CaseIterable, Identifiable {
-        case vinyl, cd, tape, mixed
-        var id: String { rawValue }
-        var label: String { rawValue.capitalized }
+    private var selected: RigEquipmentTemplate? {
+        choices.first { $0.id == templateId }
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Equipment") {
-                    TextField("Label (e.g. CD Player)", text: $label)
-                        .autocorrectionDisabled()
-                    Picker("Type", selection: $role) {
-                        ForEach(RoleOption.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    if role == .physicalMedia {
-                        Picker("Format", selection: $physicalFormat) {
-                            ForEach(FormatOption.allCases) { Text($0.label).tag($0) }
-                        }
-                    }
-                }
-
                 Section {
-                    ForEach(Self.availableActions, id: \.self) { action in
-                        Toggle(
-                            action.replacingOccurrences(of: "_", with: " ").capitalized,
-                            isOn: Binding(
-                                get: { selectedActions.contains(action) },
-                                set: { isOn in
-                                    if isOn { selectedActions.insert(action) } else { selectedActions.remove(action) }
-                                }
-                            )
-                        )
-                        .tint(Brand.accent)
+                    Picker("Kind", selection: $templateId) {
+                        ForEach(choices) { Text($0.label).tag($0.id) }
                     }
+                    TextField(selected.map { "Name (e.g. My \($0.label))" } ?? "Name", text: $label)
+                        .autocorrectionDisabled()
                 } header: {
-                    Text("Commands to Teach")
+                    Text("Equipment")
                 } footer: {
-                    Text("You can teach the IR codes for these afterward, one at a time.")
-                        .foregroundStyle(Brand.muted)
+                    if let t = selected {
+                        Text(t.hasRemote
+                             ? "Next, teach its remote: Oceano suggests the \(t.actions.count + t.optionalActions.count) buttons \(t.label.lowercased()) remotes usually have, and you press each one."
+                             : "Registered for input mapping only — \(t.label.lowercased())s usually have no remote.")
+                            .foregroundStyle(Brand.muted)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -82,8 +51,11 @@ struct AddEquipmentView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") { Task { await save() } }
-                        .disabled(label.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                        .disabled(isSaving || (label.trimmingCharacters(in: .whitespaces).isEmpty && selected == nil))
                 }
+            }
+            .onAppear {
+                if templateId.isEmpty { templateId = choices.first?.id ?? "" }
             }
         }
     }
@@ -91,15 +63,17 @@ struct AddEquipmentView: View {
     private func save() async {
         isSaving = true
         defer { isSaving = false }
+        let name = label.trimmingCharacters(in: .whitespaces)
         let req = RigEquipmentSaveRequest(
             id: nil,
-            label: label.trimmingCharacters(in: .whitespaces),
-            backend: nil,
-            actions: Array(selectedActions),
-            role: role.rawValue,
-            physicalFormat: role == .physicalMedia ? physicalFormat.rawValue : nil,
+            label: name.isEmpty ? selected?.label : name,
+            backend: nil, // groove-rig defaults to the amplifier's IR bridge
+            actions: [], // buttons are added by learning them
+            role: nil,
+            physicalFormat: nil,
             inputIds: nil,
-            hasRemote: true
+            hasRemote: nil,
+            templateId: selected?.id
         )
         if await model.addEquipment(req) {
             dismiss()
