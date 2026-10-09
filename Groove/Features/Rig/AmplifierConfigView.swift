@@ -37,8 +37,9 @@ struct AmplifierConfigView: View {
     @State private var useInputForFormat = true
 
     @State private var selectedProfileId = ""
-    @State private var showSaveProfileSheet = false
-    @State private var newProfileName = ""
+    @State private var showDuplicateSheet = false
+    @State private var duplicateName = ""
+    @State private var confirmReset = false
     @State private var exportDocument: AmplifierProfileDocument?
     @State private var showExporter = false
     @State private var showImporter = false
@@ -64,24 +65,17 @@ struct AmplifierConfigView: View {
                     .disabled(model.isSaving)
             }
         }
-        .sheet(isPresented: $showSaveProfileSheet) { saveProfileSheet }
-        .alert(
-            "Unsaved Changes",
-            isPresented: Binding(
-                get: { model.pendingForceActivate != nil },
-                set: { if !$0 { model.pendingForceActivate = nil } }
-            ),
-            presenting: model.pendingForceActivate
-        ) { pending in
-            // The server auto-saves the diverged live config as its own
-            // profile before switching (see AmplifierConfigModel.activate),
-            // so this is never a true, unrecoverable discard.
-            Button("Back Up and Activate", role: .destructive) {
-                Task { await model.activate(profileId: pending.profileId, force: true) }
+        .sheet(isPresented: $showDuplicateSheet) { duplicateSheet }
+        .confirmationDialog(
+            "Reset to factory settings?",
+            isPresented: $confirmReset,
+            titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive) {
+                Task { await model.resetProfile(id: selectedProfileId) }
             }
-            Button("Cancel", role: .cancel) { model.pendingForceActivate = nil }
-        } message: { pending in
-            Text(pending.message)
+        } message: {
+            Text("Your input names, visibility and timing for this amplifier are discarded. Learned remote codes are kept.")
         }
         .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .json, defaultFilename: "amplifier-profile") { _ in }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
@@ -91,20 +85,6 @@ struct AmplifierConfigView: View {
 
     private var content: some View {
         Form {
-            if let backupId = model.lastBackupProfileId {
-                Section {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.ok)
-                        Text("Your previous setup was saved as profile \"\(backupId)\".")
-                            .font(.footnote)
-                            .foregroundStyle(Brand.muted)
-                        Spacer()
-                        Button("Dismiss") { model.lastBackupProfileId = nil }
-                            .font(.footnote)
-                    }
-                }
-            }
-
             profileSection
 
             commandsSection
@@ -192,51 +172,76 @@ struct AmplifierConfigView: View {
         }
     }
 
+    private var selectedProfile: RigStoredAmplifierProfile? {
+        model.profiles.first { $0.id == selectedProfileId }
+    }
+
+    /// Edits are saved into the active profile (a built-in's override, or
+    /// the custom profile) by groove-rig itself, so there's no "save as new
+    /// profile" step — Duplicate is the only thing that makes a copy.
     private var profileSection: some View {
-        Section {
+        let isActive = selectedProfileId == (model.activeProfileId ?? "")
+        return Section {
             Picker("Profile", selection: $selectedProfileId) {
                 ForEach(model.profiles) { profile in
-                    Text(profile.name).tag(profile.id)
+                    Text(profile.customised == true ? "\(profile.name) · customised" : profile.name).tag(profile.id)
                 }
             }
-            if selectedProfileId != (model.activeProfileId ?? "") {
+            if !isActive {
                 Button("Activate") { Task { await model.activate(profileId: selectedProfileId) } }
             }
-            Button("Save Current as New Profile…") {
-                newProfileName = ""
-                showSaveProfileSheet = true
+            if let profile = selectedProfile, profile.origin == "builtin", profile.customised == true {
+                Button("Reset to Factory Settings") { confirmReset = true }
+            }
+            Button("Duplicate Selected Profile…") {
+                duplicateName = "\(selectedProfile?.name ?? "Amplifier") (copy)"
+                showDuplicateSheet = true
             }
             Button("Export Selected Profile") { Task { await export() } }
             Button("Import Profile…") { showImporter = true }
-            if let profile = model.profiles.first(where: { $0.id == selectedProfileId }), profile.origin != "builtin" {
+            if let profile = selectedProfile, profile.origin != "builtin", !isActive {
                 Button("Delete Selected Profile", role: .destructive) {
                     Task { await model.deleteProfile(id: profile.id) }
                 }
             }
         } header: {
             Text("Profile")
+        } footer: {
+            Text(isActive
+                 ? "Changes you save below are kept with this amplifier — switching to another one and back brings them back."
+                 : "Activating switches the rig to this amplifier, with its own settings, remote codes and equipment wiring.")
+                .foregroundStyle(Brand.muted)
         }
     }
 
-    private var saveProfileSheet: some View {
+    private var duplicateSheet: some View {
         NavigationStack {
             Form {
-                TextField("Profile Name", text: $newProfileName)
+                Section {
+                    TextField("Profile Name", text: $duplicateName)
+                } footer: {
+                    Text("The copy keeps this profile's learned remote codes and equipment wiring.")
+                        .foregroundStyle(Brand.muted)
+                }
             }
-            .navigationTitle("New Profile")
+            .navigationTitle("Duplicate Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showSaveProfileSheet = false }
+                    Button("Cancel") { showDuplicateSheet = false }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button("Duplicate") {
                         Task {
-                            await model.saveAsNewProfile(id: slugify(newProfileName), name: newProfileName)
-                            showSaveProfileSheet = false
+                            guard let source = selectedProfile else { return }
+                            let name = duplicateName.trimmingCharacters(in: .whitespaces)
+                            if let id = await model.duplicateProfile(source, name: name) {
+                                selectedProfileId = id
+                            }
+                            showDuplicateSheet = false
                         }
                     }
-                    .disabled(newProfileName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(duplicateName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
@@ -302,11 +307,4 @@ struct AmplifierConfigView: View {
             model.actionError = "Couldn't read that profile file."
         }
     }
-}
-
-private func slugify(_ text: String) -> String {
-    let lowered = text.lowercased()
-    let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
-    let mapped = lowered.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }
-    return String(mapped)
 }

@@ -147,6 +147,24 @@ struct RigStoredAmplifierProfile: Codable, Identifiable, Hashable {
     var name: String
     var origin: String?
     var config: RigAmplifierConfig
+    /// A built-in with this installation's changes applied (`config` is the
+    /// effective one). "Reset to Factory Settings" clears it.
+    var customised: Bool?
+}
+
+/// `POST /amplifier/profiles` for a duplicate: the source profile's config
+/// under a new id, plus `copyCodesFrom` so the copy keeps the source's
+/// learned IR codes and equipment wiring (same amplifier, same cabling).
+struct RigProfileDuplicateRequest: Encodable {
+    var id: String
+    var name: String
+    var origin: String = "custom"
+    var config: RigAmplifierConfig
+    var copyCodesFrom: String
+}
+
+struct RigProfileResetRequest: Encodable {
+    var profileId: String
 }
 
 struct RigAmplifierProfilesResponse: Decodable {
@@ -161,10 +179,6 @@ struct RigProfileExportDoc: Codable {
 
 struct RigProfileActivateRequest: Encodable {
     var profileId: String
-    /// Skips the server's unsaved-local-changes guard, overwriting the live
-    /// amplifier config anyway. Only set true after the user confirms
-    /// discarding those changes (see `AmplifierConfigModel.activate`).
-    var force: Bool = false
 }
 
 /// Generic ack shape shared by the profile mutation endpoints (upsert/delete/
@@ -175,10 +189,6 @@ struct RigOkResponse: Decodable {
     var profileId: String?
     var activeProfileId: String?
     var updated: Bool?
-    /// Set by a forced `activate` when the live config had diverged from
-    /// its profile — the server auto-saves that diverged config under this
-    /// new profile id before switching, so it's recoverable afterward.
-    var backupProfileId: String?
 }
 
 // MARK: - Rig sessions (IR learn / pair)

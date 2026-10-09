@@ -453,19 +453,28 @@ struct CatalogService {
         try await api.get("/rig/amplifier/profiles")
     }
 
-    @discardableResult
-    func rigSaveProfile(_ profile: RigStoredAmplifierProfile) async throws -> RigOkResponse {
-        try await api.post("/rig/amplifier/profiles", body: profile)
-    }
 
     func rigDeleteProfile(id: String) async throws {
         let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
         try await api.delete("/rig/amplifier/profiles?profile_id=\(encoded)")
     }
 
+    /// Switching never needs confirming: groove-rig saves edits into the
+    /// active profile as they're made, so there's nothing to lose.
     @discardableResult
-    func rigActivateProfile(id: String, force: Bool = false) async throws -> RigOkResponse {
-        try await api.post("/rig/amplifier/profiles/activate", body: RigProfileActivateRequest(profileId: id, force: force))
+    func rigActivateProfile(id: String) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles/activate", body: RigProfileActivateRequest(profileId: id))
+    }
+
+    @discardableResult
+    func rigDuplicateProfile(_ req: RigProfileDuplicateRequest) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles", body: req)
+    }
+
+    /// Drops this installation's changes to a built-in profile.
+    @discardableResult
+    func rigResetProfile(id: String) async throws -> RigOkResponse {
+        try await api.post("/rig/amplifier/profiles/reset", body: RigProfileResetRequest(profileId: id))
     }
 
     func rigExportProfile(id: String) async throws -> RigProfileExportDoc {
