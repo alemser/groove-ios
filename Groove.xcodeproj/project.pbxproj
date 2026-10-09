@@ -112,7 +112,7 @@
 		38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningClient.swift; sourceTree = "<group>"; };
 		3A9BAD5549550DECAB6614F5 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
-		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4271F4F0D0D2FEC9D2446F75 /* CatalogDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDiscovery.swift; sourceTree = "<group>"; };
 		431A7B81109A3032AF631217 /* StylusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylusModel.swift; sourceTree = "<group>"; };
 		4E4B6394B0A202EEC5CC67D1 /* ManualIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualIdentifySheet.swift; sourceTree = "<group>"; };
@@ -438,7 +438,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					183CFA358C610AC48FAF527E = {
-						DevelopmentTeam = VNTRG9Q6BU;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -698,6 +697,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = V3SNV627ZD;
 				INFOPLIST_FILE = Groove/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -715,6 +715,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = V3SNV627ZD;
 				INFOPLIST_FILE = Groove/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
