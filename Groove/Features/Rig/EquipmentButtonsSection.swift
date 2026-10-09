@@ -100,6 +100,12 @@ struct EquipmentButtonsSection: View {
 
     private func rowView(_ row: Row) -> some View {
         let isLearned = learned(row)
+        // Shipped with the amplifier profile: works without teaching, can't
+        // be removed; a local code (re-learn) overrides it.
+        let hasBuiltin = row.keys.contains { model.hasBuiltinCode(targetId: item.id, action: $0) }
+        let onlyBuiltin = hasBuiltin && row.keys.allSatisfy { k in
+            !model.isLearned(targetId: item.id, action: k) || model.isBuiltin(targetId: item.id, action: k)
+        }
         return Button {
             if isLearned {
                 Task { await model.fire(targetId: item.id, action: row.action) }
@@ -114,7 +120,9 @@ struct EquipmentButtonsSection: View {
                 Text(row.label)
                     .foregroundStyle(isLearned ? Brand.text : Brand.muted)
                 Spacer()
-                if isLearned {
+                if onlyBuiltin {
+                    Text("Built-in").font(.caption.weight(.semibold)).foregroundStyle(Brand.ok)
+                } else if isLearned {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.ok)
                 } else {
                     Text("Teach").font(.caption.weight(.semibold)).foregroundStyle(Brand.accent)
@@ -124,8 +132,10 @@ struct EquipmentButtonsSection: View {
         .buttonStyle(.plain)
         .disabled(model.isPerformingAction)
         .swipeActions(edge: .trailing) {
-            Button("Remove", role: .destructive) {
-                Task { await model.removeButton(targetId: item.id, actions: row.keys) }
+            if !hasBuiltin {
+                Button("Remove", role: .destructive) {
+                    Task { await model.removeButton(targetId: item.id, actions: row.keys) }
+                }
             }
         }
         .contextMenu {
@@ -142,17 +152,19 @@ struct EquipmentButtonsSection: View {
                     Label("Rename", systemImage: "pencil")
                 }
             }
-            if isLearned {
+            if isLearned && !onlyBuiltin {
                 Button {
                     Task { for k in row.keys { await model.unlearn(targetId: item.id, action: k) } }
                 } label: {
-                    Label("Forget Code", systemImage: "xmark.circle")
+                    Label(hasBuiltin ? "Use Built-in Code" : "Forget Code", systemImage: "xmark.circle")
                 }
             }
-            Button(role: .destructive) {
-                Task { await model.removeButton(targetId: item.id, actions: row.keys) }
-            } label: {
-                Label("Remove Button", systemImage: "trash")
+            if !hasBuiltin {
+                Button(role: .destructive) {
+                    Task { await model.removeButton(targetId: item.id, actions: row.keys) }
+                } label: {
+                    Label("Remove Button", systemImage: "trash")
+                }
             }
         }
     }

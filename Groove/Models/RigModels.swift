@@ -53,6 +53,13 @@ struct RigToneRequest: Encodable {
 struct RigTargetActionStatus: Decodable {
     var learned: Bool
     var learnedAt: String?
+    /// Works through the amplifier profile's shipped code (nothing learned
+    /// locally). Re-learning replaces it locally.
+    var builtin: Bool?
+    /// The profile ships a code for this button, even if a local one
+    /// overrides it — forgetting the local code falls back to it, and the
+    /// button can't be removed.
+    var builtinAvailable: Bool?
 }
 
 /// Optional where groove-rig can omit/null a field: this decodes inside the

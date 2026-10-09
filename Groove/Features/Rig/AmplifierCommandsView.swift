@@ -97,6 +97,8 @@ struct AmplifierCommandsView: View {
     private func inputRow(_ step: LearnStep) -> some View {
         let action = step.action ?? ""
         let isLearned = learned(step)
+        let hasBuiltin = model.hasBuiltinCode(targetId: currentItem.id, action: action)
+        let onlyBuiltin = model.isBuiltin(targetId: currentItem.id, action: action)
         return Button {
             if isLearned {
                 Task { await model.fire(targetId: currentItem.id, action: action) }
@@ -110,7 +112,9 @@ struct AmplifierCommandsView: View {
                     .frame(width: 24)
                 Text(step.label).foregroundStyle(isLearned ? Brand.text : Brand.muted)
                 Spacer()
-                if isLearned {
+                if onlyBuiltin {
+                    Text("Built-in").font(.caption.weight(.semibold)).foregroundStyle(Brand.ok)
+                } else if isLearned {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.ok)
                 } else {
                     Text("Teach").font(.caption.weight(.semibold)).foregroundStyle(Brand.accent)
@@ -125,11 +129,11 @@ struct AmplifierCommandsView: View {
             } label: {
                 Label(isLearned ? "Re-learn" : "Teach", systemImage: "wand.and.stars")
             }
-            if isLearned {
+            if isLearned && !onlyBuiltin {
                 Button(role: .destructive) {
                     Task { await model.unlearn(targetId: currentItem.id, action: action) }
                 } label: {
-                    Label("Forget Code", systemImage: "xmark.circle")
+                    Label(hasBuiltin ? "Use Built-in Code" : "Forget Code", systemImage: "xmark.circle")
                 }
             }
         }

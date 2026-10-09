@@ -142,6 +142,16 @@ final class EquipmentRemoteModel {
         snapshot?.targets.first { $0.id == targetId }?.actions[action]?.learned ?? false
     }
 
+    /// Working only through the amplifier profile's shipped code.
+    func isBuiltin(targetId: String, action: String) -> Bool {
+        snapshot?.targets.first { $0.id == targetId }?.actions[action]?.builtin ?? false
+    }
+
+    /// The amplifier profile ships a code for this button (local or not).
+    func hasBuiltinCode(targetId: String, action: String) -> Bool {
+        snapshot?.targets.first { $0.id == targetId }?.actions[action]?.builtinAvailable ?? false
+    }
+
     func fire(targetId: String, action: String) async {
         guard let settings, !isPerformingAction else { return }
         isPerformingAction = true
