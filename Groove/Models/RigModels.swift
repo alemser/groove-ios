@@ -26,19 +26,66 @@ struct RigAmplifierStatus: Decodable {
     var activeInputLabel: String?
     var inputs: [RigInputStatus]?
     var power: RigPowerStatus?
+    /// Set when the profile has remote tone control.
+    var tone: RigToneStatus?
+}
+
+/// `active`/`activeUntil` are set while the amp is in bass/treble mode
+/// (Volume ± adjusts that control; groove-rig holds volume presses).
+struct RigToneStatus: Decodable {
+    var mode: String
+    var active: String?
+    var activeUntil: String?
+}
+
+/// How this amplifier's remote adjusts bass/treble (profile `tone`).
+struct RigToneConfig: Codable, Hashable {
+    var mode: String
+    var settleMs: Int?
+    var timeoutMs: Int?
+}
+
+struct RigToneRequest: Encodable {
+    var control: String
+    var direction: String
 }
 
 struct RigTargetActionStatus: Decodable {
     var learned: Bool
     var learnedAt: String?
+    /// Works through the amplifier profile's shipped code (nothing learned
+    /// locally). Re-learning replaces it locally.
+    var builtin: Bool?
+    /// The profile ships a code for this button, even if a local one
+    /// overrides it — forgetting the local code falls back to it, and the
+    /// button can't be removed.
+    var builtinAvailable: Bool?
 }
 
+/// Optional where groove-rig can omit/null a field: this decodes inside the
+/// one `/status` snapshot every learned flag comes from, so a single
+/// unexpected null used to fail the whole decode — and the remote then hid
+/// every button as "not learned" (a passive turntable's
+/// `"capabilities": null` did exactly that).
 struct RigTargetStatus: Decodable, Identifiable {
     var id: String
     var label: String
-    var backend: String
-    var capabilities: [String]
+    var backend: String?
+    var capabilities: [String]?
     var actions: [String: RigTargetActionStatus]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? id
+        backend = try c.decodeIfPresent(String.self, forKey: .backend)
+        capabilities = try c.decodeIfPresent([String].self, forKey: .capabilities)
+        actions = try c.decodeIfPresent([String: RigTargetActionStatus].self, forKey: .actions) ?? [:]
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, backend, capabilities, actions
+    }
 }
 
 struct RigSnapshot: Decodable {
@@ -67,10 +114,94 @@ struct RigEquipmentItem: Decodable, Identifiable, Hashable {
     var physicalFormat: String
     var inputIds: [String]?
     var hasRemote: Bool
+    /// Resolved display name for every entry in `actions` (custom label →
+    /// server vocabulary → title-cased id). Use `label(for:)`.
+    var actionLabels: [String: String]?
+    /// The equipment template it was created from, if any — drives which
+    /// buttons are suggested ("Common on CD player remotes").
+    var templateId: String?
+    /// Wiring per amplifier profile id; `inputIds` is the active one's.
+    var inputsByProfile: [String: [String]]?
+
+    func label(for action: String) -> String {
+        if ["power_toggle", "power_on", "power_off"].contains(action) { return "Power" }
+        return actionLabels?[action] ?? action.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 }
 
 struct RigEquipmentListResponse: Decodable {
     var items: [RigEquipmentItem]
+}
+
+// MARK: - Button vocabulary, equipment templates (GET /rig/actions, /rig/equipment/templates)
+
+/// A well-known remote button. `icon` is an SF Symbol name.
+struct RigActionDef: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var group: String
+    var icon: String?
+}
+
+struct RigActionVocabulary: Decodable {
+    var groups: [String]
+    var items: [RigActionDef]
+}
+
+/// A starting point for new equipment: IR can't report which buttons a
+/// remote has, so this is the "typical" set plus optional extras.
+struct RigEquipmentTemplate: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var role: String
+    var physicalFormat: String
+    var hasRemote: Bool
+    var actions: [String]
+    var optionalActions: [String]
+}
+
+struct RigEquipmentTemplateList: Decodable {
+    var items: [RigEquipmentTemplate]
+}
+
+struct RigEquipmentActionRequest: Encodable {
+    var label: String
+}
+
+// MARK: - Remote layout (GET/PUT/DELETE /rig/remote/layout)
+
+/// One placed control. `widget` is power | input_select | volume | action;
+/// `key`, `label`, `icon` are server-resolved display hints (read-only).
+struct RigLayoutControl: Codable, Identifiable, Hashable {
+    var widget: String
+    var target: String
+    var action: String?
+    var span: Int
+    var key: String
+    var label: String
+    var icon: String?
+    var id: String { key }
+}
+
+struct RigLayoutPanel: Codable, Identifiable, Hashable {
+    var id: String
+    /// Stored override; "" means "use the target's label".
+    var title: String?
+    /// What to show: title, else the owning target's label.
+    var label: String
+    var target: String?
+    var controls: [RigLayoutControl]
+}
+
+/// The remote's arrangement — the same one the web remote draws. Saving
+/// sends it straight back; the server ignores the display-hint fields and
+/// reads `hidden` controls by key.
+struct RigRemoteLayout: Codable, Hashable {
+    var version: Int
+    var columns: Int
+    var customised: Bool
+    var panels: [RigLayoutPanel]
+    var hidden: [RigLayoutControl]
 }
 
 struct RigEquipmentSaveRequest: Encodable {
@@ -82,6 +213,8 @@ struct RigEquipmentSaveRequest: Encodable {
     var physicalFormat: String?
     var inputIds: [String]?
     var hasRemote: Bool?
+    /// Seeds role/format and the suggested buttons (GET /rig/equipment/templates).
+    var templateId: String?
 }
 
 /// Edits an existing piece of equipment. Distinct from `RigEquipmentSaveRequest`
@@ -129,6 +262,7 @@ struct RigAmplifierConfig: Codable, Hashable {
     var standbyTimeoutMins: Int?
     var cycle: RigCycleConfig?
     var inputs: [RigInputConfig]?
+    var tone: RigToneConfig?
 }
 
 /// Whether the amplifier's selected input may be read as evidence of which
@@ -147,6 +281,24 @@ struct RigStoredAmplifierProfile: Codable, Identifiable, Hashable {
     var name: String
     var origin: String?
     var config: RigAmplifierConfig
+    /// A built-in with this installation's changes applied (`config` is the
+    /// effective one). "Reset to Factory Settings" clears it.
+    var customised: Bool?
+}
+
+/// `POST /amplifier/profiles` for a duplicate: the source profile's config
+/// under a new id, plus `copyCodesFrom` so the copy keeps the source's
+/// learned IR codes and equipment wiring (same amplifier, same cabling).
+struct RigProfileDuplicateRequest: Encodable {
+    var id: String
+    var name: String
+    var origin: String = "custom"
+    var config: RigAmplifierConfig
+    var copyCodesFrom: String
+}
+
+struct RigProfileResetRequest: Encodable {
+    var profileId: String
 }
 
 struct RigAmplifierProfilesResponse: Decodable {
@@ -161,10 +313,6 @@ struct RigProfileExportDoc: Codable {
 
 struct RigProfileActivateRequest: Encodable {
     var profileId: String
-    /// Skips the server's unsaved-local-changes guard, overwriting the live
-    /// amplifier config anyway. Only set true after the user confirms
-    /// discarding those changes (see `AmplifierConfigModel.activate`).
-    var force: Bool = false
 }
 
 /// Generic ack shape shared by the profile mutation endpoints (upsert/delete/
@@ -175,10 +323,6 @@ struct RigOkResponse: Decodable {
     var profileId: String?
     var activeProfileId: String?
     var updated: Bool?
-    /// Set by a forced `activate` when the live config had diverged from
-    /// its profile — the server auto-saves that diverged config under this
-    /// new profile id before switching, so it's recoverable afterward.
-    var backupProfileId: String?
 }
 
 // MARK: - Rig sessions (IR learn / pair)
@@ -192,13 +336,21 @@ struct RigSessionSummary: Decodable, Identifiable {
     var action: String?
     var message: String?
     var code: String?
+    /// Learn only: other buttons on the same target whose learned code is
+    /// the same press as this capture — usually the wrong button pressed.
+    var duplicateOf: [String]?
 }
 
 struct RigLearnRequest: Encodable {
     var backendId: String?
     var targetId: String
-    var action: String
+    /// nil with `register` + `label` = a custom button, id slugged server-side.
+    var action: String?
     var timeoutSecs: Int?
+    /// Add the button (with `label`) to the target only once a code is
+    /// captured — cancel/timeout leaves nothing behind.
+    var register: Bool?
+    var label: String?
 }
 
 // MARK: - Streaming (AirPlay output device — proxied `/rig/streaming/*` →

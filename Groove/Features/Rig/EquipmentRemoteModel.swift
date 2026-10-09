@@ -9,8 +9,91 @@ final class EquipmentRemoteModel {
     var phase: Phase = .loading
     var actionError: String?
     var isPerformingAction = false
+    /// Well-known buttons and equipment templates from groove-rig — the
+    /// server owns "which buttons does this kind of device have", not the
+    /// app. Supplementary: empty on an older server, and nothing breaks.
+    var vocabulary: [RigActionDef] = []
+    var templates: [RigEquipmentTemplate] = []
 
     enum Phase: Equatable { case loading, loaded, error(String) }
+
+    static let powerKeys: Set<String> = ["power_toggle", "power_on", "power_off"]
+
+    func icon(for action: String) -> String? {
+        if Self.powerKeys.contains(action) { return "power" }
+        return vocabulary.first { $0.id == action }?.icon
+    }
+
+    /// The template describing `item` — its own, or (for equipment added
+    /// before templates existed) a guess from its format/role.
+    func template(for item: RigEquipmentItem) -> RigEquipmentTemplate? {
+        if item.id == "amplifier" { return templates.first { $0.id == "amplifier" } }
+        if let id = item.templateId, let t = templates.first(where: { $0.id == id }) { return t }
+        let guess: String?
+        switch item.physicalFormat {
+        case "cd": guess = "cd_player"
+        case "tape": guess = "cassette_deck"
+        case "vinyl": guess = "turntable"
+        default: guess = item.role == "streaming" ? "streamer" : nil
+        }
+        return guess.flatMap { g in templates.first { $0.id == g } }
+    }
+
+    /// The template's buttons `item` doesn't have yet, in the template's
+    /// order — standard and optional ones alike. What Add Button suggests
+    /// ("Common on … remotes") and its "Walk Me Through All".
+    func missingTemplateButtons(for item: RigEquipmentItem) -> [String] {
+        guard let t = template(for: item) else { return [] }
+        return missing(t.actions + t.optionalActions, for: item)
+    }
+
+    /// Only the template's *standard* buttons that are still missing — the
+    /// ones a remote of this kind is expected to have. Optional extras
+    /// (Mute, Display, number keys…) aren't "unfinished work", so they
+    /// never drive the "Teach the Remote" prompt; they stay suggestions.
+    /// `extra`: buttons standard for this particular device beyond its
+    /// template — the Bass/Treble keys of an amplifier whose profile has
+    /// remote tone control.
+    func missingStandardButtons(for item: RigEquipmentItem, extra: [String] = []) -> [String] {
+        let standard = (template(for: item)?.actions ?? []) + extra
+        return missing(standard, for: item)
+    }
+
+    private func missing(_ actions: [String], for item: RigEquipmentItem) -> [String] {
+        let have = item.actions ?? []
+        let hasPower = have.contains { Self.powerKeys.contains($0) }
+        return actions.filter { a in
+            !have.contains(a) && !(hasPower && Self.powerKeys.contains(a))
+        }
+    }
+
+    func vocabularyLabel(_ action: String) -> String {
+        if Self.powerKeys.contains(action) { return "Power" }
+        return vocabulary.first { $0.id == action }?.label ?? action.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    func renameButton(targetId: String, action: String, label: String) async {
+        guard let settings else { return }
+        do {
+            try await CatalogService(settings: settings).rigRenameEquipmentAction(target: targetId, action: action, label: label)
+            await load()
+        } catch {
+            actionError = error.localizedForDisplay
+        }
+    }
+
+    /// Removes the button and its learned code (power: every power key).
+    func removeButton(targetId: String, actions: [String]) async {
+        guard let settings else { return }
+        do {
+            let service = CatalogService(settings: settings)
+            for a in actions { try await service.rigRemoveEquipmentAction(target: targetId, action: a) }
+            await load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            actionError = error.localizedForDisplay
+        }
+    }
 
     private var settings: AppSettings?
 
@@ -35,6 +118,8 @@ final class EquipmentRemoteModel {
         let service = CatalogService(settings: settings)
         async let eq = service.rigEquipment()
         async let snap = service.rigStatus()
+        async let vocab = service.rigActionVocabulary()
+        async let tpls = service.rigEquipmentTemplates()
         do {
             equipment = try await eq
         } catch {
@@ -47,11 +132,24 @@ final class EquipmentRemoteModel {
         // degrades to false without it — so a failure here shouldn't blank a
         // screen that already has a real equipment list to show.
         snapshot = (try? await snap) ?? snapshot
+        // Also supplementary — degrade to what we had (CLAUDE.md async-let rule).
+        vocabulary = (try? await vocab)?.items ?? vocabulary
+        templates = (try? await tpls) ?? templates
         phase = .loaded
     }
 
     func isLearned(targetId: String, action: String) -> Bool {
         snapshot?.targets.first { $0.id == targetId }?.actions[action]?.learned ?? false
+    }
+
+    /// Working only through the amplifier profile's shipped code.
+    func isBuiltin(targetId: String, action: String) -> Bool {
+        snapshot?.targets.first { $0.id == targetId }?.actions[action]?.builtin ?? false
+    }
+
+    /// The amplifier profile ships a code for this button (local or not).
+    func hasBuiltinCode(targetId: String, action: String) -> Bool {
+        snapshot?.targets.first { $0.id == targetId }?.actions[action]?.builtinAvailable ?? false
     }
 
     func fire(targetId: String, action: String) async {

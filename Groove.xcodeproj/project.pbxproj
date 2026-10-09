@@ -46,13 +46,16 @@
 		75B9D078E9EFCDAC8E00EAC5 /* ChangeReleaseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A0CECF61D4276DD41099F9 /* ChangeReleaseSheet.swift */; };
 		7913A612D1355F1B0D9431CE /* CatalogSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31203FC57565EB390686DD7 /* CatalogSessionView.swift */; };
 		7EA1D48D11F0E03C59385AE5 /* AmplifierModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72D9FF93C4894E2FD593E08D /* AmplifierModel.swift */; };
+		847DD6E84CDDF6566A87E7E9 /* AddButtonSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23353F59B5F59055945D5990 /* AddButtonSheet.swift */; };
 		876122F7EBCEB0E576914734 /* GrooveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 599238D9601A338235548EB9 /* GrooveApp.swift */; };
 		8B761AC36121A55B4CD45305 /* TrackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D45B7346C13419666E75AA6 /* TrackDetailView.swift */; };
 		91122A625338C9EE6FACF203 /* AudioInputModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CE28FA2F7EA52890362EFC /* AudioInputModel.swift */; };
 		9124A458EAEC8E255255C2FB /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569411080918D04DCBAC649F /* Artwork.swift */; };
 		9436589215B9A9DAE6659F23 /* StylusModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354361FA261048E456288AB8 /* StylusModels.swift */; };
+		9857D48C75FF43FF0B99995E /* ArrangeRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */; };
 		99D2880D1FB1BEC67D7D43A0 /* RigModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A2E76DD3C03EACA8571DDA /* RigModels.swift */; };
 		9B9FBC5A7BE2AB51DC3FB3E4 /* EquipmentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1419E86CA4A3D1E5BD3CBEC2 /* EquipmentDetailView.swift */; };
+		A0232D1FAEED9FD29B37F568 /* EquipmentButtonsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2634F6426F312060200F06B8 /* EquipmentButtonsSection.swift */; };
 		A516116BA4E48D5F5B3269C5 /* Barcode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3634CDA0BB984B61C55ADD18 /* Barcode.swift */; };
 		A5C8565C906430EC7A80EA7E /* RigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672B702C305D95A110E0B197 /* RigView.swift */; };
 		A5D7CD5275C59AD65C8F7403 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F2A1EC6AA9160C8B6AB11 /* Formatters.swift */; };
@@ -80,6 +83,7 @@
 		F0FE630615F7FE81459A8319 /* CustomProviderFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19701153C1009440F8683D72 /* CustomProviderFormView.swift */; };
 		F1ADECE205EB465BB191F3B5 /* AmplifierConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F8DED941B474568FDBE984 /* AmplifierConfigView.swift */; };
 		F1D5E38E633D0C502A15089B /* EditionQuestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8405014CDE5049C52E26E628 /* EditionQuestionCard.swift */; };
+		F2B4B2AAD3DA41B951841086 /* RemoteLayoutModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */; };
 		F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C276B60479555871B884B5E /* NavigationState.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
@@ -95,8 +99,11 @@
 		0E83562951C9D7BD7A48EAE5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0F52429B8B0A4F07F02E2D73 /* BLEProvisioningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningView.swift; sourceTree = "<group>"; };
 		1419E86CA4A3D1E5BD3CBEC2 /* EquipmentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentDetailView.swift; sourceTree = "<group>"; };
+		15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteLayoutModel.swift; sourceTree = "<group>"; };
 		164F9B46FAA2A75FDEB3E77A /* AmplifierConfigModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierConfigModel.swift; sourceTree = "<group>"; };
 		19701153C1009440F8683D72 /* CustomProviderFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomProviderFormView.swift; sourceTree = "<group>"; };
+		23353F59B5F59055945D5990 /* AddButtonSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddButtonSheet.swift; sourceTree = "<group>"; };
+		2634F6426F312060200F06B8 /* EquipmentButtonsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentButtonsSection.swift; sourceTree = "<group>"; };
 		27254E509C0A5183FE8A30CB /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		27ED92912FF018764F1314A9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		29A0CECF61D4276DD41099F9 /* ChangeReleaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeReleaseSheet.swift; sourceTree = "<group>"; };
@@ -157,6 +164,7 @@
 		DB9253360D61A0BC5E0BE49D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		E1413AC3F7F93EB3B0926AD2 /* AssociationReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssociationReviewSheet.swift; sourceTree = "<group>"; };
 		E359E243C5567C525755CBD8 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
+		E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrangeRemoteView.swift; sourceTree = "<group>"; };
 		E9D087FFBFCB4708D377BC3C /* BLEProvisioningModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningModel.swift; sourceTree = "<group>"; };
 		EA402F3DB82BD6BF6BBF486B /* AmplifierView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierView.swift; sourceTree = "<group>"; };
 		EF2C8786E67341140FA8EFAF /* LevelMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelMeterView.swift; sourceTree = "<group>"; };
@@ -244,6 +252,7 @@
 		59D40C2F6A9F6CE4F87C8E65 /* Rig */ = {
 			isa = PBXGroup;
 			children = (
+				23353F59B5F59055945D5990 /* AddButtonSheet.swift */,
 				FB241ADDC25A22478684F3EE /* AddEquipmentView.swift */,
 				0CBAF08163F31479F9161C5C /* AmplifierCommandsView.swift */,
 				164F9B46FAA2A75FDEB3E77A /* AmplifierConfigModel.swift */,
@@ -252,13 +261,16 @@
 				72D9FF93C4894E2FD593E08D /* AmplifierModel.swift */,
 				66C5227820A40CD353C1E8E3 /* AmplifierRemoteTab.swift */,
 				EA402F3DB82BD6BF6BBF486B /* AmplifierView.swift */,
+				E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */,
 				B2CE28FA2F7EA52890362EFC /* AudioInputModel.swift */,
 				8E960DB14104D8D2AB678A2F /* AudioInputView.swift */,
+				2634F6426F312060200F06B8 /* EquipmentButtonsSection.swift */,
 				1419E86CA4A3D1E5BD3CBEC2 /* EquipmentDetailView.swift */,
 				02A8A778A9F5863318C47A4A /* EquipmentRemoteModel.swift */,
 				08E51F3CA60D5303071D7FA3 /* LearnSessionModel.swift */,
 				6CB0BA11AD156E7724FAA0C7 /* LearnSessionSheet.swift */,
 				EF2C8786E67341140FA8EFAF /* LevelMeterView.swift */,
+				15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */,
 				672B702C305D95A110E0B197 /* RigView.swift */,
 				7C54B427D95192B93FFCA854 /* StreamingView.swift */,
 				431A7B81109A3032AF631217 /* StylusModel.swift */,
@@ -467,6 +479,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */,
+				847DD6E84CDDF6566A87E7E9 /* AddButtonSheet.swift in Sources */,
 				C9D4BF7C12E77F859C6C00DD /* AddEquipmentView.swift in Sources */,
 				71BAC18D62D28ADD88BF0792 /* AddReleaseView.swift in Sources */,
 				F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */,
@@ -478,6 +491,7 @@
 				092C5C78CF3B8FD2571F9070 /* AmplifierRemoteTab.swift in Sources */,
 				686B8A619CF6DC47A499AD0E /* AmplifierView.swift in Sources */,
 				6EB577E6A6586EA2225A3FCD /* AppSettings.swift in Sources */,
+				9857D48C75FF43FF0B99995E /* ArrangeRemoteView.swift in Sources */,
 				9124A458EAEC8E255255C2FB /* Artwork.swift in Sources */,
 				C6E2E1883D30558A13D31727 /* AssociationReviewSheet.swift in Sources */,
 				360BB6AE36C8A7A1F3F00FF0 /* AttentionCenter.swift in Sources */,
@@ -503,6 +517,7 @@
 				6FD3B20B65667FF86306D706 /* EnrichJobDetailView.swift in Sources */,
 				D3BF1220E59898E2D65811D6 /* EnricherCredentialsForm.swift in Sources */,
 				0FEC380873CA3EF6C35DE7FF /* EnricherSettingsView.swift in Sources */,
+				A0232D1FAEED9FD29B37F568 /* EquipmentButtonsSection.swift in Sources */,
 				9B9FBC5A7BE2AB51DC3FB3E4 /* EquipmentDetailView.swift in Sources */,
 				510D1882797CEC49A61789A1 /* EquipmentRemoteModel.swift in Sources */,
 				A5D7CD5275C59AD65C8F7403 /* Formatters.swift in Sources */,
@@ -529,6 +544,7 @@
 				61A9CCC98217FDD0C862BB6F /* RecognitionProvidersScreen.swift in Sources */,
 				319EF9BE91669E7469DB384D /* ReleaseDetailView.swift in Sources */,
 				64E51F3C005C12BF7954F5B9 /* ReleasesView.swift in Sources */,
+				F2B4B2AAD3DA41B951841086 /* RemoteLayoutModel.swift in Sources */,
 				EFCEAE28AA013B4C50B3A62D /* RemoteQuickAccessSheet.swift in Sources */,
 				99D2880D1FB1BEC67D7D43A0 /* RigModels.swift in Sources */,
 				A5C8565C906430EC7A80EA7E /* RigView.swift in Sources */,

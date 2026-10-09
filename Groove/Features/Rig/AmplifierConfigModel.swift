@@ -10,16 +10,6 @@ final class AmplifierConfigModel {
     var phase: Phase = .loading
     var actionError: String?
     var isSaving = false
-    /// Set when the server refuses `activate` (409) because the live config
-    /// has unsaved local edits on top of the currently active profile —
-    /// switching would silently discard them. The view shows a confirm
-    /// alert; confirming retries with `force: true`.
-    var pendingForceActivate: (profileId: String, message: String)?
-    /// Set right after a forced activate that had to back up diverged
-    /// local edits — names the new profile they landed in, so the view can
-    /// tell the user where their previous setup went instead of leaving
-    /// them to wonder whether "Discard and Activate" really discarded it.
-    var lastBackupProfileId: String?
     /// Whether the amplifier's selected input may inform which medium is
     /// playing. Loaded and saved separately from `config` — see `RigFormatHint`.
     var useAmplifierInputForFormat = true
@@ -81,48 +71,68 @@ final class AmplifierConfigModel {
         }
     }
 
-    func activate(profileId: String, force: Bool = false) async {
+    /// Switches amplifier. Never blocked: groove-rig saves edits into the
+    /// active profile as they're made (a built-in's override, or the custom
+    /// profile), so switching away and back restores them.
+    func activate(profileId: String) async {
         guard let settings else { return }
         do {
-            let res = try await CatalogService(settings: settings).rigActivateProfile(id: profileId, force: force)
-            lastBackupProfileId = res.backupProfileId
+            try await CatalogService(settings: settings).rigActivateProfile(id: profileId)
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch let error as APIError {
-            if case let .http(status, body) = error, status == 409 {
-                pendingForceActivate = (profileId, Self.extractServerMessage(from: body) ?? error.localizedDescription)
-            } else {
-                actionError = error.localizedDescription
-            }
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.localizedForDisplay
         }
     }
 
-    /// Pulls `{"error": "..."}` out of a raw HTTP error body, matching the
-    /// shape groove-rig's `writeError` sends — falls back to nil (caller
-    /// shows the generic `APIError.http` description instead) for anything
-    /// that isn't that shape.
-    private static func extractServerMessage(from body: String) -> String? {
-        guard let data = body.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return obj["error"] as? String
-    }
-
-    @discardableResult
-    func saveAsNewProfile(id: String, name: String) async -> Bool {
-        guard let settings, let config else { return false }
+    /// Copies `source` under a new name, with its learned IR codes and
+    /// equipment wiring. Returns the new profile's id on success.
+    func duplicateProfile(_ source: RigStoredAmplifierProfile, name: String) async -> String? {
+        guard let settings else { return nil }
+        let base = Self.slug(name)
+        var id = base
+        var n = 2
+        while profiles.contains(where: { $0.id == id }) {
+            id = "\(base)_\(n)"
+            n += 1
+        }
         do {
-            _ = try await CatalogService(settings: settings).rigSaveProfile(
-                RigStoredAmplifierProfile(id: id, name: name, origin: "custom", config: config)
+            _ = try await CatalogService(settings: settings).rigDuplicateProfile(
+                RigProfileDuplicateRequest(id: id, name: name, config: source.config, copyCodesFrom: source.id)
             )
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
+            return id
         } catch {
             actionError = error.localizedForDisplay
-            return false
+            return nil
         }
+    }
+
+    func resetProfile(id: String) async {
+        guard let settings else { return }
+        do {
+            try await CatalogService(settings: settings).rigResetProfile(id: id)
+            await load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            actionError = error.localizedForDisplay
+        }
+    }
+
+    /// Profile ids are internal (`^[a-z0-9][a-z0-9_-]*$` on the server).
+    private static func slug(_ text: String) -> String {
+        let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789")
+        var out = ""
+        for ch in text.lowercased() {
+            if allowed.contains(ch) {
+                out.append(ch)
+            } else if !out.hasSuffix("_") {
+                out.append("_")
+            }
+        }
+        let trimmed = out.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return trimmed.isEmpty ? "profile" : trimmed
     }
 
     func deleteProfile(id: String) async {

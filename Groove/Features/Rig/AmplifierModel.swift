@@ -121,6 +121,44 @@ final class AmplifierModel {
         await task.value
     }
 
+    /// Steps bass or treble (profiles with tone.mode select_then_volume —
+    /// the SP103's Bass/Treble key, then Volume ±). groove-rig sends the
+    /// sequence and holds real volume presses until the amp's tone mode
+    /// expires. Same serial chain as volume, so tone and volume presses go
+    /// out in the order they were tapped.
+    func tone(control: String, direction: String) async {
+        guard let settings else { return }
+        let previous = volumeChain
+        let task = Task { @MainActor [weak self] in
+            _ = await previous?.result
+            guard let self else { return }
+            do {
+                self.snapshot = try await CatalogService(settings: settings).rigTone(control: control, direction: direction)
+                self.actionError = nil
+            } catch {
+                self.actionError = error.localizedForDisplay
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
+        volumeChain = task
+        await task.value
+    }
+
+    /// Bass/treble mode currently active on the amp, and seconds left —
+    /// while it lasts, Volume ± is held by groove-rig.
+    func activeTone(at now: Date) -> (control: String, seconds: Int)? {
+        guard let t = amplifier?.tone, let control = t.active, let until = t.activeUntil,
+              let date = Self.rfc3339.date(from: until) ?? ISO8601DateFormatter().date(from: until) else { return nil }
+        let left = date.timeIntervalSince(now)
+        return left > 0 ? (control, Int(left.rounded(.up))) : nil
+    }
+
+    private static let rfc3339: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
     func nextInput() async {
         guard let settings else { return }
         await perform {
