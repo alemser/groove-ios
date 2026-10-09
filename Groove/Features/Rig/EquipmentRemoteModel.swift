@@ -40,12 +40,26 @@ final class EquipmentRemoteModel {
     }
 
     /// The template's buttons `item` doesn't have yet, in the template's
-    /// order — what "Common on … remotes" and "Teach the Remote" offer.
+    /// order — standard and optional ones alike. What Add Button suggests
+    /// ("Common on … remotes") and its "Walk Me Through All".
     func missingTemplateButtons(for item: RigEquipmentItem) -> [String] {
         guard let t = template(for: item) else { return [] }
+        return missing(t.actions + t.optionalActions, for: item)
+    }
+
+    /// Only the template's *standard* buttons that are still missing — the
+    /// ones a remote of this kind is expected to have. Optional extras
+    /// (Mute, Display, number keys…) aren't "unfinished work", so they
+    /// never drive the "Teach the Remote" prompt; they stay suggestions.
+    func missingStandardButtons(for item: RigEquipmentItem) -> [String] {
+        guard let t = template(for: item) else { return [] }
+        return missing(t.actions, for: item)
+    }
+
+    private func missing(_ actions: [String], for item: RigEquipmentItem) -> [String] {
         let have = item.actions ?? []
         let hasPower = have.contains { Self.powerKeys.contains($0) }
-        return (t.actions + t.optionalActions).filter { a in
+        return actions.filter { a in
             !have.contains(a) && !(hasPower && Self.powerKeys.contains(a))
         }
     }

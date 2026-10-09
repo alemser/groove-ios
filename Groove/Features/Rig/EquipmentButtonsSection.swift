@@ -57,13 +57,22 @@ struct EquipmentButtonsSection: View {
             Button(action: onAddButton) {
                 Label("Add Button…", systemImage: "plus.circle.fill")
             }
-            let missing = model.missingTemplateButtons(for: item)
+            // Only standard buttons still missing prompt a walkthrough —
+            // optional extras are offered under Add Button instead, so a
+            // complete remote never looks unfinished.
+            let missing = model.missingStandardButtons(for: item)
             if !missing.isEmpty {
                 Button {
                     onLearn(missing.map { LearnStep(action: $0, label: model.vocabularyLabel($0)) })
                 } label: {
-                    Label(rows.isEmpty ? "Teach the Remote (\(missing.count))" : "Teach the Rest of the Remote (\(missing.count))",
-                          systemImage: "list.number")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label(rows.isEmpty ? "Teach the Remote (\(missing.count))" : "Teach the Missing Buttons (\(missing.count))",
+                              systemImage: "list.number")
+                        Text(missing.map(model.vocabularyLabel).joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundStyle(Brand.muted)
+                            .padding(.leading, 36)
+                    }
                 }
             }
         } header: {
