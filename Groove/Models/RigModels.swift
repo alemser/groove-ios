@@ -33,12 +33,30 @@ struct RigTargetActionStatus: Decodable {
     var learnedAt: String?
 }
 
+/// Optional where groove-rig can omit/null a field: this decodes inside the
+/// one `/status` snapshot every learned flag comes from, so a single
+/// unexpected null used to fail the whole decode — and the remote then hid
+/// every button as "not learned" (a passive turntable's
+/// `"capabilities": null` did exactly that).
 struct RigTargetStatus: Decodable, Identifiable {
     var id: String
     var label: String
-    var backend: String
-    var capabilities: [String]
+    var backend: String?
+    var capabilities: [String]?
     var actions: [String: RigTargetActionStatus]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? id
+        backend = try c.decodeIfPresent(String.self, forKey: .backend)
+        capabilities = try c.decodeIfPresent([String].self, forKey: .capabilities)
+        actions = try c.decodeIfPresent([String: RigTargetActionStatus].self, forKey: .actions) ?? [:]
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, backend, capabilities, actions
+    }
 }
 
 struct RigSnapshot: Decodable {
