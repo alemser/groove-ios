@@ -525,6 +525,10 @@ struct CatalogService {
         try await api.get("/rig/equipment/templates", as: RigEquipmentTemplateList.self).items
     }
 
+    func rigEquipmentModels() async throws -> [RigEquipmentModel] {
+        try await api.get("/rig/equipment/models", as: RigEquipmentModelList.self).items
+    }
+
     /// Renames a button; an empty label restores its default name.
     @discardableResult
     func rigRenameEquipmentAction(target: String, action: String, label: String) async throws -> RigEquipmentItem {

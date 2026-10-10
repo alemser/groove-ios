@@ -14,6 +14,9 @@ final class EquipmentRemoteModel {
     /// app. Supplementary: empty on an older server, and nothing breaks.
     var vocabulary: [RigActionDef] = []
     var templates: [RigEquipmentTemplate] = []
+    /// Built-in makes/models that ship IR codes. Supplementary like
+    /// templates: empty on a server without GET /rig/equipment/models.
+    var builtInModels: [RigEquipmentModel] = []
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
@@ -22,6 +25,11 @@ final class EquipmentRemoteModel {
     func icon(for action: String) -> String? {
         if Self.powerKeys.contains(action) { return "power" }
         return vocabulary.first { $0.id == action }?.icon
+    }
+
+    /// Built-in models of one kind (template id), for a Model picker.
+    func builtInModels(ofKind templateId: String?) -> [RigEquipmentModel] {
+        builtInModels.filter { $0.templateId == templateId }
     }
 
     /// The template describing `item` — its own, or (for equipment added
@@ -120,6 +128,7 @@ final class EquipmentRemoteModel {
         async let snap = service.rigStatus()
         async let vocab = service.rigActionVocabulary()
         async let tpls = service.rigEquipmentTemplates()
+        async let models = service.rigEquipmentModels()
         do {
             equipment = try await eq
         } catch {
@@ -135,6 +144,7 @@ final class EquipmentRemoteModel {
         // Also supplementary — degrade to what we had (CLAUDE.md async-let rule).
         vocabulary = (try? await vocab)?.items ?? vocabulary
         templates = (try? await tpls) ?? templates
+        builtInModels = (try? await models) ?? builtInModels
         phase = .loaded
     }
 

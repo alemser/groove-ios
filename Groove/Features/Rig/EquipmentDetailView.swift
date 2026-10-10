@@ -23,6 +23,9 @@ struct EquipmentDetailView: View {
                 if currentItem.physicalFormat != "unspecified" {
                     InfoRow(label: "Format", value: currentItem.physicalFormat.capitalized)
                 }
+                if let m = model.builtInModels.first(where: { $0.id == currentItem.modelId }) {
+                    InfoRow(label: "Model", value: m.label)
+                }
             }
 
             if currentItem.hasRemote {
@@ -99,10 +102,10 @@ struct EquipmentDetailView: View {
     }
 }
 
-/// Editable equipment attributes — label, role, physical format, and whether
-/// it's exposed on the Remote tab. Backend/actions/input wiring stay
-/// create-time-only for now, edited by re-adding the device if they need to
-/// change.
+/// Editable equipment attributes — label, role, physical format, built-in
+/// model, and whether it's exposed on the Remote tab. Backend/actions/input
+/// wiring stay create-time-only for now, edited by re-adding the device if
+/// they need to change.
 struct EquipmentEditForm: View {
     let item: RigEquipmentItem
     let model: EquipmentRemoteModel
@@ -112,7 +115,19 @@ struct EquipmentEditForm: View {
     @State private var role = "physical_media"
     @State private var physicalFormat = "unspecified"
     @State private var hasRemote = false
+    /// "" = no built-in model.
+    @State private var modelId = ""
     @State private var isSaving = false
+
+    /// Built-in models of this equipment's kind — plus its current one, so
+    /// the picker can always show what's set.
+    private var modelChoices: [RigEquipmentModel] {
+        var out = model.builtInModels(ofKind: model.template(for: item)?.id)
+        if let current = model.builtInModels.first(where: { $0.id == item.modelId }), !out.contains(current) {
+            out.append(current)
+        }
+        return out
+    }
 
     var body: some View {
         NavigationStack {
@@ -132,6 +147,20 @@ struct EquipmentEditForm: View {
                         Text("Mixed").tag("mixed")
                     }
                     Toggle("Show on Remote", isOn: $hasRemote)
+                }
+
+                if !modelChoices.isEmpty {
+                    Section {
+                        Picker("Model", selection: $modelId) {
+                            Text("Other / not listed").tag("")
+                            ForEach(modelChoices) { Text($0.label).tag($0.id) }
+                        }
+                    } footer: {
+                        Text(modelId.isEmpty
+                             ? "Pick its model if listed: Oceano already knows that remote's buttons, so they work without teaching them."
+                             : "Buttons this model's remote has are added and work without teaching. Choosing “Other” keeps them, but they'll need teaching.")
+                            .foregroundStyle(Brand.muted)
+                    }
                 }
 
                 if let error = model.actionError {
@@ -157,6 +186,7 @@ struct EquipmentEditForm: View {
             role = item.role
             physicalFormat = item.physicalFormat
             hasRemote = item.hasRemote
+            modelId = item.modelId ?? ""
         }
     }
 
@@ -165,7 +195,9 @@ struct EquipmentEditForm: View {
         defer { isSaving = false }
         let patch = RigEquipmentPatchRequest(
             label: label.nonEmpty, backend: nil, actions: nil,
-            role: role, physicalFormat: physicalFormat, inputIds: nil, hasRemote: hasRemote
+            role: role, physicalFormat: physicalFormat, inputIds: nil, hasRemote: hasRemote,
+            // Only on a change — nil leaves the model as it is.
+            modelId: modelId == (item.modelId ?? "") ? nil : modelId
         )
         if await model.updateEquipment(id: item.id, patch) {
             dismiss()

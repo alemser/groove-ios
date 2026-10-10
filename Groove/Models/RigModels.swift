@@ -120,6 +120,9 @@ struct RigEquipmentItem: Decodable, Identifiable, Hashable {
     /// The equipment template it was created from, if any — drives which
     /// buttons are suggested ("Common on CD player remotes").
     var templateId: String?
+    /// The built-in model (GET /rig/equipment/models) whose IR codes this
+    /// equipment ships with — its buttons work without being taught.
+    var modelId: String?
     /// Wiring per amplifier profile id; `inputIds` is the active one's.
     var inputsByProfile: [String: [String]]?
 
@@ -162,6 +165,22 @@ struct RigEquipmentTemplate: Decodable, Identifiable, Hashable {
 
 struct RigEquipmentTemplateList: Decodable {
     var items: [RigEquipmentTemplate]
+}
+
+/// A built-in make/model whose remote's IR codes groove-rig ships, so the
+/// equipment works without its remote (GET /rig/equipment/models).
+/// `actions` are the buttons it has codes for.
+struct RigEquipmentModel: Decodable, Identifiable, Hashable {
+    var id: String
+    var maker: String
+    var model: String
+    var label: String
+    var templateId: String
+    var actions: [String]
+}
+
+struct RigEquipmentModelList: Decodable {
+    var items: [RigEquipmentModel]
 }
 
 struct RigEquipmentActionRequest: Encodable {
@@ -215,6 +234,9 @@ struct RigEquipmentSaveRequest: Encodable {
     var hasRemote: Bool?
     /// Seeds role/format and the suggested buttons (GET /rig/equipment/templates).
     var templateId: String?
+    /// A built-in model: the server pre-registers the buttons it ships
+    /// codes for (when `actions` is empty).
+    var modelId: String? = nil
 }
 
 /// Edits an existing piece of equipment. Distinct from `RigEquipmentSaveRequest`
@@ -229,6 +251,10 @@ struct RigEquipmentPatchRequest: Encodable {
     var physicalFormat: String?
     var inputIds: [String]?
     var hasRemote: Bool?
+    /// Attach a built-in model (adds the buttons it ships codes for), or
+    /// `""` to detach it (buttons stay, they just need teaching). nil
+    /// leaves it unchanged.
+    var modelId: String? = nil
 }
 
 // MARK: - Amplifier configuration (editable) and profiles
