@@ -536,6 +536,12 @@ struct CatalogService {
     }
 
     /// Removes a button and its learned code.
+    /// Adds a button without learning it (its code ships with the model).
+    @discardableResult
+    func rigAddEquipmentAction(target: String, action: String) async throws -> RigEquipmentItem {
+        try await api.post("/rig/equipment/\(target)/actions", body: RigEquipmentAddActionRequest(id: action))
+    }
+
     func rigRemoveEquipmentAction(target: String, action: String) async throws {
         try await api.delete("/rig/equipment/\(target)/actions/\(action)")
     }

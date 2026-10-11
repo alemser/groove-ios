@@ -158,7 +158,7 @@ struct EquipmentEditForm: View {
                     } footer: {
                         Text(modelId.isEmpty
                              ? "Pick its model if listed: Oceano already knows that remote's buttons, so they work without teaching them."
-                             : "Buttons this model's remote has are added and work without teaching. Choosing “Other” keeps them, but they'll need teaching.")
+                             : "Its main buttons are added and work without teaching; the rest are in Add Button. Choosing “Other” keeps them, but they'll need teaching.")
                             .foregroundStyle(Brand.muted)
                     }
                 }

@@ -3,7 +3,9 @@ import SwiftUI
 /// "Which button?" — the first half of adding a button; the second half is
 /// pressing it on the remote (`LearnSessionSheet`). Suggests the buttons
 /// this kind of equipment usually has (its template), searches the full
-/// button vocabulary, and accepts any name as a custom button.
+/// button vocabulary, and accepts any name as a custom button. Buttons the
+/// equipment's built-in model ships codes for skip the second half: picking
+/// one just adds it.
 struct AddButtonSheet: View {
     let item: RigEquipmentItem
     let model: EquipmentRemoteModel
@@ -46,6 +48,9 @@ struct AddButtonSheet: View {
         return taken ? nil : q
     }
 
+    /// Built into the model, not on the equipment yet.
+    private var shipped: [String] { model.missingShippedButtons(for: item) }
+
     private var suggested: [String] {
         model.missingTemplateButtons(for: item).filter { !$0.hasPrefix("digit_") }
     }
@@ -58,6 +63,7 @@ struct AddButtonSheet: View {
         NavigationStack {
             List {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    builtInSection
                     suggestionsSection
                     allButtonsSection
                 } else {
@@ -85,6 +91,37 @@ struct AddButtonSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var builtInSection: some View {
+        let all = shipped
+        if !all.isEmpty, let m = model.builtInModel(for: item) {
+            let digits = all.filter { $0.hasPrefix("digit_") }
+            Section {
+                Button {
+                    add(all)
+                } label: {
+                    Label("Add All \(all.count)", systemImage: "plus.circle.fill")
+                        .font(.body.weight(.semibold))
+                }
+                ForEach(all.filter { !$0.hasPrefix("digit_") }, id: \.self) { a in
+                    pickRow(a, model.vocabularyLabel(a), icon: model.icon(for: a))
+                }
+                if !digits.isEmpty {
+                    Button {
+                        add(digits)
+                    } label: {
+                        Label("Number Keys 0–9", systemImage: "number")
+                    }
+                }
+            } header: {
+                Text("Built into the \(m.label)")
+            } footer: {
+                Text("These already work — tap to put one on the remote, no teaching needed.")
+                    .foregroundStyle(Brand.muted)
             }
         }
     }
@@ -121,7 +158,7 @@ struct AddButtonSheet: View {
 
     private var allButtonsSection: some View {
         Section("All buttons") {
-            ForEach(available.filter { !suggested.contains($0.id) && $0.group != "numeric" }) { def in
+            ForEach(available.filter { !suggested.contains($0.id) && !shipped.contains($0.id) && $0.group != "numeric" }) { def in
                 pickRow(def.id, def.label, icon: def.icon)
             }
         }
@@ -140,7 +177,19 @@ struct AddButtonSheet: View {
     }
 
     private func pick(_ steps: [LearnStep]) {
+        // One button the model already has a code for (a tap in the
+        // built-in section, or a search hit): add it, nothing to learn.
+        if steps.count == 1, let a = steps[0].action, shipped.contains(a) {
+            add([a])
+            return
+        }
         onPick(steps)
+        dismiss()
+    }
+
+    private func add(_ actions: [String]) {
+        let targetId = item.id
+        Task { await model.addShippedButtons(targetId: targetId, actions: actions) }
         dismiss()
     }
 }

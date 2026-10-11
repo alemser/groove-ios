@@ -49,10 +49,40 @@ final class EquipmentRemoteModel {
 
     /// The template's buttons `item` doesn't have yet, in the template's
     /// order — standard and optional ones alike. What Add Button suggests
-    /// ("Common on … remotes") and its "Walk Me Through All".
+    /// ("Common on … remotes") and its "Walk Me Through All". Buttons its
+    /// built-in model ships codes for are left out: they need no teaching
+    /// (`missingShippedButtons`).
     func missingTemplateButtons(for item: RigEquipmentItem) -> [String] {
         guard let t = template(for: item) else { return [] }
-        return missing(t.actions + t.optionalActions, for: item)
+        let shipped = Set(missingShippedButtons(for: item))
+        return missing(t.actions + t.optionalActions, for: item).filter { !shipped.contains($0) }
+    }
+
+    /// The built-in model `item` was registered as, if any.
+    func builtInModel(for item: RigEquipmentItem) -> RigEquipmentModel? {
+        builtInModels.first { $0.id == item.modelId }
+    }
+
+    /// Buttons `item`'s built-in model ships codes for that aren't on it
+    /// yet — only the standard ones are registered on create, so a full
+    /// remote's number keys, Program, Dimmer… wait here, one tap from working.
+    func missingShippedButtons(for item: RigEquipmentItem) -> [String] {
+        guard let m = builtInModel(for: item) else { return [] }
+        return missing(m.actions, for: item)
+    }
+
+    /// Adds buttons whose codes ship with the model — no learning.
+    func addShippedButtons(targetId: String, actions: [String]) async {
+        guard let settings else { return }
+        do {
+            let service = CatalogService(settings: settings)
+            for a in actions { try await service.rigAddEquipmentAction(target: targetId, action: a) }
+            await load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            actionError = error.localizedForDisplay
+            await load()
+        }
     }
 
     /// Only the template's *standard* buttons that are still missing — the

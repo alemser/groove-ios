@@ -100,9 +100,14 @@ struct EquipmentButtonsSection: View {
 
     private func rowView(_ row: Row) -> some View {
         let isLearned = learned(row)
-        // Shipped with the amplifier profile: works without teaching, can't
-        // be removed; a local code (re-learn) overrides it.
+        // Shipped with the amplifier profile or the equipment's built-in
+        // model: works without teaching; a local code (re-learn) overrides it.
         let hasBuiltin = row.keys.contains { model.hasBuiltinCode(targetId: item.id, action: $0) }
+        // The amplifier's shipped buttons always come back with its
+        // profile, so they can't be removed (hide them on the Remote
+        // instead); a built-in equipment model's can — re-adding one from
+        // Add Button needs no teaching.
+        let canRemove = !hasBuiltin || item.id != "amplifier"
         let onlyBuiltin = hasBuiltin && row.keys.allSatisfy { k in
             !model.isLearned(targetId: item.id, action: k) || model.isBuiltin(targetId: item.id, action: k)
         }
@@ -132,7 +137,7 @@ struct EquipmentButtonsSection: View {
         .buttonStyle(.plain)
         .disabled(model.isPerformingAction)
         .swipeActions(edge: .trailing) {
-            if !hasBuiltin {
+            if canRemove {
                 Button("Remove", role: .destructive) {
                     Task { await model.removeButton(targetId: item.id, actions: row.keys) }
                 }
@@ -159,7 +164,7 @@ struct EquipmentButtonsSection: View {
                     Label(hasBuiltin ? "Use Built-in Code" : "Forget Code", systemImage: "xmark.circle")
                 }
             }
-            if !hasBuiltin {
+            if canRemove {
                 Button(role: .destructive) {
                     Task { await model.removeButton(targetId: item.id, actions: row.keys) }
                 } label: {

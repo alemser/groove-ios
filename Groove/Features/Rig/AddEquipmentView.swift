@@ -54,7 +54,7 @@ struct AddEquipmentView: View {
                     Text("Equipment")
                 } footer: {
                     if let m = selectedModel {
-                        Text("Oceano already knows the \(m.label)'s remote: \(buttonList(m)) work right away, no remote needed. You can teach any other buttons afterwards.")
+                        Text("Oceano already knows the \(m.label)'s remote: \(buttonList(m)) work right away, no remote needed.\(extraNote(m))")
                             .foregroundStyle(Brand.muted)
                     } else if let t = selected {
                         Text(t.hasRemote
@@ -113,12 +113,18 @@ struct AddEquipmentView: View {
         return selected.map { "Name (e.g. My \($0.label))" } ?? "Name"
     }
 
-    /// "Play, Stop and Record" from the model's shipped buttons.
+    /// "Play, Stop and Record" from the buttons registered on create.
     private func buttonList(_ m: RigEquipmentModel) -> String {
-        let names = m.actions.map { action in
+        let names = (m.defaultActions ?? m.actions).map { action in
             model.vocabulary.first { $0.id == action }?.label ?? action.replacingOccurrences(of: "_", with: " ").capitalized
         }
         guard let last = names.last else { return "its buttons" }
         return names.count == 1 ? last : names.dropLast().joined(separator: ", ") + " and " + last
+    }
+
+    /// The model's other shipped buttons wait in Add Button.
+    private func extraNote(_ m: RigEquipmentModel) -> String {
+        let extra = m.actions.count - (m.defaultActions ?? m.actions).count
+        return extra > 0 ? " Its \(extra) other buttons are in Add Button, ready to use without teaching." : " You can teach any other buttons afterwards."
     }
 }

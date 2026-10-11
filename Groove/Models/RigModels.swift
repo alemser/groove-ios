@@ -169,7 +169,9 @@ struct RigEquipmentTemplateList: Decodable {
 
 /// A built-in make/model whose remote's IR codes groove-rig ships, so the
 /// equipment works without its remote (GET /rig/equipment/models).
-/// `actions` are the buttons it has codes for.
+/// `actions` are the buttons it has codes for; `defaultActions` the
+/// standard ones registered when equipment is created from it — the rest
+/// are offered in Add Button, ready to use without teaching.
 struct RigEquipmentModel: Decodable, Identifiable, Hashable {
     var id: String
     var maker: String
@@ -177,6 +179,7 @@ struct RigEquipmentModel: Decodable, Identifiable, Hashable {
     var label: String
     var templateId: String
     var actions: [String]
+    var defaultActions: [String]?
 }
 
 struct RigEquipmentModelList: Decodable {
@@ -185,6 +188,12 @@ struct RigEquipmentModelList: Decodable {
 
 struct RigEquipmentActionRequest: Encodable {
     var label: String
+}
+
+/// Registers a vocabulary button by id (POST /rig/equipment/{id}/actions),
+/// without learning it — for buttons a built-in model ships codes for.
+struct RigEquipmentAddActionRequest: Encodable {
+    var id: String
 }
 
 // MARK: - Remote layout (GET/PUT/DELETE /rig/remote/layout)
