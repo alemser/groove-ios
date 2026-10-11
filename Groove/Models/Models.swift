@@ -285,6 +285,86 @@ struct UserReleaseArtworkResponse: Decodable {
     var tracksUpdated: Int
 }
 
+// MARK: - Library suggestions
+
+/// An album the catalog recognized but the library holds no edition of yet
+/// (groove-catalog#24). Nothing is added to the library until the user picks
+/// an edition: the primary (the edition the play was confirmed on, else the
+/// best fit) or one of the ranked alternatives.
+struct LibrarySuggestion: Decodable, Identifiable, Hashable {
+    var id: Int64
+    var artist: String
+    var album: String
+    var status: String
+    var mediumHint: String?
+    var recognizedTracks: [LibrarySuggestionTrack]?
+    var primary: LibrarySuggestionEdition?
+    var alternatives: [LibrarySuggestionEdition]?
+    /// Ranked editions left out by the alternatives cap.
+    var moreAlternatives: Int?
+
+    static func == (lhs: LibrarySuggestion, rhs: LibrarySuggestion) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct LibrarySuggestionTrack: Decodable, Hashable {
+    var trackId: Int64
+    var title: String
+    var isrc: String?
+}
+
+struct LibrarySuggestionEdition: Decodable, Identifiable, Hashable {
+    var source: String
+    var releaseId: String
+    var artist: String?
+    var album: String?
+    var releaseType: String?
+    var releaseFormat: String?
+    var releaseDate: String?
+    var country: String?
+    var label: String?
+    var artworkUrl: String?
+    var trackTotal: Int?
+    /// The edition the play was confirmed on.
+    var confirmed: Bool?
+    /// Recognized tracks found on this edition's tracklist.
+    var matchedTracks: Int?
+    var score: Double?
+    var reasons: [String]?
+
+    var id: String { "\(source)|\(releaseId)" }
+    var year: String? {
+        guard let date = releaseDate?.nonEmpty else { return nil }
+        return String(date.prefix(4))
+    }
+}
+
+struct LibrarySuggestionsResponse: Decodable {
+    var suggestions: [LibrarySuggestion]
+    var pending: Int
+}
+
+struct LibrarySuggestionAcceptResponse: Decodable {
+    var suggestion: LibrarySuggestion
+    var release: PendingRelease
+}
+
+/// The body groove-catalog answers a refused confirm with (422). `forceable`
+/// is false when a track has no duration — no override exists for that; the
+/// edition has to be edited first.
+struct ConfirmPreflightError: Decodable {
+    var error: String?
+    var forceable: Bool?
+    var preflightIssues: [ConfirmPreflightIssue]?
+}
+
+struct ConfirmPreflightIssue: Decodable, Hashable {
+    var severity: String?
+    var code: String?
+    var ordinal: Int?
+    var message: String?
+}
+
 // MARK: - Pending associations (review queue)
 
 struct PendingAssociation: Decodable, Identifiable, Hashable {
