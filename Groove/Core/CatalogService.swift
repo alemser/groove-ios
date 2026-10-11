@@ -254,6 +254,52 @@ struct CatalogService {
         )
     }
 
+    // MARK: Library suggestions
+    //
+    // Albums recognized but not in the library (groove-catalog#24). The
+    // server never adds one on its own; these are the user's answers.
+
+    func librarySuggestions(alternatives: Int = 5) async throws -> LibrarySuggestionsResponse {
+        try await api.get("/catalog/library/suggestions", query: [
+            .init(name: "alternatives", value: String(alternatives)),
+        ])
+    }
+
+    func librarySuggestion(id: Int64, alternatives: Int) async throws -> LibrarySuggestion {
+        try await api.get("/catalog/library/suggestions/\(id)", query: [
+            .init(name: "alternatives", value: String(alternatives)),
+        ])
+    }
+
+    /// Adds the chosen edition to the library as the user's own copy, linked
+    /// to the recognized tracks. A 422 means its tracklist failed the confirm
+    /// check (see `ConfirmPreflightError`); `force` overrides it unless a
+    /// duration is missing.
+    @discardableResult
+    func acceptLibrarySuggestion(id: Int64, edition: LibrarySuggestionEdition, force: Bool = false) async throws -> LibrarySuggestionAcceptResponse {
+        try await api.post(
+            "/catalog/library/suggestions/\(id)/accept", query: forceQuery(force),
+            body: LibraryForkRequest(source: edition.source, releaseId: edition.releaseId),
+            as: LibrarySuggestionAcceptResponse.self
+        )
+    }
+
+    /// Copies the chosen edition into an editable draft without adding it.
+    /// The suggestion stays open until that edition is saved.
+    func forkLibrarySuggestion(id: Int64, edition: LibrarySuggestionEdition) async throws -> LibraryForkResponse {
+        try await api.post(
+            "/catalog/library/suggestions/\(id)/fork",
+            body: LibraryForkRequest(source: edition.source, releaseId: edition.releaseId),
+            as: LibraryForkResponse.self
+        )
+    }
+
+    /// "Not now": the library is untouched and the album isn't suggested
+    /// again for the rest of the sitting.
+    func dismissLibrarySuggestion(id: Int64) async throws {
+        _ = try await api.post("/catalog/library/suggestions/\(id)/dismiss", body: Empty(), as: EmptyResponse.self)
+    }
+
     // MARK: Pending associations
 
     func pendingAssociations() async throws -> PendingAssociationsResponse {

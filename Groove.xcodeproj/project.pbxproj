@@ -27,6 +27,7 @@
 		3E248FD660D01CE13FD67284 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27ED92912FF018764F1314A9 /* RootView.swift */; };
 		4AA7165515150B2A1126E18B /* LevelMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2C8786E67341140FA8EFAF /* LevelMeterView.swift */; };
 		4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9253360D61A0BC5E0BE49D /* LibraryView.swift */; };
+		DBFFCA702A15123375274133 /* LibrarySuggestionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135C4287218C7613D5344B4D /* LibrarySuggestionsSheet.swift */; };
 		4BDD17BF4D62826ED588D229 /* BLEProvisioningModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D087FFBFCB4708D377BC3C /* BLEProvisioningModel.swift */; };
 		510D1882797CEC49A61789A1 /* EquipmentRemoteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A8A778A9F5863318C47A4A /* EquipmentRemoteModel.swift */; };
 		54797A0D0D18B3306CF02600 /* EditReleaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A373873E7A0F33DEB4004BBC /* EditReleaseView.swift */; };
@@ -162,6 +163,7 @@
 		D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteQuickAccessSheet.swift; sourceTree = "<group>"; };
 		D5EB40C22B18DFB61CAA5600 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB9253360D61A0BC5E0BE49D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		135C4287218C7613D5344B4D /* LibrarySuggestionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySuggestionsSheet.swift; sourceTree = "<group>"; };
 		E1413AC3F7F93EB3B0926AD2 /* AssociationReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssociationReviewSheet.swift; sourceTree = "<group>"; };
 		E359E243C5567C525755CBD8 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
 		E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrangeRemoteView.swift; sourceTree = "<group>"; };
@@ -353,6 +355,7 @@
 				9B7842CB9B4E1728D1B27D1A /* EditReleaseModel.swift */,
 				A373873E7A0F33DEB4004BBC /* EditReleaseView.swift */,
 				DB9253360D61A0BC5E0BE49D /* LibraryView.swift */,
+				135C4287218C7613D5344B4D /* LibrarySuggestionsSheet.swift */,
 				4E4B6394B0A202EEC5CC67D1 /* ManualIdentifySheet.swift */,
 				C9D14EECF13D2E7740D76994 /* ReleaseDetailView.swift */,
 				535882879A217CB2085F866E /* ReleasesView.swift */,
@@ -527,6 +530,7 @@
 				CAC5831843B67710D826D6F8 /* LearnSessionSheet.swift in Sources */,
 				4AA7165515150B2A1126E18B /* LevelMeterView.swift in Sources */,
 				4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */,
+				DBFFCA702A15123375274133 /* LibrarySuggestionsSheet.swift in Sources */,
 				097AE1BADFB101B2A7FAACEC /* ManualIdentifySheet.swift in Sources */,
 				E947901EE0ADF3D0BDEC0487 /* MediaFormatIcon.swift in Sources */,
 				AC56F500A15DAB4B209720C2 /* Models.swift in Sources */,

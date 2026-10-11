@@ -161,6 +161,42 @@ def capture_level():
             "db_per_step":1.5,"control":"Mic"},
         "programme":prog}
 
+# "Add to library" suggestions (groove-catalog#24): recognized albums with no
+# edition in the library yet. Accept/fork/dismiss resolve them in memory.
+def sg_edition(src,rid,fmt,country,year,label,total,matched,cover,confirmed=False,reasons=()):
+    return {"source":src,"release_id":rid,"artist":"Talking Heads","album":"Remain in Light",
+        "release_format":fmt,"release_date":year,"country":country,"label":label,
+        "artwork_url":"/catalog/artwork/tracks/%d"%(100+cover),"track_total":total,
+        "confirmed":confirmed,"matched_tracks":matched,"score":50.0-len(rid),
+        "reasons":list(reasons)}
+SUGGESTIONS={1:{"id":1,"artist":"Talking Heads","album":"Remain in Light","status":"pending",
+    "medium_hint":"vinyl","created_at":"2026-10-11T19:00:00Z","updated_at":"2026-10-11T19:20:00Z",
+    "recognized_tracks":[{"track_id":104,"title":"Born Under Punches"},{"track_id":112,"title":"Crosseyed and Painless"},
+        {"track_id":120,"title":"The Great Curve"}],
+    "editions":[
+        sg_edition("musicbrainz","mb-ril-cd","cd","US","1984","Sire",8,3,4,True,
+            ("edition the play was confirmed on","3/3 recognized tracks on tracklist","played in tracklist order")),
+        sg_edition("discogs","dg-ril-lp","vinyl","UK","1980","Sire",8,3,12,False,
+            ("3/3 recognized tracks on tracklist","played in tracklist order","matches vinyl playback")),
+        sg_edition("discogs","dg-ril-lp-us","vinyl","US","1980","Sire",8,3,20,False,("3/3 recognized tracks on tracklist",)),
+        sg_edition("itunes","it-ril","digital","US","2006","Rhino",12,3,4,False,("3/3 recognized tracks on tracklist",)),
+        sg_edition("musicbrainz","mb-ril-remaster","cd","EU","2006","Rhino",12,3,12,False,("3/3 recognized tracks on tracklist",)),
+        sg_edition("discogs","dg-ril-cass","cassette","US","1980","Sire",8,2,20,False,("2/3 recognized tracks on tracklist",)),
+        sg_edition("musicbrainz","mb-ril-jp","cd","JP","1989","Sire",8,3,4,False,("3/3 recognized tracks on tracklist",)),
+    ]}}
+
+def suggestion_view(sg,alts=5):
+    out={k:v for k,v in sg.items() if k!="editions"}
+    eds=sg["editions"]
+    out["primary"]=eds[0] if eds else None
+    rest=eds[1:]
+    out["alternatives"]=rest[:alts]
+    out["more_alternatives"]=max(0,len(rest)-alts)
+    return out
+
+def pending_suggestions(alts=5):
+    return [suggestion_view(sg,alts) for sg in SUGGESTIONS.values() if sg["status"]=="pending"]
+
 class H(http.server.BaseHTTPRequestHandler):
     def log_message(self,*a): pass
     def _json(self,obj,code=200):
@@ -191,6 +227,15 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._json({"track":track(max(0,i)),"fingerprints":[{"id":1,"track_id":100+i,"fingerprint_version":"v2","fingerprint_hash":"abc","offset_ms":0}],"plays":[play(i),play(i+1)]})
         m=re.match(r"/catalog/tracks/(\d+)$",path)
         if m: return self._json(track(int(m.group(1))-100))
+        if path=="/catalog/library/suggestions":
+            alts=int(parse_qs(p.query).get("alternatives",["5"])[0])
+            items=pending_suggestions(alts)
+            return self._json({"suggestions":items,"pending":len(items)})
+        m=re.match(r"/catalog/library/suggestions/(\d+)$",path)
+        if m:
+            sg=SUGGESTIONS.get(int(m.group(1)))
+            if not sg: return self._json({"error":"not found"},404)
+            return self._json(suggestion_view(sg,int(parse_qs(p.query).get("alternatives",["5"])[0])))
         if path=="/catalog/releases":
             return self._json({"releases":[release(i) for i in range(12)]})
         if path=="/catalog/enrich/jobs":
@@ -235,6 +280,25 @@ class H(http.server.BaseHTTPRequestHandler):
         self._json({"error":"not found"},404)
     def do_POST(self):
         if self.path=="/catalog/stylus/replace": return self._json(stylus_state())
+        m=re.match(r"/catalog/library/suggestions/(\d+)/(accept|fork|dismiss)",self.path)
+        if m:
+            sg=SUGGESTIONS.get(int(m.group(1)))
+            if not sg: return self._json({"error":"not found"},404)
+            if sg["status"]!="pending": return self._json({"error":"library suggestion is not pending"},409)
+            body=self._body(); action=m.group(2)
+            ed=next((e for e in sg["editions"] if e["source"]==body.get("source") and e["release_id"]==body.get("release_id")),sg["editions"][0])
+            draft={"id":990,"job_id":7990,"status":"pending","source":"user","release_id":"user-%s"%ed["release_id"],
+                "artist":ed["artist"],"album":ed["album"],"title":ed["album"],"release_format":ed["release_format"],
+                "release_date":ed["release_date"],"country":ed["country"],"label":ed["label"],"artwork_url":ed["artwork_url"],
+                "tracklist":[{"position":str(t+1),"ordinal":t+1,"title":"Track %d"%(t+1),"duration_ms":200000+t*9000} for t in range(ed["track_total"])]}
+            if action=="fork":
+                return self._json({"draft":draft,"job":{"id":7990,"listener_epoch":1000000000001,"artist":ed["artist"],
+                    "album":ed["album"],"title":ed["album"],"status":"complete"},"track_id":0})
+            sg["status"]="accepted" if action=="accept" else "dismissed"
+            if action=="accept":
+                draft["status"]="confirmed"
+                return self._json({"suggestion":suggestion_view(sg),"release":draft})
+            return self._json(suggestion_view(sg))
         if self.path.startswith("/rig/targets/") and "/actions/" in self.path:
             return self._json(rig_status())
         if self.path=="/rig/observe/power/ensure_on":

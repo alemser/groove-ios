@@ -7,6 +7,9 @@ final class ReleasesModel {
     var releases: [LibraryRelease] = []
     var pending: [PendingReleaseTrack] = []
     var associationsCount = 0
+    /// Recognized albums with no edition in the library yet, waiting for the
+    /// user to pick one (groove-catalog#24).
+    var suggestionsCount = 0
     var actionError: String?
     var phase: Phase = .loading
     enum Phase: Equatable { case loading, loaded, error(String) }
@@ -54,8 +57,10 @@ final class ReleasesModel {
         // already loaded fine. Degrade to the previous value instead.
         async let pendingList = service.pendingReleaseTracks()
         async let associations = service.pendingAssociations()
+        async let suggestions = service.librarySuggestions(alternatives: 1)
         pending = (try? await pendingList) ?? pending
         associationsCount = (try? await associations)?.items.count ?? associationsCount
+        suggestionsCount = (try? await suggestions)?.pending ?? suggestionsCount
         phase = .loaded
     }
 
@@ -95,6 +100,7 @@ struct ReleasesView: View {
     @State private var model = ReleasesModel()
     @State private var search = ""
     @State private var showAssociations = false
+    @State private var showSuggestions = false
     @State private var showAddRelease = false
     @State private var showAllReleases = false
     @State private var dropTargetReleaseId: String?
@@ -136,6 +142,9 @@ struct ReleasesView: View {
             }
             .sheet(isPresented: $showAssociations, onDismiss: { Task { await model.load(query: search) } }) {
                 AssociationReviewSheet()
+            }
+            .sheet(isPresented: $showSuggestions, onDismiss: { Task { await model.load(query: search) } }) {
+                LibrarySuggestionsSheet()
             }
             .sheet(isPresented: $showAddRelease, onDismiss: { Task { await model.load(query: search) } }) {
                 AddReleaseView {}
@@ -205,7 +214,7 @@ struct ReleasesView: View {
         case let .error(message):
             ErrorStateView(message: message) { Task { await model.load(query: search) } }
         case .loaded:
-            if model.releases.isEmpty && filteredPending.isEmpty {
+            if model.releases.isEmpty && filteredPending.isEmpty && model.suggestionsCount == 0 {
                 EmptyStateView(icon: "square.stack", title: search.isEmpty ? "No releases" : "No matches",
                                message: search.isEmpty ? "Recognized tracks land here once their release is confirmed." : nil)
             } else {
@@ -223,6 +232,10 @@ struct ReleasesView: View {
 
                 if model.associationsCount > 0 {
                     associationsBanner
+                }
+
+                if model.suggestionsCount > 0 {
+                    suggestionsBanner
                 }
 
                 if !filteredPending.isEmpty {
@@ -420,6 +433,41 @@ struct ReleasesView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Review plays needing association")
+    }
+
+    /// Same shape as `associationsBanner`, in the accent color rather than
+    /// the warning one: nothing is wrong, an album just isn't in the library.
+    private var suggestionsBanner: some View {
+        let count = model.suggestionsCount
+        return Button {
+            showSuggestions = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus.square.on.square")
+                    .font(.title3)
+                    .foregroundStyle(Brand.teal)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(count) album\(count == 1 ? "" : "s") to add to your library")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.text)
+                    Text("Recognized while playing — pick the edition you own.")
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Brand.muted)
+            }
+            .padding(12)
+            .background(Brand.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Brand.teal.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Review albums to add to your library")
     }
 }
 
