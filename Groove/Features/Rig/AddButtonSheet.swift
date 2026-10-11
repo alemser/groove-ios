@@ -114,7 +114,7 @@ struct AddButtonSheet: View {
                     Button {
                         add(digits)
                     } label: {
-                        Label("Number Keys 0–9", systemImage: "number")
+                        Label(digitsLabel(digits), systemImage: "number")
                     }
                 }
             } header: {
@@ -144,7 +144,7 @@ struct AddButtonSheet: View {
                     Button {
                         pick(missingDigits.map { LearnStep(action: $0, label: model.vocabularyLabel($0)) })
                     } label: {
-                        Label("Number Keys 0–9", systemImage: "number")
+                        Label(digitsLabel(missingDigits), systemImage: "number")
                     }
                 }
             } header: {
@@ -185,6 +185,14 @@ struct AddButtonSheet: View {
         }
         onPick(steps)
         dismiss()
+    }
+
+    /// "Number Keys 0–9" when all ten are missing, else the ones that are
+    /// ("Number Keys 3, 7") — the row only adds/teaches those.
+    private func digitsLabel(_ digits: [String]) -> String {
+        if digits.count == 10 { return "Number Keys 0–9" }
+        let nums = digits.map { String($0.dropFirst("digit_".count)) }.joined(separator: ", ")
+        return (digits.count == 1 ? "Number Key " : "Number Keys ") + nums
     }
 
     private func add(_ actions: [String]) {
