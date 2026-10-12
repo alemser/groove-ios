@@ -60,6 +60,9 @@ struct AmplifierConfigView: View {
         .onChange(of: model.config) { _, new in seed(from: new) }
         .onChange(of: model.useAmplifierInputForFormat) { _, new in useInputForFormat = new }
         .toolbar {
+            if model.phase == .loaded {
+                ToolbarItem(placement: .topBarTrailing) { profileMenu }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button(model.isSaving ? "Saving…" : "Save") { Task { await save() } }
                     .disabled(model.isSaving)
@@ -179,38 +182,74 @@ struct AmplifierConfigView: View {
     /// Edits are saved into the active profile (a built-in's override, or
     /// the custom profile) by groove-rig itself, so there's no "save as new
     /// profile" step — Duplicate is the only thing that makes a copy.
+    private var isSelectedProfileActive: Bool {
+        selectedProfileId == (model.activeProfileId ?? "")
+    }
+
     private var profileSection: some View {
-        let isActive = selectedProfileId == (model.activeProfileId ?? "")
-        return Section {
-            Picker("Profile", selection: $selectedProfileId) {
+        Section {
+            Picker(selection: $selectedProfileId) {
                 ForEach(model.profiles) { profile in
-                    Text(profile.customised == true ? "\(profile.name) · customised" : profile.name).tag(profile.id)
+                    Text(profile.name).tag(profile.id)
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Profile")
+                    if selectedProfile?.customised == true {
+                        Text("Customised").font(.caption).foregroundStyle(Brand.muted)
+                    }
                 }
             }
-            if !isActive {
-                Button("Activate") { Task { await model.activate(profileId: selectedProfileId) } }
+            .pickerStyle(.navigationLink)
+            if !isSelectedProfileActive {
+                Button("Activate Profile") { Task { await model.activate(profileId: selectedProfileId) } }
             }
-            if let profile = selectedProfile, profile.origin == "builtin", profile.customised == true {
-                Button("Reset to Factory Settings") { confirmReset = true }
+        } footer: {
+            if !isSelectedProfileActive {
+                Text("Switches the rig to this amplifier's settings, remote codes and wiring.")
+                    .foregroundStyle(Brand.muted)
             }
-            Button("Duplicate Selected Profile…") {
+        }
+    }
+
+    /// Profile housekeeping lives in one toolbar menu rather than a stack of
+    /// buttons in the form, the way Files or Notes keep secondary actions.
+    private var profileMenu: some View {
+        Menu {
+            Button {
                 duplicateName = "\(selectedProfile?.name ?? "Amplifier") (copy)"
                 showDuplicateSheet = true
+            } label: {
+                Label("Duplicate Profile…", systemImage: "plus.square.on.square")
             }
-            Button("Export Selected Profile") { Task { await export() } }
-            Button("Import Profile…") { showImporter = true }
-            if let profile = selectedProfile, profile.origin != "builtin", !isActive {
-                Button("Delete Selected Profile", role: .destructive) {
-                    Task { await model.deleteProfile(id: profile.id) }
+            Button {
+                Task { await export() }
+            } label: {
+                Label("Export Profile", systemImage: "square.and.arrow.up")
+            }
+            Button {
+                showImporter = true
+            } label: {
+                Label("Import Profile…", systemImage: "square.and.arrow.down")
+            }
+            if let profile = selectedProfile, profile.origin == "builtin", profile.customised == true {
+                Divider()
+                Button(role: .destructive) {
+                    confirmReset = true
+                } label: {
+                    Label("Reset to Factory Settings", systemImage: "arrow.counterclockwise")
                 }
             }
-        } header: {
-            Text("Profile")
-        } footer: {
-            Text(isActive
-                 ? "Changes you save below are kept with this amplifier — switching to another one and back brings them back."
-                 : "Activating switches the rig to this amplifier, with its own settings, remote codes and equipment wiring.")
-                .foregroundStyle(Brand.muted)
+            if let profile = selectedProfile, profile.origin != "builtin", !isSelectedProfileActive {
+                Divider()
+                Button(role: .destructive) {
+                    Task { await model.deleteProfile(id: profile.id) }
+                } label: {
+                    Label("Delete Profile", systemImage: "trash")
+                }
+            }
+        } label: {
+            Label("Profile Actions", systemImage: "ellipsis.circle")
         }
     }
 
