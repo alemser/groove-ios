@@ -25,6 +25,19 @@ struct CatalogService {
         try await api.get("/status")
     }
 
+    // MARK: Device power
+    //
+    // Both answer 202 about a second before the device starts going down, so
+    // a success means "scheduled", not "done".
+
+    func rebootDevice() async throws {
+        try await api.postNoContent("/system/reboot")
+    }
+
+    func powerOffDevice() async throws {
+        try await api.postNoContent("/system/poweroff")
+    }
+
     // MARK: Tracks
 
     func track(id: Int64) async throws -> Track {
