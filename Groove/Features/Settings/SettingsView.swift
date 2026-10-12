@@ -8,6 +8,10 @@ struct SettingsView: View {
 
     @State private var showSwitchServer = false
     @State private var showBLEProvisioning = false
+    @State private var pendingPower: PowerAction?
+    @State private var isSendingPower = false
+    @State private var powerStatus: String?
+    @State private var powerError: String?
 
     var body: some View {
         NavigationStack {
@@ -72,6 +76,31 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Button {
+                        pendingPower = .restart
+                    } label: {
+                        Label("Restart Oceano", systemImage: "arrow.clockwise")
+                    }
+                    Button(role: .destructive) {
+                        pendingPower = .shutDown
+                    } label: {
+                        Label("Shut Down Oceano", systemImage: "power")
+                    }
+                } header: {
+                    Text("Device")
+                } footer: {
+                    if let powerError {
+                        Text(powerError).foregroundStyle(Brand.err)
+                    } else if let powerStatus {
+                        Text(powerStatus).foregroundStyle(Brand.muted)
+                    } else {
+                        Text("After a shut down, Oceano stays off until its power is unplugged and plugged back in.")
+                            .foregroundStyle(Brand.muted)
+                    }
+                }
+                .disabled(settings.baseURL == nil || isSendingPower)
+
+                Section {
                     Button(role: .destructive) {
                         settings.host = ""
                     } label: {
@@ -84,6 +113,22 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
             .navigationTitle("Settings")
+            .confirmationDialog(
+                pendingPower?.title ?? "",
+                isPresented: Binding(
+                    get: { pendingPower != nil },
+                    set: { if !$0 { pendingPower = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingPower
+            ) { action in
+                Button(action.verb, role: .destructive) {
+                    Task { await sendPower(action) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { action in
+                Text(action.message)
+            }
         }
         .sheet(isPresented: $showSwitchServer) {
             NavigationStack {
@@ -101,6 +146,23 @@ struct SettingsView: View {
             // means "reconfigure" is the exact same flow as first-run, just
             // reached from a different entry point.
             BLEProvisioningView()
+        }
+    }
+
+    private func sendPower(_ action: PowerAction) async {
+        isSendingPower = true
+        defer { isSendingPower = false }
+        powerError = nil
+        powerStatus = nil
+        let service = CatalogService(settings: settings)
+        do {
+            switch action {
+            case .restart: try await service.rebootDevice()
+            case .shutDown: try await service.powerOffDevice()
+            }
+            powerStatus = action.sentStatus
+        } catch {
+            powerError = error.localizedForDisplay
         }
     }
 
@@ -151,5 +213,40 @@ struct SettingsView: View {
                 .foregroundStyle(Brand.muted)
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// The two device power actions Settings offers, with the copy each one needs.
+private enum PowerAction: Identifiable {
+    case restart, shutDown
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .restart: "Restart Oceano?"
+        case .shutDown: "Shut down Oceano?"
+        }
+    }
+
+    var verb: String {
+        switch self {
+        case .restart: "Restart"
+        case .shutDown: "Shut Down"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .restart: "Recognition and the display stop for about a minute while Oceano starts again."
+        case .shutDown: "Oceano stays off until its power is unplugged and plugged back in."
+        }
+    }
+
+    var sentStatus: String {
+        switch self {
+        case .restart: "Restarting. Oceano will be back in about a minute."
+        case .shutDown: "Shutting down. Wait for the display to go dark before unplugging."
+        }
     }
 }
