@@ -23,9 +23,9 @@ struct Badge: View {
 }
 
 /// Same pill as `Badge`, but for a release/media format it shows the
-/// vinyl/CD vector mark instead of (or alongside, when `labeled`) the word —
-/// falls back to the plain text badge for formats with no dedicated icon
-/// (cassette, digital, …).
+/// vinyl/CD/cassette vector mark instead of (or alongside, when `labeled`) the
+/// word — falls back to the plain text badge for formats with no dedicated
+/// icon (digital, …).
 struct MediaFormatBadge: View {
     let raw: String?
     var color: Color = Brand.gold

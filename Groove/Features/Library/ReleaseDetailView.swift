@@ -84,7 +84,8 @@ struct ReleaseDetailView: View {
     private var label: String? { release.label?.nonEmpty ?? model.edition?.label?.nonEmpty }
     private var country: String? { release.country?.nonEmpty ?? model.edition?.country?.nonEmpty }
     private var releaseType: String? { model.edition?.releaseType?.nonEmpty?.capitalized }
-    private var isVinyl: Bool { (release.releaseFormat ?? "").lowercased() == "vinyl" }
+    /// Records and tapes both have sides; their tracklists split by them.
+    private var hasSides: Bool { ["vinyl", "cassette"].contains((release.releaseFormat ?? "").lowercased()) }
 
     var body: some View {
         ScrollView {
@@ -181,7 +182,7 @@ struct ReleaseDetailView: View {
                     Text("No tracklist available for this edition.")
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
-                } else if isVinyl, let sides = vinylSides(tracklist) {
+                } else if hasSides, let sides = sideGroups(tracklist) {
                     VStack(alignment: .leading, spacing: 16) {
                         ForEach(sides, id: \.side) { group in
                             VStack(alignment: .leading, spacing: 8) {
@@ -256,9 +257,9 @@ struct ReleaseDetailView: View {
 
     /// Groups by the leading letter of each track's position (e.g. "A1",
     /// "B2") — only when every entry actually has one, otherwise this isn't
-    /// really a multi-side vinyl tracklist (or the data's incomplete) and a
+    /// really a multi-side tracklist (or the data's incomplete) and a
     /// flat list is more honest than a half-grouped one.
-    private func vinylSides(_ tracklist: [TracklistEntry]) -> [(side: String, entries: [TracklistEntry])]? {
+    private func sideGroups(_ tracklist: [TracklistEntry]) -> [(side: String, entries: [TracklistEntry])]? {
         var order: [String] = []
         var bySide: [String: [TracklistEntry]] = [:]
         for entry in tracklist {
