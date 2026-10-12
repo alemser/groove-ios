@@ -90,8 +90,6 @@ struct AmplifierConfigView: View {
         Form {
             profileSection
 
-            commandsSection
-
             Section("Device") {
                 TextField("Maker", text: $maker)
                 TextField("Model", text: $deviceModel)
@@ -105,12 +103,7 @@ struct AmplifierConfigView: View {
                     .keyboardType(.numberPad)
             }
 
-            Section {
-                Toggle("Use Input to Detect Format", isOn: $useInputForFormat)
-            } footer: {
-                Text("When an album is in your catalogue on more than one format, the input this amplifier is switched to decides which one is playing — PHONO means the record. Turn this off if you change inputs by hand: the rig only knows the input it set itself, so a stale one would answer confidently and wrongly.")
-                    .foregroundStyle(Brand.muted)
-            }
+            commandsSection
 
             Section {
                 ForEach($inputs) { $input in
@@ -140,6 +133,13 @@ struct AmplifierConfigView: View {
                 Text("Inputs")
             } footer: {
                 Text("What each source is called and whether recognition runs on it.")
+                    .foregroundStyle(Brand.muted)
+            }
+
+            Section {
+                Toggle("Use Input to Detect Format", isOn: $useInputForFormat)
+            } footer: {
+                Text("When an album is in your catalogue on more than one format, the input this amplifier is switched to decides which one is playing — PHONO means the record. Turn this off if you change inputs by hand: the rig only knows the input it set itself, so a stale one would answer confidently and wrongly.")
                     .foregroundStyle(Brand.muted)
             }
 
