@@ -1,7 +1,10 @@
 import SwiftUI
 
-/// Square artwork with a graceful vinyl-record placeholder and loading shimmer.
-/// Resolves relative catalog paths against the configured server.
+/// Artwork in a square slot with a graceful vinyl-record placeholder and
+/// loading shimmer. Resolves relative catalog paths against the configured
+/// server. A cover clearly off square (a cassette J-card) is drawn whole in
+/// its own proportions, fitted and centred in the slot, instead of being
+/// cropped to a square; the slot itself never grows.
 struct Artwork: View {
     let raw: String?
     var cornerRadius: CGFloat = 10
@@ -12,43 +15,87 @@ struct Artwork: View {
     /// playing but not yet identified, distinct from "no artwork at all."
     var isRecognizing: Bool = false
 
+    /// How far from 1:1 a cover may be and still fill the square (cropping the
+    /// difference). Same rule as groove-display and the catalog Studio: CD and
+    /// LP scans are rarely exactly square, a cassette J-card is ~0.63.
+    static let squareTolerance: CGFloat = 1.1
+
     @Environment(AppSettings.self) private var settings
-    // AsyncImage never retries on its own — a single transient blip fetching
-    // an external cover-art CDN over the LAN (the common case here, unlike
-    // the web UI's browser-level retry/caching) leaves the placeholder up
-    // for good. Bumping this forces AsyncImage to recreate itself and try
-    // again, up to a couple of times, before settling on the placeholder.
+    @State private var loaded: (url: URL, image: UIImage)?
+    @State private var failed = false
+    // A single transient blip fetching an external cover-art CDN over the
+    // LAN would otherwise leave the placeholder up for good, so a failed
+    // load is retried a couple of times before settling on the placeholder.
     @State private var retryCount = 0
     private let maxRetries = 2
 
     var body: some View {
         let url = settings.resolveArtwork(raw)
-        return AsyncImage(url: url, transaction: .init(animation: .easeInOut(duration: 0.25))) { phase in
-            switch phase {
-            case let .success(image):
-                image.resizable().scaledToFill()
-            case .failure:
-                placeholder
-                    .task(id: retryCount) {
-                        guard retryCount < maxRetries else { return }
-                        try? await Task.sleep(for: .milliseconds(600 * Int64(retryCount + 1)))
-                        guard !Task.isCancelled else { return }
-                        retryCount += 1
-                    }
-            case .empty:
-                if url == nil { placeholder } else { shimmer }
-            @unknown default:
-                placeholder
+        // Color.clear takes exactly the proposed size, so a tall cover can
+        // never stretch the caller's square slot.
+        return Color.clear
+            .overlay { content(for: url) }
+            .task(id: LoadKey(url: url, attempt: retryCount)) { await load(url) }
+            .accessibilityLabel(label ?? "")
+            .accessibilityHidden(label == nil)
+    }
+
+    @ViewBuilder
+    private func content(for url: URL?) -> some View {
+        if let loaded, loaded.url == url {
+            let size = loaded.image.size
+            let aspect = size.height > 0 ? size.width / size.height : 1
+            if aspect > 1 / Self.squareTolerance && aspect < Self.squareTolerance {
+                framed(Color.clear.overlay {
+                    Image(uiImage: loaded.image).resizable().scaledToFill()
+                })
+            } else {
+                framed(Image(uiImage: loaded.image).resizable())
+                    .aspectRatio(aspect, contentMode: .fit)
+            }
+        } else if url == nil || failed {
+            framed(placeholder)
+        } else {
+            framed(shimmer)
+        }
+    }
+
+    private func framed(_ view: some View) -> some View {
+        view
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Brand.border, lineWidth: 1)
+            )
+    }
+
+    private struct LoadKey: Equatable {
+        let url: URL?
+        let attempt: Int
+    }
+
+    private func load(_ url: URL?) async {
+        guard let url else { return }
+        if loaded?.url == url { return }
+        failed = false
+        if retryCount > 0 {
+            try? await Task.sleep(for: .milliseconds(600 * Int64(retryCount)))
+            guard !Task.isCancelled else { return }
+        }
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard !Task.isCancelled else { return }
+            guard (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
+                  let image = UIImage(data: data) else { throw URLError(.cannotDecodeContentData) }
+            withAnimation(.easeInOut(duration: 0.25)) { loaded = (url, image) }
+        } catch {
+            guard !Task.isCancelled else { return }
+            if retryCount < maxRetries {
+                retryCount += 1
+            } else {
+                failed = true
             }
         }
-        .id(retryCount)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Brand.border, lineWidth: 1)
-        )
-        .accessibilityLabel(label ?? "")
-        .accessibilityHidden(label == nil)
     }
 
     private var placeholder: some View {

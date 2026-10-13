@@ -60,8 +60,11 @@ Respond in **English**. Code, comments, commit messages, and docs are English re
 - `Core/Poller.swift` — shared polling-loop primitive; every screen that polls the catalog for
   live state (`NowPlayingModel`, `CatalogSessionModel`, `AttentionCenter`) uses this instead of
   hand-rolling a `Task` loop. Add new pollers here, don't duplicate the loop shape.
-- `DesignSystem/Artwork.swift` — the only `AsyncImage` call site in the app; it retries on
-  failure (a single blip fetching cover art over the LAN used to leave a permanent placeholder).
+- `DesignSystem/Artwork.swift` — the one place cover art is fetched (its own URLSession loader,
+  not `AsyncImage`, because it needs the decoded image's size); it retries on failure (a single
+  blip fetching cover art over the LAN used to leave a permanent placeholder). A cover more than
+  10% off square (cassette J-card) is drawn whole inside the caller's square slot, never growing
+  it — same rule as groove-display and the catalog Studio.
 - A model with more than one concurrent async fetch (`async let`) must gate its error phase on
   the *primary* fetch only — a secondary fetch failing should degrade to the previous value
   (`(try? await x) ?? previousValue`), not blank the whole screen. This exact bug shipped in
