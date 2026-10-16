@@ -31,9 +31,12 @@ struct Artwork: View {
 
     var body: some View {
         let url = settings.resolveArtwork(raw)
-        // Color.clear takes exactly the proposed size, so a tall cover can
-        // never stretch the caller's square slot.
+        // The slot is the largest square inside the proposal: a tall cover can
+        // never stretch it, and a caller proposing a taller-than-wide area
+        // (e.g. `.frame(maxWidth:)` under `.aspectRatio(1)` in a scroll view)
+        // still gets a square, not a cropped portrait rectangle.
         return Color.clear
+            .aspectRatio(1, contentMode: .fit)
             .overlay { content(for: url) }
             .task(id: LoadKey(url: url, attempt: retryCount)) { await load(url) }
             .accessibilityLabel(label ?? "")

@@ -8,6 +8,7 @@ struct HomeView: View {
     @Environment(AttentionCenter.self) private var attention
     @Environment(NavigationState.self) private var navigation
     @Environment(NowPlayingModel.self) private var nowPlaying
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var ampModel = AmplifierModel()
     @State private var equipmentModel = EquipmentRemoteModel()
@@ -43,6 +44,10 @@ struct HomeView: View {
                 quickLinksSection
             }
             .scrollContentBackground(.hidden)
+            .refreshable {
+                await reloadRemote()
+                await loadStylusState()
+            }
             .grooveScreenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -57,8 +62,32 @@ struct HomeView: View {
         .task { ampModel.configure(settings) }
         .task { equipmentModel.configure(settings) }
         .task { await loadStylusState() }
+        .task { await retryRemoteWhileMissing() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await reloadRemote() }
+        }
         .sheet(isPresented: $showRemoteSheet) {
             RemoteQuickAccessSheet(model: ampModel, equipmentModel: equipmentModel)
+        }
+    }
+
+    /// The Remote section shows only once the rig's state has loaded. It used
+    /// to load once, when Home first appeared, so a failed first fetch (oceano
+    /// restarting, the network not up yet) hid the section until the app was
+    /// killed. It now reloads on returning to the foreground and on pull to
+    /// refresh, and retries while nothing has loaded.
+    private func reloadRemote() async {
+        async let amp: Void = ampModel.load()
+        async let equipment: Void = equipmentModel.load()
+        _ = await (amp, equipment)
+    }
+
+    private func retryRemoteWhileMissing() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled, ampModel.snapshot == nil, equipmentModel.equipment.isEmpty else { return }
+            await reloadRemote()
         }
     }
 
