@@ -73,6 +73,16 @@ Respond in **English**. Code, comments, commit messages, and docs are English re
   headless-device WiFi onboarding (groove-provision's BLE GATT protocol). See groove-provision's
   `PROTOCOL.md` for the wire contract; UUIDs must match exactly on both sides.
 
+## Code quality (mandatory)
+
+Every change follows the code quality rules in groove-system's
+[`docs/code-quality.md`](https://github.com/alemser/groove-system/blob/main/docs/code-quality.md)
+(local checkout: `../groove-system/docs/code-quality.md`). Read them before
+writing code. Before reporting work as done, review the whole diff against
+each rule, and fix every deviation or name it in the report.
+
+@../groove-system/docs/code-quality.md
+
 ## Documentation hygiene
 
 | Change type | Update |
