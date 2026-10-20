@@ -75,19 +75,27 @@ final class AmplifierModel {
         }
     }
 
-    /// Most amplifier remotes have a single physical power button (one
-    /// `power_toggle` IR code), not discrete on/off — mirrors the web
-    /// remote's single Power button. Picks on vs. off from the currently
-    /// displayed state; the server resolves that intent to whatever's
-    /// actually learned (`power_toggle` preferred) either way, so this is
-    /// just which single button the UI shows, not a behavior change.
+    /// The displayed power state — the rig's estimate, not a reading: it
+    /// can't always see whether the amp is on (a silent input reads like
+    /// off).
     var isPowerOn: Bool {
         let state = amplifier?.power?.state ?? "unknown"
         return state == "on" || state == "warming_up"
     }
 
+    /// Most amplifier remotes have a single physical power button (one
+    /// `power_toggle` IR code), not discrete on/off. With that code the
+    /// button presses it straight away, like the amp's own remote: deciding
+    /// on vs. off from `isPowerOn` first sent the wrong press whenever the
+    /// estimate was wrong, and each press waited on two ~3 s level probes.
+    /// Only discrete on/off codes go through ensure_on/ensure_off.
     func togglePower() async {
-        if isPowerOn {
+        guard let settings else { return }
+        if isLearned("power_toggle") {
+            await perform {
+                self.snapshot = try await CatalogService(settings: settings).rigAction(action: "power_toggle")
+            }
+        } else if isPowerOn {
             await powerOff()
         } else {
             await powerOn()

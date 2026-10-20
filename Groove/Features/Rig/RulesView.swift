@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Automations groove-rig runs on its own (its `/rules`). One kind today:
 /// when AirPlay or Bluetooth starts, power the amplifier on if it reads off
+/// (only with a separate power-on code)
 /// and switch it to the input the streamer is wired to. Every change is
 /// saved as it's made, like the Streaming screen's device choice.
 struct RulesView: View {
@@ -81,7 +82,7 @@ struct RulesView: View {
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 if rule.then == .selectInput {
-                    Text("Turns the amplifier on first when it reads off. If the rig can't tell whether it's on, it only switches the input.")
+                    Text("Turns the amplifier on first when it reads off and its remote has a separate power-on button. With a single power button it only switches the input — a press could turn a running amplifier off.")
                         .foregroundStyle(Brand.muted)
                 }
                 if !rule.available, let reason = rule.unavailableReason {

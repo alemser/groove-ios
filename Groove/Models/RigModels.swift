@@ -116,7 +116,8 @@ struct RigRuleTrigger: RawRepresentable, Codable, Hashable {
 /// What a rule does when it fires; same decoding reasoning as the trigger.
 struct RigRuleAction: RawRepresentable, Codable, Hashable {
     var rawValue: String
-    /// Power the amplifier on if it reads off, then select `inputId`.
+    /// Power the amplifier on if it reads off (separate power-on code only),
+    /// then select `inputId`.
     static let selectInput = RigRuleAction(rawValue: "select_input")
 }
 
