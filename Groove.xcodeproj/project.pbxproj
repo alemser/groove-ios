@@ -18,6 +18,7 @@
 		10728624876A84B1BDF41511 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07D707E80C5DEF8D824443B /* HealthView.swift */; };
 		1AD0CBCE8EFE905E329CA062 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */; };
 		1E60AA21BFA1FD60CE4E8877 /* StreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C54B427D95192B93FFCA854 /* StreamingView.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6D /* RulesView.swift */; };
 		1E7FFD6EB3A48BA130D0BB71 /* BLEProvisioningClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */; };
 		25EF7E2728396EBAD1F9762B /* RecognitionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBA85AF898CC46578F41CD6 /* RecognitionModels.swift */; };
 		2F5CF009B81C7D08A2EB3E6C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0E83562951C9D7BD7A48EAE5 /* Assets.xcassets */; };
@@ -131,6 +132,7 @@
 		72D9FF93C4894E2FD593E08D /* AmplifierModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierModel.swift; sourceTree = "<group>"; };
 		7AB2E6DDB717ECEE8D44A210 /* NowPlayingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingModel.swift; sourceTree = "<group>"; };
 		7C54B427D95192B93FFCA854 /* StreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingView.swift; sourceTree = "<group>"; };
+		B2C3D4E5F60718293A4B5C6D /* RulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesView.swift; sourceTree = "<group>"; };
 		80C08861DABACCD203B79E1B /* Poller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Poller.swift; sourceTree = "<group>"; };
 		8405014CDE5049C52E26E628 /* EditionQuestionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditionQuestionCard.swift; sourceTree = "<group>"; };
 		876155CF9A90291A8BC5DE46 /* MediaFormatIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFormatIcon.swift; sourceTree = "<group>"; };
@@ -275,6 +277,7 @@
 				15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */,
 				672B702C305D95A110E0B197 /* RigView.swift */,
 				7C54B427D95192B93FFCA854 /* StreamingView.swift */,
+				B2C3D4E5F60718293A4B5C6D /* RulesView.swift */,
 				431A7B81109A3032AF631217 /* StylusModel.swift */,
 				C562BF700C03B7623BADB564 /* StylusView.swift */,
 			);
@@ -554,6 +557,7 @@
 				3E248FD660D01CE13FD67284 /* RootView.swift in Sources */,
 				0BA058B9DB3B8E645C1A48C3 /* SettingsView.swift in Sources */,
 				1E60AA21BFA1FD60CE4E8877 /* StreamingView.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* RulesView.swift in Sources */,
 				0ECA80898AF1C05367635A39 /* StylusModel.swift in Sources */,
 				9436589215B9A9DAE6659F23 /* StylusModels.swift in Sources */,
 				5D7B96197E969608A9E1AF0E /* StylusView.swift in Sources */,

@@ -103,6 +103,64 @@ struct RigActiveInputRequest: Encodable {
     var inputId: String
 }
 
+// MARK: - Rules (GET/POST /rig/rules, PATCH/DELETE /rig/rules/{id})
+
+/// The event a rule waits for. A struct, not an enum, so a trigger a newer
+/// rig adds still decodes here (shown by its raw value).
+struct RigRuleTrigger: RawRepresentable, Codable, Hashable {
+    var rawValue: String
+    /// An AirPlay or Bluetooth session starts.
+    static let streamingStarted = RigRuleTrigger(rawValue: "streaming_started")
+}
+
+/// What a rule does when it fires; same decoding reasoning as the trigger.
+struct RigRuleAction: RawRepresentable, Codable, Hashable {
+    var rawValue: String
+    /// Power the amplifier on if it reads off, then select `inputId`.
+    static let selectInput = RigRuleAction(rawValue: "select_input")
+}
+
+/// A rule's latest firing since groove-rig started.
+struct RigRuleRun: Decodable, Hashable {
+    var at: String
+    var source: String
+    /// Amplifier power state after the power step.
+    var power: String?
+    var powerError: String?
+    /// Input selection failure; nil when the input was selected.
+    var error: String?
+}
+
+struct RigRule: Decodable, Identifiable, Hashable {
+    var id: String
+    var enabled: Bool
+    var when: RigRuleTrigger
+    var then: RigRuleAction
+    var inputId: String?
+    var inputLabel: String?
+    /// The action can run now (the amplifier is remote-controlled and can
+    /// reach the input); `unavailableReason` says why not.
+    var available: Bool
+    var unavailableReason: String?
+    var lastRun: RigRuleRun?
+}
+
+struct RigRuleListResponse: Decodable {
+    var items: [RigRule]
+}
+
+struct RigRuleCreateRequest: Encodable {
+    var when: RigRuleTrigger
+    var then: RigRuleAction
+    var inputId: String
+}
+
+/// nil fields are left as they are.
+struct RigRulePatchRequest: Encodable {
+    var enabled: Bool?
+    var inputId: String?
+}
+
 // MARK: - Rig equipment (IR-controlled devices other than the amplifier)
 
 struct RigEquipmentItem: Decodable, Identifiable, Hashable {

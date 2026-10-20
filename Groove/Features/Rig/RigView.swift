@@ -10,6 +10,7 @@ struct RigView: View {
     @State private var ampStatusText: String?
     @State private var streamingStatusText: String?
     @State private var audioInputStatusText: String?
+    @State private var rulesStatusText: String?
 
     var body: some View {
         NavigationStack {
@@ -56,6 +57,18 @@ struct RigView: View {
                         )
                     }
                 }
+                Section("Automations") {
+                    NavigationLink {
+                        RulesView()
+                    } label: {
+                        hardwareRow(
+                            title: "Rules",
+                            subtitle: rulesStatusText ?? "Loading…",
+                            icon: "wand.and.stars",
+                            tint: Brand.gold
+                        )
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
@@ -65,6 +78,7 @@ struct RigView: View {
         .task { await loadAmpStatus() }
         .task { await loadStreamingStatus() }
         .task { await loadAudioInputStatus() }
+        .task { await loadRulesStatus() }
     }
 
     private func hardwareRow(title: String, subtitle: String, icon: String, tint: Color) -> some View {
@@ -139,6 +153,23 @@ struct RigView: View {
             }
         } catch {
             audioInputStatusText = "Unavailable"
+        }
+    }
+
+    private func loadRulesStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let rules = try await CatalogService(settings: settings).rigRules()
+            let on = rules.filter(\.enabled)
+            if on.isEmpty {
+                rulesStatusText = rules.isEmpty ? "None" : "All off"
+            } else if on.contains(where: { !$0.available }) {
+                rulesStatusText = "\(on.count) on · needs setup"
+            } else {
+                rulesStatusText = "\(on.count) on"
+            }
+        } catch {
+            rulesStatusText = "Unavailable"
         }
     }
 

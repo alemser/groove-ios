@@ -465,6 +465,26 @@ struct CatalogService {
         )
     }
 
+    // MARK: Rig rules
+
+    func rigRules() async throws -> [RigRule] {
+        try await api.get("/rig/rules", as: RigRuleListResponse.self).items
+    }
+
+    @discardableResult
+    func rigCreateRule(_ req: RigRuleCreateRequest) async throws -> RigRule {
+        try await api.post("/rig/rules", body: req)
+    }
+
+    @discardableResult
+    func rigPatchRule(id: String, _ patch: RigRulePatchRequest) async throws -> RigRule {
+        try await api.patch("/rig/rules/\(id)", body: patch)
+    }
+
+    func rigDeleteRule(id: String) async throws {
+        try await api.delete("/rig/rules/\(id)")
+    }
+
     // MARK: Rig equipment
 
     func rigEquipment() async throws -> [RigEquipmentItem] {
