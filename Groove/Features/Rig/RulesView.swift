@@ -93,7 +93,7 @@ struct RulesView: View {
                 Text(actionNote(rule.then))
                     .foregroundStyle(Brand.muted)
                 if !rule.available, let reason = rule.unavailableReason {
-                    Text("Can't run yet: \(reason)")
+                    Text("Can't run: \(reason)")
                         .foregroundStyle(Brand.warn)
                 }
                 if let run = rule.lastRun {
@@ -163,30 +163,26 @@ struct RulesView: View {
     private func triggerTitle(_ trigger: RigRuleTrigger) -> String {
         switch trigger {
         case .streamingStarted: return "When AirPlay or Bluetooth starts"
-        case .inactivity: return "When nothing has played for a while"
+        case .inactivity: return "When nothing plays"
         default: return trigger.rawValue
         }
     }
 
+    /// One line under an existing rule: what it does beyond its controls.
     private func actionNote(_ action: RigRuleAction) -> String {
         switch action {
-        case .selectInput:
-            return "Turns the amplifier on first when it reads off and its remote has a separate power-on button. With a single power button it only switches the input — a press could turn a running amplifier off."
-        case .powerOff:
-            return "Sends the amplifier's power-off once music or streaming has stopped for this long. Only counts after the rig has heard something play, and skips it if you already switched off from the app. If you switch off with the amplifier's own remote, the rig can't tell — a single power button would turn it back on."
-        default:
-            return action.rawValue
+        case .selectInput: return "Also powers the amplifier on, if its remote has a power-on button."
+        case .powerOff: return "Then turns the amplifier off. Counts from the last music the rig heard."
+        default: return action.rawValue
         }
     }
 
+    /// Shown once, while adding: the one thing to know before relying on it.
     private func addNote(_ kind: RigRuleKind) -> String {
         switch kind.then {
-        case .selectInput:
-            return "Pick the amplifier input the streamer is wired to. Works when the amplifier is controlled by the rig's remote."
-        case .powerOff:
-            return "This amplifier has no standby of its own, so the rig can switch it off after a quiet spell."
-        default:
-            return ""
+        case .selectInput: return "Pick the input the streamer is wired to."
+        case .powerOff: return "The rig can't see the amplifier's own remote: switched off there, it may be switched back on."
+        default: return ""
         }
     }
 
@@ -200,28 +196,27 @@ struct RulesView: View {
         return choices
     }
 
+    /// "Last run 10:27 · input switched". A power step skipped on purpose
+    /// (single power button) isn't news — the note above says so — so only
+    /// a failed action shows its error.
     private func lastRunText(_ rule: RigRule, _ run: RigRuleRun) -> String {
-        var text = "Last ran"
-        if let source = run.source {
-            text += " on \(source == "bluetooth" ? "Bluetooth" : "AirPlay")"
-        }
-        text += " at \(Self.formatTime(run.at))"
+        let outcome: String
         if let error = run.error {
-            let what = rule.then == .selectInput ? "input not switched" : "not sent"
-            text += " — \(what): \(error)"
-        } else if let powerError = run.powerError {
-            text += " — input switched; amplifier not powered: \(powerError)"
+            outcome = "failed: \(error)"
         } else {
-            text += " — done"
+            outcome = rule.then == .selectInput ? "input switched" : "power-off sent"
         }
-        return text
+        return "Last run \(Self.formatTime(run.at)) · \(outcome)"
     }
 
+    /// Time only for today, date and time otherwise.
     private static func formatTime(_ iso: String) -> String {
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         guard let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else { return iso }
-        return date.formatted(date: .abbreviated, time: .shortened)
+        return Calendar.current.isDateInToday(date)
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(date: .abbreviated, time: .shortened)
     }
 
     // MARK: - Loading and saving
