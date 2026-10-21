@@ -482,10 +482,6 @@ struct CatalogService {
         try await api.patch("/rig/rules/\(id)", body: patch)
     }
 
-    func rigDeleteRule(id: String) async throws {
-        try await api.delete("/rig/rules/\(id)")
-    }
-
     // MARK: Rig equipment
 
     func rigEquipment() async throws -> [RigEquipmentItem] {

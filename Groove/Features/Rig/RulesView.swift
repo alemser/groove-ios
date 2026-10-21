@@ -1,12 +1,11 @@
 import SwiftUI
 
-/// Automations groove-rig runs on its own (its `/rules`): when AirPlay or
-/// Bluetooth starts, power the amplifier on if it reads off (only with a
-/// separate power-on code) and switch it to the streamer's input; and, for
-/// an amplifier without its own auto standby, send the power-off signal
-/// after a stretch without music. The rig says which kinds it offers on
-/// this setup; every change is saved as it's made, like the Streaming
-/// screen's device choice.
+/// Automations groove-rig runs on its own (its `/rules`), shown as settings:
+/// one block per kind of rule, named with an on/off toggle, its options
+/// under it. Turning one on for the first time creates the rule; off
+/// disables it. The rig says which kinds it offers on this setup (Auto
+/// standby only for an amplifier without its own); every change is saved as
+/// it's made, like the Streaming screen's device choice.
 struct RulesView: View {
     @Environment(AppSettings.self) private var settings
 
@@ -17,8 +16,30 @@ struct RulesView: View {
     @State private var errorMessage: String?
     @State private var actionError: String?
     @State private var isSaving = false
+    /// Options picked for a rule not created yet, used when it's turned on.
     @State private var newInputId = ""
     @State private var newAfterMins: Int?
+
+    /// One block: a kind the rig offers, or an existing rule whose kind it no
+    /// longer offers (shown so it can still be turned off).
+    private struct Slot: Identifiable {
+        var when: RigRuleTrigger
+        var then: RigRuleAction
+        var afterMins: RigAfterMinsRange?
+        var rule: RigRule?
+        var id: String { "\(when.rawValue)→\(then.rawValue)" }
+    }
+
+    private var slots: [Slot] {
+        let offered = kinds.map { kind in
+            Slot(when: kind.when, then: kind.then, afterMins: kind.afterMins,
+                 rule: rules.first { $0.when == kind.when && $0.then == kind.then })
+        }
+        let orphaned = rules
+            .filter { rule in !kinds.contains { $0.when == rule.when && $0.then == rule.then } }
+            .map { Slot(when: $0.when, then: $0.then, afterMins: nil, rule: $0) }
+        return offered + orphaned
+    }
 
     var body: some View {
         Form {
@@ -37,11 +58,8 @@ struct RulesView: View {
                         .foregroundStyle(Brand.muted)
                 }
             } else {
-                ForEach(rules) { rule in
-                    ruleSection(rule)
-                }
-                ForEach(kinds.filter { kind in !rules.contains { $0.when == kind.when && $0.then == kind.then } }, id: \.self) { kind in
-                    addSection(kind)
+                ForEach(slots) { slot in
+                    section(slot)
                 }
                 if let actionError {
                     Section {
@@ -61,42 +79,61 @@ struct RulesView: View {
         .refreshable { await load() }
     }
 
-    // MARK: - Sections
+    // MARK: - Blocks
 
     @ViewBuilder
-    private func ruleSection(_ rule: RigRule) -> some View {
+    private func section(_ slot: Slot) -> some View {
         Section {
-            Toggle("On", isOn: Binding(
-                get: { rule.enabled },
-                set: { enabled in Task { await patch(rule, RigRulePatchRequest(enabled: enabled)) } }
-            ))
-            if rule.then == .selectInput {
-                Picker("Switch amplifier to", selection: Binding(
-                    get: { rule.inputId ?? "" },
-                    set: { id in Task { await patch(rule, RigRulePatchRequest(inputId: id)) } }
+            Toggle(isOn: Binding(
+                get: { slot.rule?.enabled ?? false },
+                set: { on in Task { await setEnabled(slot, on) } }
+            )) {
+                Text(title(slot))
+                    .fontWeight(.semibold)
+            }
+            if slot.then == .selectInput {
+                Picker("Set amplifier input to", selection: Binding(
+                    get: { slot.rule?.inputId ?? newInputId },
+                    set: { id in
+                        if let rule = slot.rule {
+                            Task { await patch(rule, RigRulePatchRequest(inputId: id)) }
+                        } else {
+                            newInputId = id
+                        }
+                    }
                 )) {
-                    inputOptions(including: rule.inputId)
+                    ForEach(inputChoices(including: slot.rule?.inputId)) { input in
+                        Text(input.label).tag(input.id)
+                    }
                 }
             }
-            if rule.when == .inactivity, let range = afterMinsRange(for: rule) {
-                afterMinsStepper(value: rule.afterMins ?? range.default, range: range) { mins in
-                    Task { await patch(rule, RigRulePatchRequest(afterMins: mins)) }
-                }
+            if let range = slot.afterMins {
+                let value = slot.rule?.afterMins ?? newAfterMins ?? range.default
+                Stepper(
+                    "After \(value) min",
+                    value: Binding(
+                        get: { value },
+                        set: { mins in
+                            if let rule = slot.rule {
+                                Task { await patch(rule, RigRulePatchRequest(afterMins: mins)) }
+                            } else {
+                                newAfterMins = mins
+                            }
+                        }
+                    ),
+                    in: range.min...range.max,
+                    step: Self.afterMinsStep
+                )
             }
-            Button("Delete Rule", role: .destructive) {
-                Task { await delete(rule) }
-            }
-        } header: {
-            Text(triggerTitle(rule.when))
         } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(actionNote(rule.then))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(note(slot.then))
                     .foregroundStyle(Brand.muted)
-                if !rule.available, let reason = rule.unavailableReason {
+                if let rule = slot.rule, rule.enabled, !rule.available, let reason = rule.unavailableReason {
                     Text("Can't run: \(reason)")
                         .foregroundStyle(Brand.warn)
                 }
-                if let run = rule.lastRun {
+                if let rule = slot.rule, let run = rule.lastRun {
                     Text(lastRunText(rule, run))
                         .foregroundStyle(run.error == nil ? Brand.muted : Brand.err)
                 }
@@ -104,84 +141,25 @@ struct RulesView: View {
         }
     }
 
-    @ViewBuilder
-    private func addSection(_ kind: RigRuleKind) -> some View {
-        Section {
-            if kind.then == .selectInput {
-                Picker("Switch amplifier to", selection: $newInputId) {
-                    inputOptions(including: nil)
-                }
-            }
-            if let range = kind.afterMins {
-                afterMinsStepper(value: newAfterMins ?? range.default, range: range) { newAfterMins = $0 }
-            }
-            Button {
-                Task { await create(kind) }
-            } label: {
-                Label("Add Rule", systemImage: "plus")
-            }
-            .disabled(kind.then == .selectInput && newInputId.isEmpty)
-        } header: {
-            Text(triggerTitle(kind.when))
-        } footer: {
-            Text(addNote(kind))
-                .foregroundStyle(Brand.muted)
-        }
-    }
-
-    // MARK: - Controls
-
-    @ViewBuilder
-    private func inputOptions(including id: String?) -> some View {
-        ForEach(inputChoices(including: id)) { input in
-            Text(input.label).tag(input.id)
-        }
-    }
-
-    private func afterMinsStepper(value: Int, range: RigAfterMinsRange, onChange: @escaping (Int) -> Void) -> some View {
-        Stepper(
-            "After \(value) min",
-            value: Binding(get: { value }, set: onChange),
-            in: range.min...range.max,
-            step: Self.afterMinsStep
-        )
-    }
-
     /// Chosen: five-minute steps cover the 5–720 min range in a handful of
     /// taps per common value without offering false precision.
     private static let afterMinsStep = 5
 
-    /// The rig's after_mins bounds for an existing rule's kind. When the kind
-    /// is no longer offered (an amplifier with auto standby now), the rule
-    /// keeps its value but can't be edited — it can't run there anyway.
-    private func afterMinsRange(for rule: RigRule) -> RigAfterMinsRange? {
-        kinds.first { $0.when == rule.when && $0.then == rule.then }?.afterMins
-    }
-
     // MARK: - Copy
 
-    private func triggerTitle(_ trigger: RigRuleTrigger) -> String {
-        switch trigger {
-        case .streamingStarted: return "When AirPlay or Bluetooth starts"
-        case .inactivity: return "When nothing plays"
-        default: return trigger.rawValue
+    private func title(_ slot: Slot) -> String {
+        switch (slot.when, slot.then) {
+        case (.streamingStarted, .selectInput): return "Autoplay when streaming starts"
+        case (.inactivity, .powerOff): return "Auto standby"
+        default: return "\(slot.when.rawValue) → \(slot.then.rawValue)"
         }
     }
 
-    /// One line under an existing rule: what it does beyond its controls.
-    private func actionNote(_ action: RigRuleAction) -> String {
+    /// One line under a block: what it does beyond its controls.
+    private func note(_ action: RigRuleAction) -> String {
         switch action {
         case .selectInput: return "Also powers the amplifier on, if its remote has a power-on button."
-        case .powerOff: return "Then turns the amplifier off. Counts from the last music the rig heard."
-        default: return action.rawValue
-        }
-    }
-
-    /// Shown once, while adding: the one thing to know before relying on it.
-    private func addNote(_ kind: RigRuleKind) -> String {
-        switch kind.then {
-        case .selectInput: return "Pick the input the streamer is wired to."
-        case .powerOff: return "The rig can't see the amplifier's own remote: switched off there, it may be switched back on."
+        case .powerOff: return "Turns the amplifier off after this long without music."
         default: return ""
         }
     }
@@ -197,8 +175,8 @@ struct RulesView: View {
     }
 
     /// "Last run 10:27 · input switched". A power step skipped on purpose
-    /// (single power button) isn't news — the note above says so — so only
-    /// a failed action shows its error.
+    /// (single power button) isn't news — the note says so — so only a
+    /// failed action shows its error.
     private func lastRunText(_ rule: RigRule, _ run: RigRuleRun) -> String {
         let outcome: String
         if let error = run.error {
@@ -262,17 +240,20 @@ struct RulesView: View {
         await save { try await $0.rigPatchRule(id: rule.id, req) }
     }
 
-    private func create(_ kind: RigRuleKind) async {
+    /// On for a rule not created yet creates it with the options picked in
+    /// its block; otherwise it enables or disables the rule.
+    private func setEnabled(_ slot: Slot, _ on: Bool) async {
+        if let rule = slot.rule {
+            await patch(rule, RigRulePatchRequest(enabled: on))
+            return
+        }
+        guard on else { return }
         let req = RigRuleCreateRequest(
-            when: kind.when,
-            then: kind.then,
-            inputId: kind.then == .selectInput ? newInputId : nil,
-            afterMins: kind.afterMins.map { newAfterMins ?? $0.default }
+            when: slot.when,
+            then: slot.then,
+            inputId: slot.then == .selectInput ? newInputId : nil,
+            afterMins: slot.afterMins.map { newAfterMins ?? $0.default }
         )
         await save { try await $0.rigCreateRule(req) }
-    }
-
-    private func delete(_ rule: RigRule) async {
-        await save { try await $0.rigDeleteRule(id: rule.id) }
     }
 }
