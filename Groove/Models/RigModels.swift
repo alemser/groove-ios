@@ -111,6 +111,8 @@ struct RigRuleTrigger: RawRepresentable, Codable, Hashable {
     var rawValue: String
     /// An AirPlay or Bluetooth session starts.
     static let streamingStarted = RigRuleTrigger(rawValue: "streaming_started")
+    /// `afterMins` pass without programme or a streaming session.
+    static let inactivity = RigRuleTrigger(rawValue: "inactivity")
 }
 
 /// What a rule does when it fires; same decoding reasoning as the trigger.
@@ -119,16 +121,19 @@ struct RigRuleAction: RawRepresentable, Codable, Hashable {
     /// Power the amplifier on if it reads off (separate power-on code only),
     /// then select `inputId`.
     static let selectInput = RigRuleAction(rawValue: "select_input")
+    /// Send the amplifier's power-off signal (power off, else the toggle).
+    static let powerOff = RigRuleAction(rawValue: "power_off")
 }
 
 /// A rule's latest firing since groove-rig started.
 struct RigRuleRun: Decodable, Hashable {
     var at: String
-    var source: String
+    /// The streaming session that fired a streaming rule.
+    var source: String?
     /// Amplifier power state after the power step.
     var power: String?
     var powerError: String?
-    /// Input selection failure; nil when the input was selected.
+    /// The action's failure; nil when it went through.
     var error: String?
 }
 
@@ -138,28 +143,47 @@ struct RigRule: Decodable, Identifiable, Hashable {
     var when: RigRuleTrigger
     var then: RigRuleAction
     var inputId: String?
+    var afterMins: Int?
     var inputLabel: String?
-    /// The action can run now (the amplifier is remote-controlled and can
-    /// reach the input); `unavailableReason` says why not.
+    /// The rule can run now (its kind is offered, and the rig can send what
+    /// the action needs); `unavailableReason` says why not.
     var available: Bool
     var unavailableReason: String?
     var lastRun: RigRuleRun?
 }
 
+/// A kind of rule the rig offers on this setup — inactivity → power off
+/// only for an amplifier without its own auto standby.
+struct RigRuleKind: Decodable, Hashable {
+    var when: RigRuleTrigger
+    var then: RigRuleAction
+    /// Bounds and default of `afterMins`, for kinds that take one.
+    var afterMins: RigAfterMinsRange?
+}
+
+struct RigAfterMinsRange: Decodable, Hashable {
+    var min: Int
+    var max: Int
+    var `default`: Int
+}
+
 struct RigRuleListResponse: Decodable {
     var items: [RigRule]
+    var kinds: [RigRuleKind]
 }
 
 struct RigRuleCreateRequest: Encodable {
     var when: RigRuleTrigger
     var then: RigRuleAction
-    var inputId: String
+    var inputId: String?
+    var afterMins: Int?
 }
 
 /// nil fields are left as they are.
 struct RigRulePatchRequest: Encodable {
     var enabled: Bool?
     var inputId: String?
+    var afterMins: Int?
 }
 
 // MARK: - Rig equipment (IR-controlled devices other than the amplifier)

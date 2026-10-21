@@ -467,8 +467,9 @@ struct CatalogService {
 
     // MARK: Rig rules
 
-    func rigRules() async throws -> [RigRule] {
-        try await api.get("/rig/rules", as: RigRuleListResponse.self).items
+    /// The rules, and the kinds of rule this rig offers.
+    func rigRules() async throws -> RigRuleListResponse {
+        try await api.get("/rig/rules")
     }
 
     @discardableResult

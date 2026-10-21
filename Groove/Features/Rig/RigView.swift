@@ -159,7 +159,7 @@ struct RigView: View {
     private func loadRulesStatus() async {
         guard settings.isConfigured else { return }
         do {
-            let rules = try await CatalogService(settings: settings).rigRules()
+            let rules = try await CatalogService(settings: settings).rigRules().items
             let on = rules.filter(\.enabled)
             if on.isEmpty {
                 rulesStatusText = rules.isEmpty ? "None" : "All off"
