@@ -23,6 +23,19 @@ struct BLEProvisioningStatus: Decodable, Equatable {
     var ip: String?
 }
 
+/// One Oceano advertising the provisioning service nearby. More than one can
+/// be in range, so the user picks which to set up.
+struct BLEOceanoDevice: Identifiable, Equatable {
+    let id: UUID
+    /// The advertised name, "Oceano-XXXX" (last 4 hex digits of the board's
+    /// Bluetooth address), unique per board.
+    var name: String
+    /// The board's own name (its hostname, e.g. "oceano-0000") when the
+    /// phone knows it and it differs from `name` — the same name the
+    /// network list shows once the device is on Wi-Fi.
+    var boardName: String?
+}
+
 extension CBManagerState {
     /// Human-readable name for console logging (`BLEProvisioningClient.log`).
     var diagnosticName: String {
@@ -41,12 +54,14 @@ extension CBManagerState {
 enum BLEProvisioningError: LocalizedError {
     case bluetoothUnavailable(String)
     case timedOut
+    case connectTimedOut
     case disconnected
 
     var errorDescription: String? {
         switch self {
         case let .bluetoothUnavailable(msg): return msg
         case .timedOut: return "Couldn't find a nearby Oceano device in time. Make sure it's powered on and hasn't already joined a network."
+        case .connectTimedOut: return "The Oceano device didn't answer over Bluetooth. Move closer to it and try again."
         case .disconnected: return "Lost the Bluetooth connection to the Oceano device."
         }
     }
@@ -54,20 +69,20 @@ enum BLEProvisioningError: LocalizedError {
 
 /// Low-level CoreBluetooth wrapper for onboarding a headless Oceano device
 /// over BLE — parallel to `APIClient.swift`, `CBCentralManager`/`CBPeripheral`
-/// instead of `URLSession`. Owns exactly one connection at a time.
+/// instead of `URLSession`. Scans for every Oceano in range and owns exactly
+/// one connection at a time, to the one the user picked.
 ///
-/// `discoverAndConnect` bridges the whole scan→connect→discover-services→
-/// discover-characteristics chain into one `async throws`, the same
-/// delegate-to-continuation approach `CatalogDiscovery.swift`'s
-/// `SRVResolution` uses for `DNSServiceResolve` — resumed exactly once, on
-/// either full readiness or a terminal failure. Ongoing characteristic
-/// updates (notify) after that use the `onNetworksUpdated`/`onStatusUpdated`
-/// closures instead, since they're a stream, not a one-shot result.
+/// `startScan` and `connect(to:)` bridge their delegate chains into
+/// `async throws`, the same delegate-to-continuation approach
+/// `CatalogDiscovery.swift`'s `SRVResolution` uses for `DNSServiceResolve` —
+/// each resumed exactly once, on success or a terminal failure. The streams
+/// that follow (devices found, characteristic notifications) use the
+/// `on…Updated` closures instead.
 @MainActor
 final class BLEProvisioningClient: NSObject {
+    var onDevicesUpdated: (([BLEOceanoDevice]) -> Void)?
     var onNetworksUpdated: (([BLEWiFiNetwork]) -> Void)?
     var onStatusUpdated: ((BLEProvisioningStatus) -> Void)?
-    var onDisconnected: (() -> Void)?
 
     private func log(_ message: String) {
         #if DEBUG
@@ -75,47 +90,94 @@ final class BLEProvisioningClient: NSObject {
         #endif
     }
 
-    /// True once `discoverAndConnect` has actually succeeded and the link is
-    /// still up — callers must check this before writing to Control (e.g.
+    /// True once `connect(to:)` has actually succeeded and the link is still
+    /// up — callers must check this before writing to Control (e.g.
     /// requesting a rescan); writing after a disconnect silently no-ops
     /// instead of failing loudly, since `controlChar` is nil.
     var isReady: Bool { peripheral != nil && controlChar != nil }
 
     private var central: CBCentralManager?
+    /// Every Oceano seen since the scan started, by peripheral identifier.
+    private var found: [UUID: (peripheral: CBPeripheral, device: BLEOceanoDevice)] = [:]
     private var peripheral: CBPeripheral?
     private var networksChar: CBCharacteristic?
     private var statusChar: CBCharacteristic?
     private var controlChar: CBCharacteristic?
 
+    private var scanContinuation: CheckedContinuation<Void, Error>?
     private var readyContinuation: CheckedContinuation<Void, Error>?
-    private var readyFinished = false
     private var timeoutTask: Task<Void, Never>?
 
     private static let decoder = JSONDecoder()
     private static let encoder = JSONEncoder()
 
-    func discoverAndConnect(timeout: Duration = .seconds(20)) async throws {
-        readyFinished = false
-        log("Creating CBCentralManager…")
-        let central = CBCentralManager(delegate: self, queue: nil)
-        self.central = central
+    /// Starts scanning and returns once the scan is running, or throws when
+    /// Bluetooth is off, denied or missing. Devices then arrive on
+    /// `onDevicesUpdated`.
+    func startScan() async throws {
+        found = [:]
+        onDevicesUpdated?([])
+        if let central {
+            if central.state == .poweredOn {
+                scan(central)
+                return
+            }
+            // A settled state sends no further update to wait for.
+            if let error = Self.unavailable(central.state) { throw error }
+        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.scanContinuation = continuation
+            if self.central == nil {
+                log("Creating CBCentralManager…")
+                self.central = CBCentralManager(delegate: self, queue: nil)
+            }
+        }
+    }
 
+    func stopScan() {
+        central?.stopScan()
+    }
+
+    /// Connects to one of the devices the scan found and runs the
+    /// connect → discover-services → discover-characteristics chain.
+    func connect(to id: UUID, timeout: Duration = .seconds(20)) async throws {
+        guard let central, let target = found[id]?.peripheral else {
+            throw BLEProvisioningError.disconnected
+        }
+        central.stopScan()
+        log("Connecting to \(found[id]?.device.name ?? id.uuidString)…")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.readyContinuation = continuation
+            self.peripheral = target
+            target.delegate = self
+            central.connect(target, options: nil)
             self.timeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: timeout)
                 guard !Task.isCancelled else { return }
                 self?.log("Timed out after \(timeout).")
-                self?.finishReady(.failure(BLEProvisioningError.timedOut))
+                self?.finishReady(.failure(BLEProvisioningError.connectTimedOut))
             }
         }
     }
 
     func disconnect() {
+        central?.stopScan()
         if let peripheral, let central {
             central.cancelPeripheralConnection(peripheral)
         }
         teardown()
+    }
+
+    private func scan(_ central: CBCentralManager) {
+        // Scanning for *everything*, not filtered to our service UUID, is a
+        // temporary diagnostic: it lets a mismatch (wrong UUID, advertisement
+        // not actually reaching the phone, primary vs. scan-response packet
+        // placement) show up as "found other devices but never ours" instead
+        // of silent nothing. Narrow back to
+        // `withServices: [BLEProvisioningProtocol.serviceUUID]` once Phase 2
+        // is confirmed working.
+        log("Scanning (unfiltered, diagnostic mode)…")
+        central.scanForPeripherals(withServices: nil, options: nil)
     }
 
     private func teardown() {
@@ -127,9 +189,14 @@ final class BLEProvisioningClient: NSObject {
         controlChar = nil
     }
 
+    private func finishScanStart(_ result: Result<Void, Error>) {
+        guard let continuation = scanContinuation else { return }
+        scanContinuation = nil
+        continuation.resume(with: result)
+    }
+
     private func finishReady(_ result: Result<Void, Error>) {
-        guard !readyFinished, let continuation = readyContinuation else { return }
-        readyFinished = true
+        guard let continuation = readyContinuation else { return }
         readyContinuation = nil
         timeoutTask?.cancel()
         timeoutTask = nil
@@ -156,45 +223,48 @@ extension BLEProvisioningClient: CBCentralManagerDelegate {
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         Task { @MainActor in
             log("State: \(central.state.diagnosticName) (raw \(central.state.rawValue))")
-            switch central.state {
-            case .poweredOn:
-                // Scanning for *everything*, not filtered to our service UUID,
-                // is a temporary diagnostic: it lets a mismatch (wrong UUID,
-                // advertisement not actually reaching the phone, primary vs.
-                // scan-response packet placement) show up as "found other
-                // devices but never ours" instead of silent nothing. Narrow
-                // back to `withServices: [BLEProvisioningProtocol.serviceUUID]`
-                // once Phase 2 is confirmed working.
-                log("Scanning (unfiltered, diagnostic mode)…")
-                central.scanForPeripherals(withServices: nil, options: nil)
-            case .poweredOff:
-                finishReady(.failure(BLEProvisioningError.bluetoothUnavailable("Bluetooth is off. Turn it on in Settings to set up an Oceano device.")))
-            case .unauthorized:
-                finishReady(.failure(BLEProvisioningError.bluetoothUnavailable("Oceano needs Bluetooth access to set up a device. Enable it in Settings → Privacy → Bluetooth.")))
-            case .unsupported:
-                finishReady(.failure(BLEProvisioningError.bluetoothUnavailable("This device doesn't support Bluetooth Low Energy.")))
-            case .resetting, .unknown:
-                break
-            @unknown default:
-                break
+            if central.state == .poweredOn {
+                guard scanContinuation != nil else { return }
+                scan(central)
+                finishScanStart(.success(()))
+            } else if let error = Self.unavailable(central.state) {
+                finishScanStart(.failure(error))
             }
+        }
+    }
+
+    /// Why Bluetooth can't be used in `state`, or nil while it is on or
+    /// still settling (resetting, unknown).
+    nonisolated private static func unavailable(_ state: CBManagerState) -> BLEProvisioningError? {
+        switch state {
+        case .poweredOff:
+            return .bluetoothUnavailable("Bluetooth is off. Turn it on in Settings to set up an Oceano device.")
+        case .unauthorized:
+            return .bluetoothUnavailable("Oceano needs Bluetooth access to set up a device. Enable it in Settings → Privacy → Bluetooth.")
+        case .unsupported:
+            return .bluetoothUnavailable("This device doesn't support Bluetooth Low Energy.")
+        case .poweredOn, .resetting, .unknown:
+            return nil
+        @unknown default:
+            return nil
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         Task { @MainActor in
-            let name = peripheral.name ?? (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? "(no name)"
+            let advertised = advertisementData[CBAdvertisementDataLocalNameKey] as? String
+            let name = advertised ?? peripheral.name ?? "(no name)"
             let uuids = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? []
             let uuidList = uuids.map(\.uuidString).joined(separator: ", ")
             let isTarget = uuids.contains(BLEProvisioningProtocol.serviceUUID)
             log("Found: \(name) rssi=\(RSSI) uuids=[\(uuidList)]\(isTarget ? " ← MATCH" : "")")
 
             guard isTarget else { return }
-            central.stopScan()
-            log("Connecting to \(name)…")
-            self.peripheral = peripheral
-            peripheral.delegate = self
-            central.connect(peripheral, options: nil)
+            let boardName = peripheral.name.flatMap { $0 == name ? nil : $0 }
+            let device = BLEOceanoDevice(id: peripheral.identifier, name: name, boardName: boardName)
+            guard found[peripheral.identifier]?.device != device else { return }
+            found[peripheral.identifier] = (peripheral, device)
+            onDevicesUpdated?(found.values.map(\.device).sorted { $0.name < $1.name })
         }
     }
 
@@ -216,7 +286,10 @@ extension BLEProvisioningClient: CBCentralManagerDelegate {
         Task { @MainActor in
             log("Disconnected\(error.map { ": \($0.localizedDescription)" } ?? "").")
             teardown()
-            onDisconnected?()
+            // Expected once the device has joined Wi-Fi (it stops
+            // advertising); mid-connect it fails the pending connect now
+            // rather than at the timeout.
+            finishReady(.failure(BLEProvisioningError.disconnected))
         }
     }
 }

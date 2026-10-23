@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Guided BLE onboarding: find a nearby, unconfigured Oceano device, pick a
+/// Guided BLE onboarding: choose one of the Oceano devices in range, pick a
 /// WiFi network, enter its password, and watch it join. Once connected, the
 /// device drops its BLE advertisement and starts advertising over mDNS
 /// instead — `onConnected` hands off to `ConnectView`'s existing discovery
@@ -36,10 +36,20 @@ struct BLEProvisioningView: View {
     private var content: some View {
         switch model.phase {
         case .searching:
+            if model.devices.isEmpty {
+                statusScreen(
+                    icon: { ProgressView().controlSize(.large).tint(Brand.accent) },
+                    title: "Looking for your Oceano device…",
+                    subtitle: "Make sure it's powered on and hasn't already joined a network."
+                )
+            } else {
+                deviceList
+            }
+        case let .connecting(device):
             statusScreen(
                 icon: { ProgressView().controlSize(.large).tint(Brand.accent) },
-                title: "Looking for your Oceano device…",
-                subtitle: "Make sure it's powered on and hasn't already joined a network."
+                title: "Connecting to \(device.name)…",
+                subtitle: "Keep your phone close to it."
             )
         case .pickingNetwork:
             networkList
@@ -125,9 +135,71 @@ struct BLEProvisioningView: View {
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(Brand.muted)
                     .padding(.top, 4)
+                Button("Set Up a Different Oceano") { model.chooseAnotherDevice() }
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Brand.muted)
             }
             .padding(24)
         }
+    }
+
+    // MARK: - Device list
+
+    /// Every Oceano in range, so the one being set up is a choice rather
+    /// than whichever advertised first. The scan keeps running underneath,
+    /// so a device that is slower to show up still joins the list.
+    private var deviceList: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                Text("Choose the Oceano to set up")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Brand.muted)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(model.devices) { device in
+                        Button {
+                            model.selectDevice(device)
+                        } label: {
+                            deviceRow(device)
+                        }
+                        .buttonStyle(.plain)
+                        if device.id != model.devices.last?.id {
+                            Divider().overlay(Brand.border).padding(.leading, 16)
+                        }
+                    }
+                }
+                .grooveCard()
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small).tint(Brand.muted)
+                    Text("Still looking for others nearby…")
+                        .font(.footnote)
+                        .foregroundStyle(Brand.muted)
+                }
+                .padding(.top, 4)
+            }
+            .padding(24)
+        }
+    }
+
+    private func deviceRow(_ device: BLEOceanoDevice) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "dot.radiowaves.left.and.right")
+                .foregroundStyle(Brand.teal)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(device.name)
+                    .foregroundStyle(Brand.text)
+                if let boardName = device.boardName {
+                    Text(boardName)
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                }
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Brand.muted)
+        }
+        .padding(16)
     }
 
     private func networkRow(_ network: BLEWiFiNetwork) -> some View {

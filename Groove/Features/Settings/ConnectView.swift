@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// First-run screen: find your Oceano. Two discovery paths run side by side
-/// from the moment this screen appears — Bonjour (silent, works when the
-/// device is already on this Wi-Fi) and Bluetooth (works even for a
-/// brand-new device that isn't on any network yet) — rather than hiding
-/// Bluetooth behind a timeout as a last resort. Manual host/IP entry is a
-/// fallback tucked behind a link.
+/// Find your Oceano: the first-run screen, and Settings' "Switch Server".
+/// Two discovery paths run side by side from the moment this screen appears —
+/// Bonjour (silent, works when the device is already on this Wi-Fi) and
+/// Bluetooth (works even for a brand-new device that isn't on any network
+/// yet) — rather than hiding Bluetooth behind a timeout as a last resort.
+/// Manual host/IP entry is a fallback tucked behind a link. A home can have
+/// more than one Oceano, so every one found is listed to choose from; only a
+/// first run with a single Oceano on the network connects on its own.
 struct ConnectView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
@@ -18,9 +20,17 @@ struct ConnectView: View {
     @State private var showManualEntry = false
     @State private var showBLEProvisioning = false
     @State private var autoConnectAttemptedIDs: Set<String> = []
+    @State private var autoConnectTask: Task<Void, Never>?
     /// Set by select() right before connect() when the host came from
     /// discovery; nil for manual entry, where there's no discovered name.
     @State private var pendingDeviceName: String?
+
+    /// How long discovery has to stay at a single Oceano before a first run
+    /// connects to it on its own. Chosen: Oceanos answer one at a time
+    /// (resolve, then the /status probe), so the first one is briefly alone
+    /// in the list even when others are on the network; this gives the rest
+    /// time to show up and turn it into a choice.
+    private static let autoConnectSettle: Duration = .seconds(3)
 
     var body: some View {
         ScrollView {
@@ -53,19 +63,29 @@ struct ConnectView: View {
         }
         .grooveScreenBackground()
         .task { discovery.startBrowsing() }
-        .onDisappear { discovery.stopBrowsing() }
+        .onDisappear {
+            autoConnectTask?.cancel()
+            discovery.stopBrowsing()
+        }
         .animation(.easeInOut(duration: 0.3), value: showManualEntry)
         .animation(.easeInOut(duration: 0.3), value: discovery.hosts.isEmpty)
         .onChange(of: discovery.hosts) { _, hosts in
+            autoConnectTask?.cancel()
             // Every listed host already answered /status as a groove-catalog,
-            // so when there's exactly one there is nothing left to choose —
-            // connect without waiting for a tap. One attempt per host: if it
-            // fails (or a second server appears) the user decides.
-            guard !showManualEntry, !probe.isProbing,
+            // so a first run that finds exactly one has nothing to choose —
+            // connect without waiting for a tap, once the list has stayed at
+            // that one. Never from Switch Server: the user came to choose.
+            // One attempt per host: if it fails the user decides.
+            guard !settings.isConfigured, !showManualEntry, !probe.isProbing,
                   hosts.count == 1, let only = hosts.first,
                   !autoConnectAttemptedIDs.contains(only.id) else { return }
-            autoConnectAttemptedIDs.insert(only.id)
-            select(only)
+            autoConnectTask = Task {
+                try? await Task.sleep(for: Self.autoConnectSettle)
+                guard !Task.isCancelled, discovery.hosts == [only],
+                      !showManualEntry, !probe.isProbing else { return }
+                autoConnectAttemptedIDs.insert(only.id)
+                select(only)
+            }
         }
     }
 
@@ -99,7 +119,9 @@ struct ConnectView: View {
                 Text("Looking for your Oceano…")
                     .font(.headline)
                     .foregroundStyle(Brand.text)
-                Text("Already on your Wi-Fi, it'll connect automatically. Brand new? Set it up over Bluetooth below.")
+                Text(settings.isConfigured
+                     ? "Every Oceano on your Wi-Fi shows up here. Brand new? Set it up over Bluetooth below."
+                     : "Already on your Wi-Fi, it'll connect automatically. Brand new? Set it up over Bluetooth below.")
                     .font(.subheadline)
                     .foregroundStyle(Brand.muted)
                     .multilineTextAlignment(.center)
@@ -163,7 +185,11 @@ struct ConnectView: View {
                                     .foregroundStyle(Brand.muted)
                             }
                             Spacer()
-                            if probe.isProbing {
+                            if isCurrent(discovered) {
+                                Text("Connected")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Brand.ok)
+                            } else if probe.isProbing {
                                 ProgressView().tint(Brand.muted)
                             } else {
                                 Image(systemName: "chevron.right")
@@ -184,7 +210,18 @@ struct ConnectView: View {
         }
     }
 
+    /// The Oceano the app is connected to now, when Switch Server lists it.
+    private func isCurrent(_ discovered: DiscoveredCatalogHost) -> Bool {
+        settings.isConfigured
+            && discovered.host.caseInsensitiveCompare(settings.host) == .orderedSame
+            && discovered.port == settings.port
+    }
+
     private func select(_ discovered: DiscoveredCatalogHost) {
+        if isCurrent(discovered) {
+            dismiss() // already connected there: nothing to switch
+            return
+        }
         host = discovered.host
         port = String(discovered.port)
         scheme = "http"
