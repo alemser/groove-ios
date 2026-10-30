@@ -24,6 +24,11 @@ final class AmplifierStateModel {
     /// reading to go on (fall back to the rig's inference).
     var power: RigAmplifierPower? { observation?.state?.power }
 
+    /// The amp's active input id as it reads it itself; nil when there's no
+    /// provider reading (fall back to the rig's tracking). Matched to the
+    /// rig's inputs by id: the amp's own names for its inputs are not used.
+    var inputId: String? { observation?.state?.inputId }
+
     private var settings: AppSettings?
     private var inputLabels: [String: String] = [:]
     private var hideTask: Task<Void, Never>?

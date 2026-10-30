@@ -209,21 +209,31 @@ struct AmplifierRemoteTab: View {
                 }
             }
 
-            Button {
-                showResyncDialog = true
-            } label: {
-                Label("Resync with physical input", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Brand.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // An amp that reads its own input keeps groove-rig in step by
+            // itself; resyncing by hand only matters without that reading.
+            if stateModel.inputId == nil {
+                Button {
+                    showResyncDialog = true
+                } label: {
+                    Label("Resync with physical input", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Brand.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isPerformingAction || model.visibleInputs.isEmpty)
             }
-            .buttonStyle(.plain)
-            .disabled(model.isPerformingAction || model.visibleInputs.isEmpty)
         }
     }
 
+    /// The amp's own reading when it has one — an input changed with its
+    /// own remote shows at once — named with the rig's label for that id;
+    /// otherwise the input groove-rig tracks.
     private var currentInputLabel: String {
-        model.amplifier?.activeInputLabel?.nonEmpty ?? model.visibleInputs.first?.label ?? "Input"
+        if let id = stateModel.inputId, let input = model.amplifier?.inputs?.first(where: { $0.id == id }) {
+            return input.label
+        }
+        return model.amplifier?.activeInputLabel?.nonEmpty ?? model.visibleInputs.first?.label ?? "Input"
     }
 
     // MARK: - Volume
