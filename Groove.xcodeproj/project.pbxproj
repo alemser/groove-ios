@@ -18,17 +18,17 @@
 		10728624876A84B1BDF41511 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07D707E80C5DEF8D824443B /* HealthView.swift */; };
 		1AD0CBCE8EFE905E329CA062 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */; };
 		1E60AA21BFA1FD60CE4E8877 /* StreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C54B427D95192B93FFCA854 /* StreamingView.swift */; };
-		A1B2C3D4E5F60718293A4B5C /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6D /* RulesView.swift */; };
 		1E7FFD6EB3A48BA130D0BB71 /* BLEProvisioningClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */; };
 		25EF7E2728396EBAD1F9762B /* RecognitionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBA85AF898CC46578F41CD6 /* RecognitionModels.swift */; };
 		2F5CF009B81C7D08A2EB3E6C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0E83562951C9D7BD7A48EAE5 /* Assets.xcassets */; };
+		3167120F2CEA8D7F2759DE6F /* AmplifierStateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26EFCF890EE02DEBAC662674 /* AmplifierStateModel.swift */; };
 		319EF9BE91669E7469DB384D /* ReleaseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D14EECF13D2E7740D76994 /* ReleaseDetailView.swift */; };
 		360BB6AE36C8A7A1F3F00FF0 /* AttentionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27254E509C0A5183FE8A30CB /* AttentionCenter.swift */; };
+		3A8A37604B08D0A2453217CD /* AmplifierHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38DB3CA3242A96763802819B /* AmplifierHUD.swift */; };
 		3DC92DF1917A2059D79AD808 /* EditTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C822D3C9AD028578CD3ABBBE /* EditTrackView.swift */; };
 		3E248FD660D01CE13FD67284 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27ED92912FF018764F1314A9 /* RootView.swift */; };
 		4AA7165515150B2A1126E18B /* LevelMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2C8786E67341140FA8EFAF /* LevelMeterView.swift */; };
 		4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9253360D61A0BC5E0BE49D /* LibraryView.swift */; };
-		DBFFCA702A15123375274133 /* LibrarySuggestionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135C4287218C7613D5344B4D /* LibrarySuggestionsSheet.swift */; };
 		4BDD17BF4D62826ED588D229 /* BLEProvisioningModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D087FFBFCB4708D377BC3C /* BLEProvisioningModel.swift */; };
 		510D1882797CEC49A61789A1 /* EquipmentRemoteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A8A778A9F5863318C47A4A /* EquipmentRemoteModel.swift */; };
 		54797A0D0D18B3306CF02600 /* EditReleaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A373873E7A0F33DEB4004BBC /* EditReleaseView.swift */; };
@@ -54,6 +54,7 @@
 		91122A625338C9EE6FACF203 /* AudioInputModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CE28FA2F7EA52890362EFC /* AudioInputModel.swift */; };
 		9124A458EAEC8E255255C2FB /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569411080918D04DCBAC649F /* Artwork.swift */; };
 		9436589215B9A9DAE6659F23 /* StylusModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354361FA261048E456288AB8 /* StylusModels.swift */; };
+		956022D3150D79C29B2BA25E /* LibrarySuggestionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8334EA6E04F5D5A95D396916 /* LibrarySuggestionsSheet.swift */; };
 		9857D48C75FF43FF0B99995E /* ArrangeRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */; };
 		99D2880D1FB1BEC67D7D43A0 /* RigModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A2E76DD3C03EACA8571DDA /* RigModels.swift */; };
 		9B9FBC5A7BE2AB51DC3FB3E4 /* EquipmentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1419E86CA4A3D1E5BD3CBEC2 /* EquipmentDetailView.swift */; };
@@ -84,9 +85,11 @@
 		EFCEAE28AA013B4C50B3A62D /* RemoteQuickAccessSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */; };
 		F0FE630615F7FE81459A8319 /* CustomProviderFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19701153C1009440F8683D72 /* CustomProviderFormView.swift */; };
 		F1ADECE205EB465BB191F3B5 /* AmplifierConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F8DED941B474568FDBE984 /* AmplifierConfigView.swift */; };
+		F1C4A445C6B788616E0F5266 /* AmplifierHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A0CBC258C3A964E867260B7 /* AmplifierHUDView.swift */; };
 		F1D5E38E633D0C502A15089B /* EditionQuestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8405014CDE5049C52E26E628 /* EditionQuestionCard.swift */; };
 		F2B4B2AAD3DA41B951841086 /* RemoteLayoutModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */; };
 		F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C276B60479555871B884B5E /* NavigationState.swift */; };
+		F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5692B96AF11DD835C1F1819A /* RulesView.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
 /* End PBXBuildFile section */
@@ -106,20 +109,23 @@
 		19701153C1009440F8683D72 /* CustomProviderFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomProviderFormView.swift; sourceTree = "<group>"; };
 		23353F59B5F59055945D5990 /* AddButtonSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddButtonSheet.swift; sourceTree = "<group>"; };
 		2634F6426F312060200F06B8 /* EquipmentButtonsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentButtonsSection.swift; sourceTree = "<group>"; };
+		26EFCF890EE02DEBAC662674 /* AmplifierStateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierStateModel.swift; sourceTree = "<group>"; };
 		27254E509C0A5183FE8A30CB /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		27ED92912FF018764F1314A9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		29A0CECF61D4276DD41099F9 /* ChangeReleaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeReleaseSheet.swift; sourceTree = "<group>"; };
 		354361FA261048E456288AB8 /* StylusModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylusModels.swift; sourceTree = "<group>"; };
 		3634CDA0BB984B61C55ADD18 /* Barcode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Barcode.swift; sourceTree = "<group>"; };
+		38DB3CA3242A96763802819B /* AmplifierHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierHUD.swift; sourceTree = "<group>"; };
 		38E7F90FC7CE8E55DE10877D /* BLEProvisioningClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningClient.swift; sourceTree = "<group>"; };
 		3A9BAD5549550DECAB6614F5 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
-		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		415BD591D32B91EC7E5C0C0A /* Groove.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Groove.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4271F4F0D0D2FEC9D2446F75 /* CatalogDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDiscovery.swift; sourceTree = "<group>"; };
 		431A7B81109A3032AF631217 /* StylusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylusModel.swift; sourceTree = "<group>"; };
 		4E4B6394B0A202EEC5CC67D1 /* ManualIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualIdentifySheet.swift; sourceTree = "<group>"; };
 		535882879A217CB2085F866E /* ReleasesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasesView.swift; sourceTree = "<group>"; };
 		54307373692AB53DC1F59A33 /* EnricherCredentialsForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnricherCredentialsForm.swift; sourceTree = "<group>"; };
+		5692B96AF11DD835C1F1819A /* RulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesView.swift; sourceTree = "<group>"; };
 		569411080918D04DCBAC649F /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
 		599238D9601A338235548EB9 /* GrooveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrooveApp.swift; sourceTree = "<group>"; };
 		5C276B60479555871B884B5E /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
@@ -127,13 +133,14 @@
 		66653264D1692CBEA90FB2AC /* EnricherSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnricherSettingsView.swift; sourceTree = "<group>"; };
 		66C5227820A40CD353C1E8E3 /* AmplifierRemoteTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierRemoteTab.swift; sourceTree = "<group>"; };
 		672B702C305D95A110E0B197 /* RigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigView.swift; sourceTree = "<group>"; };
+		6A0CBC258C3A964E867260B7 /* AmplifierHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierHUDView.swift; sourceTree = "<group>"; };
 		6CB0BA11AD156E7724FAA0C7 /* LearnSessionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnSessionSheet.swift; sourceTree = "<group>"; };
 		70A2E76DD3C03EACA8571DDA /* RigModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigModels.swift; sourceTree = "<group>"; };
 		72D9FF93C4894E2FD593E08D /* AmplifierModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierModel.swift; sourceTree = "<group>"; };
 		7AB2E6DDB717ECEE8D44A210 /* NowPlayingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingModel.swift; sourceTree = "<group>"; };
 		7C54B427D95192B93FFCA854 /* StreamingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingView.swift; sourceTree = "<group>"; };
-		B2C3D4E5F60718293A4B5C6D /* RulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesView.swift; sourceTree = "<group>"; };
 		80C08861DABACCD203B79E1B /* Poller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Poller.swift; sourceTree = "<group>"; };
+		8334EA6E04F5D5A95D396916 /* LibrarySuggestionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySuggestionsSheet.swift; sourceTree = "<group>"; };
 		8405014CDE5049C52E26E628 /* EditionQuestionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditionQuestionCard.swift; sourceTree = "<group>"; };
 		876155CF9A90291A8BC5DE46 /* MediaFormatIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFormatIcon.swift; sourceTree = "<group>"; };
 		8E960DB14104D8D2AB678A2F /* AudioInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioInputView.swift; sourceTree = "<group>"; };
@@ -165,7 +172,6 @@
 		D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteQuickAccessSheet.swift; sourceTree = "<group>"; };
 		D5EB40C22B18DFB61CAA5600 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB9253360D61A0BC5E0BE49D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
-		135C4287218C7613D5344B4D /* LibrarySuggestionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySuggestionsSheet.swift; sourceTree = "<group>"; };
 		E1413AC3F7F93EB3B0926AD2 /* AssociationReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssociationReviewSheet.swift; sourceTree = "<group>"; };
 		E359E243C5567C525755CBD8 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
 		E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrangeRemoteView.swift; sourceTree = "<group>"; };
@@ -262,8 +268,11 @@
 				164F9B46FAA2A75FDEB3E77A /* AmplifierConfigModel.swift */,
 				B3F8DED941B474568FDBE984 /* AmplifierConfigView.swift */,
 				98EFCEA58EE319666D979B2A /* AmplifierEquipmentTab.swift */,
+				38DB3CA3242A96763802819B /* AmplifierHUD.swift */,
+				6A0CBC258C3A964E867260B7 /* AmplifierHUDView.swift */,
 				72D9FF93C4894E2FD593E08D /* AmplifierModel.swift */,
 				66C5227820A40CD353C1E8E3 /* AmplifierRemoteTab.swift */,
+				26EFCF890EE02DEBAC662674 /* AmplifierStateModel.swift */,
 				EA402F3DB82BD6BF6BBF486B /* AmplifierView.swift */,
 				E466ED60E5F63F41B29A8DD4 /* ArrangeRemoteView.swift */,
 				B2CE28FA2F7EA52890362EFC /* AudioInputModel.swift */,
@@ -276,8 +285,8 @@
 				EF2C8786E67341140FA8EFAF /* LevelMeterView.swift */,
 				15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */,
 				672B702C305D95A110E0B197 /* RigView.swift */,
+				5692B96AF11DD835C1F1819A /* RulesView.swift */,
 				7C54B427D95192B93FFCA854 /* StreamingView.swift */,
-				B2C3D4E5F60718293A4B5C6D /* RulesView.swift */,
 				431A7B81109A3032AF631217 /* StylusModel.swift */,
 				C562BF700C03B7623BADB564 /* StylusView.swift */,
 			);
@@ -357,8 +366,8 @@
 				4127735EBF896EB4DC3F00A6 /* BarcodeScannerView.swift */,
 				9B7842CB9B4E1728D1B27D1A /* EditReleaseModel.swift */,
 				A373873E7A0F33DEB4004BBC /* EditReleaseView.swift */,
+				8334EA6E04F5D5A95D396916 /* LibrarySuggestionsSheet.swift */,
 				DB9253360D61A0BC5E0BE49D /* LibraryView.swift */,
-				135C4287218C7613D5344B4D /* LibrarySuggestionsSheet.swift */,
 				4E4B6394B0A202EEC5CC67D1 /* ManualIdentifySheet.swift */,
 				C9D14EECF13D2E7740D76994 /* ReleaseDetailView.swift */,
 				535882879A217CB2085F866E /* ReleasesView.swift */,
@@ -444,6 +453,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					183CFA358C610AC48FAF527E = {
+						DevelopmentTeam = VNTRG9Q6BU;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -492,8 +502,11 @@
 				EBDB97AA8FD8BD7CE797D9A9 /* AmplifierConfigModel.swift in Sources */,
 				F1ADECE205EB465BB191F3B5 /* AmplifierConfigView.swift in Sources */,
 				102F9509A73736397BBEBEFA /* AmplifierEquipmentTab.swift in Sources */,
+				3A8A37604B08D0A2453217CD /* AmplifierHUD.swift in Sources */,
+				F1C4A445C6B788616E0F5266 /* AmplifierHUDView.swift in Sources */,
 				7EA1D48D11F0E03C59385AE5 /* AmplifierModel.swift in Sources */,
 				092C5C78CF3B8FD2571F9070 /* AmplifierRemoteTab.swift in Sources */,
+				3167120F2CEA8D7F2759DE6F /* AmplifierStateModel.swift in Sources */,
 				686B8A619CF6DC47A499AD0E /* AmplifierView.swift in Sources */,
 				6EB577E6A6586EA2225A3FCD /* AppSettings.swift in Sources */,
 				9857D48C75FF43FF0B99995E /* ArrangeRemoteView.swift in Sources */,
@@ -532,8 +545,8 @@
 				58C30C986F9BA5EB5F3B563E /* LearnSessionModel.swift in Sources */,
 				CAC5831843B67710D826D6F8 /* LearnSessionSheet.swift in Sources */,
 				4AA7165515150B2A1126E18B /* LevelMeterView.swift in Sources */,
+				956022D3150D79C29B2BA25E /* LibrarySuggestionsSheet.swift in Sources */,
 				4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */,
-				DBFFCA702A15123375274133 /* LibrarySuggestionsSheet.swift in Sources */,
 				097AE1BADFB101B2A7FAACEC /* ManualIdentifySheet.swift in Sources */,
 				E947901EE0ADF3D0BDEC0487 /* MediaFormatIcon.swift in Sources */,
 				AC56F500A15DAB4B209720C2 /* Models.swift in Sources */,
@@ -555,9 +568,9 @@
 				99D2880D1FB1BEC67D7D43A0 /* RigModels.swift in Sources */,
 				A5C8565C906430EC7A80EA7E /* RigView.swift in Sources */,
 				3E248FD660D01CE13FD67284 /* RootView.swift in Sources */,
+				F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */,
 				0BA058B9DB3B8E645C1A48C3 /* SettingsView.swift in Sources */,
 				1E60AA21BFA1FD60CE4E8877 /* StreamingView.swift in Sources */,
-				A1B2C3D4E5F60718293A4B5C /* RulesView.swift in Sources */,
 				0ECA80898AF1C05367635A39 /* StylusModel.swift in Sources */,
 				9436589215B9A9DAE6659F23 /* StylusModels.swift in Sources */,
 				5D7B96197E969608A9E1AF0E /* StylusView.swift in Sources */,
@@ -705,7 +718,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = V3SNV627ZD;
 				INFOPLIST_FILE = Groove/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -723,7 +735,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = V3SNV627ZD;
 				INFOPLIST_FILE = Groove/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -30,6 +30,46 @@ struct RigAmplifierStatus: Decodable {
     var tone: RigToneStatus?
 }
 
+/// `GET /rig/observe/amplifier`: what the amplifier's state provider — a
+/// device that reads the amp's own state back, like the SP103's display
+/// Pico — last reported (groove-rig `docs/state-provider.md`). `state` is
+/// only present while `connected`, so it is never a stale reading.
+struct RigAmplifierObservation: Decodable, Equatable {
+    var configured: Bool
+    var connected: Bool
+    var state: RigAmplifierReading?
+}
+
+/// Every nil field is unknown to the provider (it hasn't seen it since it
+/// started).
+struct RigAmplifierReading: Decodable, Equatable {
+    var power: RigAmplifierPower?
+    var volumeDb: Double?
+    var inputId: String?
+    var bassDb: Double?
+    var trebleDb: Double?
+    var balance: RigAmplifierBalance?
+    var loudness: Bool?
+    var speakers: Bool?
+}
+
+enum RigAmplifierPower: String, Decodable {
+    case on
+    case standby
+}
+
+/// `db` 0 is centred; otherwise the attenuation of the channel `side`
+/// doesn't name. `side` is nil when the provider can't tell.
+struct RigAmplifierBalance: Decodable, Equatable {
+    var side: Side?
+    var db: Double
+
+    enum Side: String, Decodable {
+        case left = "L"
+        case right = "R"
+    }
+}
+
 /// `active`/`activeUntil` are set while the amp is in bass/treble mode
 /// (Volume ± adjusts that control; groove-rig holds volume presses).
 struct RigToneStatus: Decodable {

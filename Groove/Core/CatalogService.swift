@@ -455,6 +455,13 @@ struct CatalogService {
         try await api.post("/rig/observe/power/ensure_off", body: Empty())
     }
 
+    /// The amplifier's own reading of its state, from its state provider —
+    /// not an inference like `power` above. An older groove-rig without the
+    /// endpoint answers 404.
+    func rigObserveAmplifier() async throws -> RigAmplifierObservation {
+        try await api.get("/rig/observe/amplifier")
+    }
+
     /// Realigns the server's notion of the active input after it was changed
     /// physically (front panel / bundled remote) rather than through this app.
     func rigResyncActiveInput(inputId: String) async throws {

@@ -11,6 +11,7 @@ struct AmplifierRemoteTab: View {
     let equipmentModel: EquipmentRemoteModel
     @Environment(AppSettings.self) private var settings
     @State private var layoutModel = RemoteLayoutModel()
+    @State private var stateModel = AmplifierStateModel()
     @State private var showResyncDialog = false
     @State private var showArrange = false
 
@@ -38,6 +39,22 @@ struct AmplifierRemoteTab: View {
                 }
             }
             .padding(16)
+        }
+        .overlay(alignment: .top) {
+            if let hud = stateModel.hud {
+                AmplifierHUDView(hud: hud)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: stateModel.hud)
+        .onAppear {
+            stateModel.setInputs(model.amplifier?.inputs ?? [])
+            stateModel.start(settings)
+        }
+        .onDisappear { stateModel.stop() }
+        .onChange(of: model.amplifier?.inputs) { _, inputs in
+            stateModel.setInputs(inputs ?? [])
         }
         .toolbar {
             if model.isPerformingAction {
@@ -109,7 +126,11 @@ struct AmplifierRemoteTab: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var powerState: String { model.amplifier?.power?.state ?? "unknown" }
+    /// The amp's own reading when it has a state provider; otherwise the
+    /// rig's inference from REC OUT level and its own IR history.
+    private var powerState: String {
+        stateModel.power?.rawValue ?? model.amplifier?.power?.state ?? "unknown"
+    }
     private var powerLabel: String { powerState.replacingOccurrences(of: "_", with: " ").capitalized }
 
     private var powerColor: Color {
@@ -126,10 +147,11 @@ struct AmplifierRemoteTab: View {
     // `power_toggle` IR code — not discrete on/off buttons. Mirrors the web
     // remote's single Power button rather than modeling hardware that
     // mostly doesn't exist. Icon-only: the "Power" section label above
-    // already says what this is, and power.state is a software inference
-    // with no hardware feedback (can be confidently wrong after a physical
-    // remote/button press), so the button deliberately never claims
-    // "Turn On"/"Turn Off" — it doesn't know which way it's about to switch.
+    // already says what this is, and without a state provider power.state
+    // is a software inference with no hardware feedback (can be confidently
+    // wrong after a physical remote/button press), so the button
+    // deliberately never claims "Turn On"/"Turn Off" — it doesn't know which
+    // way it's about to switch.
     private var powerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Power")
