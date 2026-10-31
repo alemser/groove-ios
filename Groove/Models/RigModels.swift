@@ -31,8 +31,7 @@ struct RigAmplifierStatus: Decodable {
 }
 
 /// `GET /rig/observe/amplifier`: what the amplifier's state provider — a
-/// device that reads the amp's own state back, like the SP103's display
-/// Pico — last reported (groove-rig `docs/state-provider.md`). `state` is
+/// device that reads the amp's own state back — last reported (groove-rig `docs/state-provider.md`). `state` is
 /// only present while `connected`, so it is never a stale reading.
 struct RigAmplifierObservation: Decodable, Equatable {
     var configured: Bool
