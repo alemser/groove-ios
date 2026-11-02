@@ -59,6 +59,8 @@ struct NowPlayingView: View {
     private var content: some View {
         if !model.hasLoadedOnce {
             LoadingView(label: "Connecting…")
+        } else if let stream = model.streaming {
+            streaming(stream)
         } else if let pb = model.status?.playback, pb.active {
             playing(pb)
         } else if model.isLikelyTransitioning() {
@@ -122,7 +124,7 @@ struct NowPlayingView: View {
                     }
                 }
 
-                progress(pb)
+                progress(durationMs: pb.durationMs)
 
             }
             .padding()
@@ -155,10 +157,53 @@ struct NowPlayingView: View {
         [pb.title?.nonEmpty, pb.artist?.nonEmpty].compactMap { $0 }.joined(separator: " by ")
     }
 
-    private func progress(_ pb: Playback) -> some View {
+    /// What AirPlay or Bluetooth is playing: shown as it comes, with nothing
+    /// recognised and nothing in the library to open.
+    private func streaming(_ s: StreamingPlayback) -> some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                Artwork(raw: s.artworkUrl, cornerRadius: 20,
+                        label: [s.title?.nonEmpty, s.artist?.nonEmpty].compactMap { $0 }.joined(separator: " by "))
+                    .frame(maxWidth: 300, maxHeight: 300)
+                    .aspectRatio(1, contentMode: .fit)
+                    .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+                    .padding(.top, 4)
+
+                VStack(spacing: 6) {
+                    Text(s.title?.nonEmpty ?? s.sourceLabel)
+                        .font(.title2.bold())
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Brand.text)
+                    if let artist = s.artist?.nonEmpty {
+                        Text(artist)
+                            .font(.title3)
+                            .foregroundStyle(Brand.teal)
+                            .multilineTextAlignment(.center)
+                    }
+                    if let album = s.album?.nonEmpty {
+                        Text(album)
+                            .font(.subheadline)
+                            .foregroundStyle(Brand.muted)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.horizontal)
+
+                Badge(text: s.sourceLabel, color: Brand.ok)
+
+                progress(durationMs: s.durationMs)
+            }
+            .padding()
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+        }
+        .refreshable { await model.refresh(CatalogService(settings: settings)) }
+    }
+
+    private func progress(durationMs: Int64?) -> some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
             let pos = model.interpolatedPositionMs(at: context.date)
-            let dur = pb.durationMs ?? 0
+            let dur = durationMs ?? 0
             VStack(spacing: 6) {
                 ProgressView(value: fraction(pos: pos, dur: dur))
                     .tint(Brand.teal)

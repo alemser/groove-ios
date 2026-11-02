@@ -137,17 +137,16 @@ struct HomeView: View {
             Button {
                 navigation.openNowPlaying()
             } label: {
-                if let pb = nowPlaying.status?.playback, pb.active || nowPlaying.isLikelyTransitioning() {
-                    let recognizing = pb.isRecognizing || nowPlaying.isLikelyTransitioning()
+                if let s = nowPlaying.summary {
                     HStack(spacing: 12) {
-                        Artwork(raw: pb.artworkUrl, cornerRadius: 8, isRecognizing: recognizing)
+                        Artwork(raw: s.artworkUrl, cornerRadius: 8, isRecognizing: s.isRecognizing)
                             .frame(width: 48, height: 48)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(pb.title?.nonEmpty ?? (recognizing ? "Recognizing…" : "Now Playing"))
+                            Text(s.title)
                                 .font(.headline)
                                 .foregroundStyle(Brand.text)
                                 .lineLimit(1)
-                            Text(pb.artist?.nonEmpty ?? (recognizing ? "Listening…" : "Unknown artist"))
+                            Text(s.subtitle)
                                 .font(.subheadline)
                                 .foregroundStyle(Brand.muted)
                                 .lineLimit(1)
