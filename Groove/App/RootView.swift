@@ -51,8 +51,9 @@ struct MainTabView: View {
             }
             .tint(Brand.accent)
 
-            if !navigation.isNowPlayingSheetPresented,
-               nowPlaying.status?.playback.active == true || nowPlaying.isLikelyTransitioning() {
+            // Home only: on the other tabs it covered their content.
+            if navigation.selectedTab == .home, !navigation.isNowPlayingSheetPresented,
+               nowPlaying.summary != nil {
                 NowPlayingMiniBar()
                     .padding(.horizontal, 12)
                     .padding(.bottom, 57)

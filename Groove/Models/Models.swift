@@ -485,8 +485,27 @@ struct ApplyReleaseTrackError: Decodable {
 
 // MARK: - Status / health
 
+/// What AirPlay or Bluetooth is playing (`/status` `streaming`, from
+/// groove-display). Streams are never recognised, so `playback` stays
+/// inactive while one plays and this is the only word on it.
+struct StreamingPlayback: Decodable, Equatable {
+    /// "airplay" or "bluetooth".
+    var source: String
+    var title: String?
+    var artist: String?
+    var album: String?
+    var durationMs: Int64?
+    /// As of the catalog's answer; advance it from when the answer arrived.
+    var positionMs: Int64?
+    var artworkUrl: String?
+
+    var sourceLabel: String { source == "bluetooth" ? "Bluetooth" : "AirPlay" }
+}
+
 struct CatalogStatus: Decodable {
     var playback: Playback
+    /// Absent unless AirPlay or Bluetooth is playing.
+    var streaming: StreamingPlayback?
     var identityStatusError: String?
     var catalogSchemaVersion: Int?
     var catalogDbPath: String?

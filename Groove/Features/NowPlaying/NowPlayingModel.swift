@@ -1,6 +1,15 @@
 import SwiftUI
 import Observation
 
+/// One line of "what's playing" — the mini-bar and Home show this, for a
+/// stream and a record alike.
+struct NowPlayingSummary {
+    var artworkUrl: String?
+    var title: String
+    var subtitle: String
+    var isRecognizing: Bool
+}
+
 @MainActor
 @Observable
 final class NowPlayingModel {
@@ -8,8 +17,9 @@ final class NowPlayingModel {
     var errorMessage: String?
     var hasLoadedOnce = false
 
-    /// Wall-clock instant the current `status.playback.positionMs` was captured,
-    /// so the UI can advance the progress bar smoothly between polls.
+    /// Wall-clock instant the current position (`status.playback.positionMs`
+    /// or `status.streaming.positionMs`) was captured, so the UI can advance
+    /// the progress bar smoothly between polls.
     private(set) var positionAnchoredAt = Date()
 
     /// Wall-clock instant `playback.active` was last true. Track transitions
@@ -29,11 +39,36 @@ final class NowPlayingModel {
     /// The open "which pressing is this?" question, if any (groove-identity#38).
     var editionQuestion: EditionQuestion? { status?.editionQuestion }
 
+    /// What AirPlay or Bluetooth is playing. groove-display ranks a stream
+    /// above the record, and so does every screen here.
+    var streaming: StreamingPlayback? { status?.streaming }
+
     /// True when playback just went inactive but was active moments ago —
     /// "probably between tracks," not "nothing has played all session."
     func isLikelyTransitioning(at now: Date = Date()) -> Bool {
         guard status?.playback.active != true, let lastActiveAt else { return false }
         return now.timeIntervalSince(lastActiveAt) <= transitionGraceInterval
+    }
+
+    /// The stream, else the record (or one being recognised between
+    /// tracks), else nil: nothing is playing.
+    var summary: NowPlayingSummary? {
+        if let s = streaming {
+            return NowPlayingSummary(
+                artworkUrl: s.artworkUrl,
+                title: s.title?.nonEmpty ?? s.sourceLabel,
+                subtitle: s.artist?.nonEmpty ?? s.sourceLabel,
+                isRecognizing: false
+            )
+        }
+        guard let pb = status?.playback, pb.active || isLikelyTransitioning() else { return nil }
+        let recognizing = pb.isRecognizing || isLikelyTransitioning()
+        return NowPlayingSummary(
+            artworkUrl: pb.artworkUrl,
+            title: pb.title?.nonEmpty ?? (recognizing ? "Recognizing…" : "Now Playing"),
+            subtitle: pb.artist?.nonEmpty ?? (recognizing ? "Listening…" : "Unknown artist"),
+            isRecognizing: recognizing
+        )
     }
 
     func start(_ settings: AppSettings) {
@@ -87,14 +122,20 @@ final class NowPlayingModel {
         }
     }
 
-    /// Interpolated playback position in ms at `now`, clamped to the track length.
+    /// Interpolated position in ms at `now` — of the stream when one plays,
+    /// else of the record — clamped to the track length.
     func interpolatedPositionMs(at now: Date) -> Int64? {
-        guard let pb = status?.playback, pb.active, let base = pb.positionMs else {
-            return status?.playback.positionMs
+        let base: Int64?
+        let duration: Int64?
+        if let s = streaming {
+            (base, duration) = (s.positionMs, s.durationMs)
+        } else {
+            guard let pb = status?.playback, pb.active else { return status?.playback.positionMs }
+            (base, duration) = (pb.positionMs, pb.durationMs)
         }
-        let elapsed = Int64(now.timeIntervalSince(positionAnchoredAt) * 1000)
-        let value = base + max(0, elapsed)
-        if let dur = pb.durationMs, dur > 0 { return min(value, dur) }
+        guard let base else { return nil }
+        let value = base + max(0, Int64(now.timeIntervalSince(positionAnchoredAt) * 1000))
+        if let duration, duration > 0 { return min(value, duration) }
         return value
     }
 }
