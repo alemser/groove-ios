@@ -127,17 +127,35 @@ struct RigTargetStatus: Decodable, Identifiable {
     }
 }
 
-/// An IR bridge as `/status` reports it. `paired` is absent from a rig that
-/// predates new installations shipping their bridge unpaired; those always
-/// had theirs set up.
-struct RigBackendStatus: Decodable {
+
+/// An IR bridge, as `/rig/status` (`backends`) and `/rig/backends` report it.
+struct RigBackend: Decodable, Identifiable {
     var id: String
+    var host: String?
     var paired: Bool?
+    var healthy: Bool
+    var error: String?
+    var capabilities: RigBackendCapabilities?
+
+    /// The bridge has a device to talk to. `paired` is absent from a rig
+    /// that predates new installations shipping their bridge unpaired;
+    /// those always had theirs set up.
+    var isPaired: Bool { paired ?? true }
+}
+
+struct RigBackendCapabilities: Decodable {
+    var pair: Bool?
+    /// Absent from a rig that can't search the network for bridges.
+    var discover: Bool?
+}
+
+struct RigBackendListResponse: Decodable {
+    var items: [RigBackend]
 }
 
 struct RigSnapshot: Decodable {
     var schemaVersion: Int
-    var backends: [RigBackendStatus]?
+    var backends: [RigBackend]?
     var targets: [RigTargetStatus]
     var amplifier: RigAmplifierStatus?
 
@@ -147,7 +165,7 @@ struct RigSnapshot: Decodable {
     /// input is set by hand.
     var irBridgePaired: Bool {
         guard let backends else { return true }
-        return backends.contains { $0.paired ?? true }
+        return backends.contains(where: \.isPaired)
     }
 }
 
@@ -156,24 +174,6 @@ struct RigControl: Codable {
     var enabled: Bool
 }
 
-/// An IR bridge as `/rig/backends` lists it, for the IR Bridge screen.
-struct RigBackend: Decodable, Identifiable {
-    var id: String
-    var host: String?
-    var paired: Bool?
-    var healthy: Bool
-    var error: String?
-    var capabilities: RigBackendCapabilities?
-}
-
-struct RigBackendCapabilities: Decodable {
-    var pair: Bool?
-    var discover: Bool?
-}
-
-struct RigBackendListResponse: Decodable {
-    var items: [RigBackend]
-}
 
 /// A bridge that answered a network search (`POST /rig/backends/{id}/discover`).
 struct RigDiscoveredBridge: Decodable, Identifiable {

@@ -262,7 +262,7 @@ struct IRBridgeView: View {
                             Task { await model.search() }
                         } label: {
                             HStack {
-                                Text(model.isSearching ? "Searching…" : (bridge.paired == true ? "Search Again" : "Search for Bridges"))
+                                Text(model.isSearching ? "Searching…" : (bridge.isPaired ? "Search Again" : "Search for Bridges"))
                                 if model.isSearching {
                                     Spacer()
                                     ProgressView()
@@ -313,7 +313,7 @@ struct IRBridgeView: View {
     }
 
     private func statusText(_ bridge: RigBackend) -> String {
-        guard bridge.paired == true else { return "Not paired" }
+        guard bridge.isPaired else { return "Not paired" }
         let host = bridge.host?.nonEmpty.map { " · \($0)" } ?? ""
         return (bridge.healthy ? "Paired" : "Paired, not reachable") + host
     }
@@ -329,7 +329,7 @@ struct IRBridgeView: View {
                     .foregroundStyle(Brand.muted)
             }
             Spacer()
-            if bridge.paired == true, bridge.host == found.host {
+            if bridge.isPaired, bridge.host == found.host {
                 Text("Paired").font(.caption).foregroundStyle(Brand.ok)
             } else if found.locked {
                 Text("Locked — unlock it in its app").font(.caption).foregroundStyle(Brand.warn)
