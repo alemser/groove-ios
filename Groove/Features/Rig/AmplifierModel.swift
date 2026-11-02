@@ -23,6 +23,16 @@ final class AmplifierModel {
         amplifierTarget?.actions[action]?.learned ?? false
     }
 
+    /// The remote shows only with a paired IR bridge and something to
+    /// press: a learned (or built-in) amplifier code, or equipment with a
+    /// remote. Built-in codes count as learned, so without the bridge check
+    /// a new SP103 would show buttons that reach nothing.
+    func remoteAvailable(with equipment: EquipmentRemoteModel) -> Bool {
+        guard snapshot?.irBridgePaired ?? false else { return false }
+        let ampLearned = amplifierTarget?.actions.values.contains { $0.learned } ?? false
+        return ampLearned || equipment.equipment.contains { $0.hasRemote }
+    }
+
     func configure(_ settings: AppSettings) {
         if self.settings == nil {
             self.settings = settings

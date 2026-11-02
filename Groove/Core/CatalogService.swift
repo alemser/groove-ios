@@ -587,6 +587,37 @@ struct CatalogService {
         try await api.get("/rig/sessions/\(id)")
     }
 
+    /// Pairs `backendId` with the bridge at `host`; poll `rigSession` for
+    /// the outcome.
+    func rigStartPair(backendId: String, host: String) async throws -> RigSessionSummary {
+        try await api.post("/rig/sessions/pair", body: RigPairRequest(backendId: backendId, host: host))
+    }
+
+    // MARK: Rig switch, bridges, amplifier removal
+
+    func rigControl() async throws -> RigControl {
+        try await api.get("/rig/control")
+    }
+
+    @discardableResult
+    func rigSetControl(enabled: Bool) async throws -> RigControl {
+        try await api.patch("/rig/control", body: RigControl(enabled: enabled))
+    }
+
+    func rigBackends() async throws -> [RigBackend] {
+        try await api.get("/rig/backends", as: RigBackendListResponse.self).items
+    }
+
+    /// Searches the network for bridges; groove-rig answers after ~4 s.
+    func rigDiscoverBridges(backendId: String) async throws -> [RigDiscoveredBridge] {
+        try await api.post("/rig/backends/\(backendId)/discover", body: Empty(), as: RigDiscoverResponse.self).items
+    }
+
+    /// "No amplifier": its settings, wiring and codes stay in its profile.
+    func rigRemoveAmplifier() async throws {
+        try await api.delete("/rig/amplifier")
+    }
+
     /// Steps bass/treble on a tone-mode amplifier (Bass/Treble key + Volume ±).
     @discardableResult
     func rigTone(control: String, direction: String) async throws -> RigSnapshot {

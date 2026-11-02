@@ -21,8 +21,12 @@ struct AmplifierProfileDocument: FileDocument {
 }
 
 /// Editable amplifier config: device attributes, the inputs table, and
-/// profile management — mirrors the web studio's Amplifier tab.
+/// profile management — mirrors the web studio's Amplifier tab. "No
+/// Amplifier" is the first choice, and what a new installation shows.
 struct AmplifierConfigView: View {
+    /// The live rig state: whether an IR bridge is paired, and the input
+    /// the amplifier is on (set by hand when there is no bridge).
+    let ampModel: AmplifierModel
     let equipmentModel: EquipmentRemoteModel
 
     @Environment(AppSettings.self) private var settings
@@ -36,7 +40,10 @@ struct AmplifierConfigView: View {
     @State private var inputs: [RigInputConfig] = []
     @State private var useInputForFormat = true
 
+    /// "" is "No Amplifier". Seeded once from the active profile.
     @State private var selectedProfileId = ""
+    @State private var selectionSeeded = false
+    @State private var confirmRemove = false
     @State private var showDuplicateSheet = false
     @State private var duplicateName = ""
     @State private var confirmReset = false
@@ -82,6 +89,20 @@ struct AmplifierConfigView: View {
         } message: {
             Text("Your input names, visibility and timing for this amplifier are discarded. Learned remote codes are kept.")
         }
+        .confirmationDialog(
+            "Remove the amplifier?",
+            isPresented: $confirmRemove,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                Task {
+                    await model.removeAmplifier()
+                    await reloadRig()
+                }
+            }
+        } message: {
+            Text("Its settings and learned remote codes are kept, for if you choose it again.")
+        }
         .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .json, defaultFilename: "amplifier-profile") { _ in }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
             Task { await handleImport(result) }
@@ -115,7 +136,11 @@ struct AmplifierConfigView: View {
                     .keyboardType(.numberPad)
             }
 
-            commandsSection
+            if bridgePaired {
+                commandsSection
+            } else {
+                currentInputSection
+            }
 
             Section {
                 ForEach($inputs) { $input in
@@ -198,15 +223,20 @@ struct AmplifierConfigView: View {
         selectedProfileId == (model.activeProfileId ?? "")
     }
 
+    /// Whether an IR bridge is paired: without one, learning is hidden and
+    /// the input is set by hand.
+    private var bridgePaired: Bool { ampModel.snapshot?.irBridgePaired ?? true }
+
     private var profileSection: some View {
         Section {
             Picker(selection: $selectedProfileId) {
+                Text("No Amplifier").tag("")
                 ForEach(model.profiles) { profile in
                     Text(profile.name).tag(profile.id)
                 }
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Profile")
+                    Text("Amplifier")
                     if selectedProfile?.customised == true {
                         Text("Customised").font(.caption).foregroundStyle(Brand.muted)
                     }
@@ -214,24 +244,65 @@ struct AmplifierConfigView: View {
             }
             .pickerStyle(.navigationLink)
             if !isSelectedProfileActive {
-                Button("Activate Profile") {
-                    Task {
-                        await model.activate(profileId: selectedProfileId)
-                        // The first activation registers the amplifier as
-                        // equipment, which the Remote Commands row reads.
-                        await equipmentModel.load()
+                if selectedProfileId.isEmpty {
+                    Button("Remove Amplifier", role: .destructive) { confirmRemove = true }
+                } else {
+                    Button(model.hasAmplifier ? "Activate Profile" : "Use This Amplifier") {
+                        Task {
+                            await model.activate(profileId: selectedProfileId)
+                            await reloadRig()
+                        }
                     }
                 }
             }
         } footer: {
-            if !model.hasAmplifier {
-                Text("No amplifier yet. Choose your amplifier's model and activate it to set it up.")
-                    .foregroundStyle(Brand.muted)
-            } else if !isSelectedProfileActive {
-                Text("Switches the rig to this amplifier's settings, remote codes and wiring.")
-                    .foregroundStyle(Brand.muted)
+            Group {
+                if isSelectedProfileActive {
+                    if !model.hasAmplifier {
+                        Text("No amplifier set up. Choose yours to tell Oceano its inputs.")
+                    }
+                } else if selectedProfileId.isEmpty {
+                    Text("Removes the amplifier from the rig. Its settings and learned remote codes are kept, for if you choose it again.")
+                } else if model.hasAmplifier {
+                    Text("Switches the rig to this amplifier's settings, remote codes and wiring.")
+                } else {
+                    Text("Sets up this amplifier, with its inputs.")
+                }
             }
+            .foregroundStyle(Brand.muted)
         }
+    }
+
+    /// Without an IR bridge Oceano can't switch inputs, but knowing which
+    /// one is selected still tells it a record from a disc. Setting it here
+    /// records it without sending anything.
+    private var currentInputSection: some View {
+        Section {
+            Picker("Amplifier Is On", selection: Binding(
+                get: { ampModel.amplifier?.activeInputId ?? "" },
+                set: { id in Task { await ampModel.resyncInput(id: id) } }
+            )) {
+                if (ampModel.amplifier?.activeInputId ?? "").isEmpty {
+                    Text("Choose…").tag("")
+                }
+                ForEach(ampModel.visibleInputs) { input in
+                    Text(input.label).tag(input.id)
+                }
+            }
+        } header: {
+            Text("Current Input")
+        } footer: {
+            Text("Without an IR bridge Oceano can't switch inputs; this only tells it which one you selected, so it knows a record from a disc. Change it here when you switch inputs on the amplifier.")
+                .foregroundStyle(Brand.muted)
+        }
+    }
+
+    /// After the amplifier is set up, switched or removed: the live state
+    /// and the equipment (the amplifier is equipment too) changed with it.
+    private func reloadRig() async {
+        async let amp: Void = ampModel.load()
+        async let equipment: Void = equipmentModel.load()
+        _ = await (amp, equipment)
     }
 
     /// Profile housekeeping lives in one toolbar menu rather than a stack of
@@ -317,10 +388,10 @@ struct AmplifierConfigView: View {
         standbyTimeoutMins = config.standbyTimeoutMins.map(String.init) ?? ""
         inputs = config.inputs ?? []
         useInputForFormat = model.useAmplifierInputForFormat
-        if selectedProfileId.isEmpty {
-            // With no amplifier yet, the list's first is offered.
-            selectedProfileId = model.activeProfileId?.nonEmpty ?? config.profileId?.nonEmpty
-                ?? model.profiles.first?.id ?? ""
+        if !selectionSeeded {
+            // Nothing is preselected: with no amplifier, "No Amplifier".
+            selectedProfileId = model.activeProfileId ?? config.profileId ?? ""
+            selectionSeeded = true
         }
     }
 

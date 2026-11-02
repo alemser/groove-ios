@@ -16,11 +16,7 @@ struct HomeView: View {
     @State private var stylusState: StylusState?
     @State private var togglingRecognition = false
 
-    private var remoteAvailable: Bool {
-        let ampLearned = ampModel.amplifierTarget?.actions.values.contains { $0.learned } ?? false
-        let equipmentHasRemote = equipmentModel.equipment.contains { $0.hasRemote }
-        return ampLearned || equipmentHasRemote
-    }
+    private var remoteAvailable: Bool { ampModel.remoteAvailable(with: equipmentModel) }
 
     var body: some View {
         NavigationStack {

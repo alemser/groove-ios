@@ -28,7 +28,12 @@ struct EquipmentDetailView: View {
                 }
             }
 
-            if currentItem.hasRemote {
+            if currentItem.hasRemote, !(model.snapshot?.irBridgePaired ?? true) {
+                Section {
+                    Text("Its remote buttons appear once an IR bridge is paired, in Rig › IR Bridge.")
+                        .foregroundStyle(Brand.muted)
+                }
+            } else if currentItem.hasRemote {
                 EquipmentButtonsSection(
                     item: currentItem, model: model,
                     onLearn: { learnRequest = LearnRequestItem(steps: $0) },

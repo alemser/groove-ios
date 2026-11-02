@@ -142,13 +142,57 @@ struct RigSnapshot: Decodable {
     var amplifier: RigAmplifierStatus?
 
     /// Some IR bridge is paired, so IR control can work at all. A new
-    /// installation has none until it's paired in the Studio; until then
-    /// the amplifier screen explains the bridge instead of offering setup
-    /// that could never send anything.
+    /// installation has none until it's paired (Rig › IR Bridge); until
+    /// then remote buttons and learning are hidden and the amplifier's
+    /// input is set by hand.
     var irBridgePaired: Bool {
         guard let backends else { return true }
         return backends.contains { $0.paired ?? true }
     }
+}
+
+/// The "Rig" switch (`/rig/control`). A new installation ships it off.
+struct RigControl: Codable {
+    var enabled: Bool
+}
+
+/// An IR bridge as `/rig/backends` lists it, for the IR Bridge screen.
+struct RigBackend: Decodable, Identifiable {
+    var id: String
+    var host: String?
+    var paired: Bool?
+    var healthy: Bool
+    var error: String?
+    var capabilities: RigBackendCapabilities?
+}
+
+struct RigBackendCapabilities: Decodable {
+    var pair: Bool?
+    var discover: Bool?
+}
+
+struct RigBackendListResponse: Decodable {
+    var items: [RigBackend]
+}
+
+/// A bridge that answered a network search (`POST /rig/backends/{id}/discover`).
+struct RigDiscoveredBridge: Decodable, Identifiable {
+    var host: String
+    var name: String?
+    var model: String?
+    var mac: String?
+    /// Locked in its maker's app: it must be unlocked there to be paired.
+    var locked: Bool
+    var id: String { mac?.nonEmpty ?? host }
+}
+
+struct RigDiscoverResponse: Decodable {
+    var items: [RigDiscoveredBridge]
+}
+
+struct RigPairRequest: Encodable {
+    var backendId: String
+    var host: String
 }
 
 struct RigSelectInputRequest: Encodable {

@@ -91,6 +91,19 @@ final class AmplifierConfigModel {
         }
     }
 
+    /// "No Amplifier": groove-rig keeps the amplifier's settings, wiring and
+    /// learned codes in its profile, so choosing it again restores them.
+    func removeAmplifier() async {
+        guard let settings else { return }
+        do {
+            try await CatalogService(settings: settings).rigRemoveAmplifier()
+            await load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            actionError = error.localizedForDisplay
+        }
+    }
+
     /// Copies `source` under a new name, with its learned IR codes and
     /// equipment wiring. Returns the new profile's id on success.
     func duplicateProfile(_ source: RigStoredAmplifierProfile, name: String) async -> String? {
