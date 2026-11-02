@@ -127,10 +127,28 @@ struct RigTargetStatus: Decodable, Identifiable {
     }
 }
 
+/// An IR bridge as `/status` reports it. `paired` is absent from a rig that
+/// predates new installations shipping their bridge unpaired; those always
+/// had theirs set up.
+struct RigBackendStatus: Decodable {
+    var id: String
+    var paired: Bool?
+}
+
 struct RigSnapshot: Decodable {
     var schemaVersion: Int
+    var backends: [RigBackendStatus]?
     var targets: [RigTargetStatus]
     var amplifier: RigAmplifierStatus?
+
+    /// Some IR bridge is paired, so IR control can work at all. A new
+    /// installation has none until it's paired in the Studio; until then
+    /// the amplifier screen explains the bridge instead of offering setup
+    /// that could never send anything.
+    var irBridgePaired: Bool {
+        guard let backends else { return true }
+        return backends.contains { $0.paired ?? true }
+    }
 }
 
 struct RigSelectInputRequest: Encodable {

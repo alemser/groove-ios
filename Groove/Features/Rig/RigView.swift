@@ -111,8 +111,12 @@ struct RigView: View {
         guard settings.isConfigured else { return }
         do {
             let snapshot = try await CatalogService(settings: settings).rigStatus()
+            guard snapshot.irBridgePaired else {
+                ampStatusText = "Needs an IR bridge"
+                return
+            }
             guard let amp = snapshot.amplifier else {
-                ampStatusText = "Not configured"
+                ampStatusText = "Not set up"
                 return
             }
             let device = [amp.maker, amp.model].compactMap { $0.nonEmpty }.joined(separator: " ")

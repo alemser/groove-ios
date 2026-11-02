@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Hub for the amplifier: its own attributes and profiles (Configuration),
 /// the other IR-controlled devices around it (Equipment), and the live
-/// remote (only shown once there's something learned to control).
+/// remote (only shown once there's something learned to control). With no
+/// IR bridge paired, none of that can send anything, so it explains the
+/// bridge instead.
 struct AmplifierView: View {
     enum Section: String, CaseIterable, Identifiable {
         case configuration = "Configuration"
@@ -28,22 +30,11 @@ struct AmplifierView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Section", selection: $section) {
-                ForEach(visibleSections) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
-
-            switch section {
-            case .configuration:
-                AmplifierConfigView(equipmentModel: equipmentModel)
-            case .equipment:
-                AmplifierEquipmentTab(model: equipmentModel)
-            case .remote:
-                AmplifierRemoteTab(model: model, equipmentModel: equipmentModel)
+        Group {
+            if let snapshot = model.snapshot, !snapshot.irBridgePaired {
+                IRBridgeNeededView()
+            } else {
+                sections
             }
         }
         .navigationTitle("Amplifier")
@@ -70,5 +61,39 @@ struct AmplifierView: View {
             Task { await model.load() }
             Task { await equipmentModel.load() }
         }
+    }
+
+    private var sections: some View {
+        VStack(spacing: 0) {
+            Picker("Section", selection: $section) {
+                ForEach(visibleSections) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            switch section {
+            case .configuration:
+                AmplifierConfigView(equipmentModel: equipmentModel)
+            case .equipment:
+                AmplifierEquipmentTab(model: equipmentModel)
+            case .remote:
+                AmplifierRemoteTab(model: model, equipmentModel: equipmentModel)
+            }
+        }
+    }
+}
+
+/// What a new installation shows until its IR bridge is paired. Pairing
+/// is done in the web Studio; the bridge is never named by brand (which
+/// devices work is listed on the website).
+struct IRBridgeNeededView: View {
+    var body: some View {
+        EmptyStateView(
+            icon: "dot.radiowaves.left.and.right",
+            title: "An IR bridge is needed",
+            message: "Oceano controls your amplifier and the rest of your equipment through an IR bridge: a small Wi-Fi device that sends your remotes' infrared signals. Pair it in the Oceano Studio, under Equipment › IR Bridge. Which bridges work is listed on getoceano.com.\n\nEverything else works without one: recognising what plays, the display and streaming."
+        )
     }
 }

@@ -60,12 +60,14 @@ struct AmplifierConfigView: View {
         .onChange(of: model.config) { _, new in seed(from: new) }
         .onChange(of: model.useAmplifierInputForFormat) { _, new in useInputForFormat = new }
         .toolbar {
-            if model.phase == .loaded {
+            // Before an amplifier is set up there is nothing to save or
+            // copy: the only thing to do is pick one and activate it.
+            if model.phase == .loaded, model.hasAmplifier {
                 ToolbarItem(placement: .topBarTrailing) { profileMenu }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button(model.isSaving ? "Saving…" : "Save") { Task { await save() } }
-                    .disabled(model.isSaving)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(model.isSaving ? "Saving…" : "Save") { Task { await save() } }
+                        .disabled(model.isSaving)
+                }
             }
         }
         .sheet(isPresented: $showDuplicateSheet) { duplicateSheet }
@@ -86,7 +88,17 @@ struct AmplifierConfigView: View {
         }
     }
 
+    @ViewBuilder
     private var content: some View {
+        if model.hasAmplifier {
+            amplifierForm
+        } else {
+            Form { profileSection }
+                .scrollContentBackground(.hidden)
+        }
+    }
+
+    private var amplifierForm: some View {
         Form {
             profileSection
 
@@ -202,10 +214,20 @@ struct AmplifierConfigView: View {
             }
             .pickerStyle(.navigationLink)
             if !isSelectedProfileActive {
-                Button("Activate Profile") { Task { await model.activate(profileId: selectedProfileId) } }
+                Button("Activate Profile") {
+                    Task {
+                        await model.activate(profileId: selectedProfileId)
+                        // The first activation registers the amplifier as
+                        // equipment, which the Remote Commands row reads.
+                        await equipmentModel.load()
+                    }
+                }
             }
         } footer: {
-            if !isSelectedProfileActive {
+            if !model.hasAmplifier {
+                Text("No amplifier yet. Choose your amplifier's model and activate it to set it up.")
+                    .foregroundStyle(Brand.muted)
+            } else if !isSelectedProfileActive {
                 Text("Switches the rig to this amplifier's settings, remote codes and wiring.")
                     .foregroundStyle(Brand.muted)
             }
@@ -296,7 +318,9 @@ struct AmplifierConfigView: View {
         inputs = config.inputs ?? []
         useInputForFormat = model.useAmplifierInputForFormat
         if selectedProfileId.isEmpty {
-            selectedProfileId = model.activeProfileId ?? config.profileId ?? ""
+            // With no amplifier yet, the list's first is offered.
+            selectedProfileId = model.activeProfileId?.nonEmpty ?? config.profileId?.nonEmpty
+                ?? model.profiles.first?.id ?? ""
         }
     }
 

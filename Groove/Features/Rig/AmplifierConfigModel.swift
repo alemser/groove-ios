@@ -16,6 +16,12 @@ final class AmplifierConfigModel {
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
+    /// An amplifier is set up. groove-rig reports an empty active profile
+    /// until the first one is activated, which is what registers the
+    /// amplifier; a new installation has none. Profiles that failed to load
+    /// (nil) leave the screen as it was.
+    var hasAmplifier: Bool { activeProfileId != "" }
+
     private var settings: AppSettings?
 
     func configure(_ settings: AppSettings) {
