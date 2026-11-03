@@ -461,6 +461,7 @@ struct EditReleaseView: View {
         releaseDate = edition.releaseDate ?? ""
         releaseType = edition.releaseType ?? ""
         releaseFormat = edition.releaseFormat?.lowercased().nonEmpty ?? "vinyl"
+        notes = edition.userNotes ?? ""
         tracklist = (edition.tracklist ?? []).sorted { $0.ordinal < $1.ordinal }
     }
 

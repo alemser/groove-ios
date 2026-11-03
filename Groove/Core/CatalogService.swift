@@ -538,8 +538,7 @@ struct CatalogService {
 
 
     func rigDeleteProfile(id: String) async throws {
-        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
-        try await api.delete("/rig/amplifier/profiles?profile_id=\(encoded)")
+        try await api.delete("/rig/amplifier/profiles", query: [.init(name: "profile_id", value: id)])
     }
 
     /// Switching never needs confirming: groove-rig saves edits into the
@@ -561,8 +560,7 @@ struct CatalogService {
     }
 
     func rigExportProfile(id: String) async throws -> RigProfileExportDoc {
-        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
-        return try await api.get("/rig/amplifier/profiles/export?profile_id=\(encoded)")
+        try await api.get("/rig/amplifier/profiles/export", query: [.init(name: "profile_id", value: id)])
     }
 
     @discardableResult

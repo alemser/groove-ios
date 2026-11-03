@@ -19,6 +19,13 @@ codebase convention only (see `CFBundleDisplayName` in `Info.plist`, `OceanoWord
 device name, or anything else a user sees — this shipped wrong once already (BLE peripheral
 advertised as "Groove-A909" before being caught and fixed).
 
+## iOS and Android stay in step (hard rule)
+
+**Every change to groove-ios or [groove-android](../groove-android) lands in both apps, in the same
+piece of work.** A feature, a fix, a copy change, a new endpoint: port it before reporting it done.
+When one platform truly can't do something, say so explicitly instead of letting the apps drift.
+groove-android's `CLAUDE.md` maps the two codebases file to file.
+
 ## Cross-repo context
 
 System-wide architecture, current hardware state (which box is "oceano" right now — it moves),

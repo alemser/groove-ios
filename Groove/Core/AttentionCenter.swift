@@ -111,7 +111,7 @@ final class AttentionCenter {
                 ?? "A play couldn't be recognized automatically."
         } else {
             content.title = "\(unseen.count) tracks need identification"
-            content.body = "They couldn't be recognized automatically — open Groove to pick them from your library."
+            content.body = "They couldn't be recognized automatically — open Oceano to pick them from your library."
         }
         let request = UNNotificationRequest(
             identifier: "pending-association-\(unseen.map { String($0.listenerEpoch) }.joined(separator: "-"))",

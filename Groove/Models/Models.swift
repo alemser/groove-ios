@@ -200,6 +200,10 @@ struct PendingRelease: Decodable, Identifiable, Hashable {
     var label: String?
     var artworkUrl: String?
     var tracklist: [TracklistEntry]?
+    var externalIds: [String: String]?
+
+    /// What the form's Notes field saved; the catalog keeps it in `external_ids`.
+    var userNotes: String? { externalIds?["user_notes"] }
 
     static func == (lhs: PendingRelease, rhs: PendingRelease) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

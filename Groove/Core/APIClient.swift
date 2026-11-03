@@ -36,12 +36,16 @@ struct APIClient {
     let settings: AppSettings
     var session: URLSession = .shared
 
+    /// `path` keeps the encoding `pathSegment` gave it. Assigning it to
+    /// `URLComponents.path` would encode the `%` a second time, and assigning
+    /// `percentEncodedPath` traps on an invalid escape; resolving against the base
+    /// URL does neither. Query parameters go in `query`, never in `path`.
     private func makeURL(_ path: String, query: [URLQueryItem] = []) throws -> URL {
         guard let baseURL = settings.baseURL else { throw APIError.notConfigured }
-        guard var comps = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+        guard let resolved = URL(string: path, relativeTo: baseURL)?.absoluteURL,
+              var comps = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
         }
-        comps.path = path
         comps.queryItems = query.isEmpty ? nil : query
         guard let url = comps.url else { throw APIError.invalidURL }
         return url
@@ -90,8 +94,8 @@ struct APIClient {
         try await send(path, method: "PUT", query: query, body: body)
     }
 
-    func delete(_ path: String) async throws {
-        _ = try await sendRaw(path, method: "DELETE", body: Optional<Empty>.none)
+    func delete(_ path: String, query: [URLQueryItem] = []) async throws {
+        _ = try await sendRaw(path, method: "DELETE", query: query, body: Optional<Empty>.none)
     }
 
     /// Posts a pre-built raw JSON body, bypassing the `Encodable` encoder — for the one
