@@ -622,6 +622,18 @@ struct CatalogService {
         try await api.post("/rig/targets/amplifier/tone", body: RigToneRequest(control: control, direction: direction))
     }
 
+    /// One balance step, through the amplifier's control endpoint.
+    @discardableResult
+    func rigBalance(direction: String) async throws -> RigSnapshot {
+        try await api.post("/rig/targets/amplifier/balance", body: RigBalanceRequest(direction: direction))
+    }
+
+    /// Loudness or speakers on or off, through the amplifier's control endpoint.
+    @discardableResult
+    func rigSwitch(control: String, on: Bool) async throws -> RigSnapshot {
+        try await api.post("/rig/targets/amplifier/switch", body: RigSwitchRequest(control: control, on: on))
+    }
+
     /// Stops a running learn; a press arriving afterwards is discarded.
     func rigCancelSession(id: String) async throws {
         try await api.delete("/rig/sessions/\(id)")

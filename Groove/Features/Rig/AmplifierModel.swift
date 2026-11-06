@@ -122,21 +122,7 @@ final class AmplifierModel {
     /// what the amplifier's own remote does. The chain matters: sending them
     /// concurrently would let the rig transmit two IR codes at once.
     func volume(direction: String) async {
-        guard let settings else { return }
-        let previous = volumeChain
-        let task = Task { @MainActor [weak self] in
-            _ = await previous?.result
-            guard let self else { return }
-            do {
-                self.snapshot = try await CatalogService(settings: settings).rigAction(action: "volume_\(direction)")
-                self.actionError = nil
-            } catch {
-                self.actionError = error.localizedForDisplay
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
-        }
-        volumeChain = task
-        await task.value
+        await chained { try await $0.rigAction(action: "volume_\(direction)") }
     }
 
     /// Steps bass or treble (profiles with tone.mode select_then_volume —
@@ -145,13 +131,29 @@ final class AmplifierModel {
     /// expires. Same serial chain as volume, so tone and volume presses go
     /// out in the order they were tapped.
     func tone(control: String, direction: String) async {
+        await chained { try await $0.rigTone(control: control, direction: direction) }
+    }
+
+    /// Steps the balance; same chain, because the amp takes one change at a time.
+    func balance(direction: String) async {
+        await chained { try await $0.rigBalance(direction: direction) }
+    }
+
+    /// Loudness or speakers; same chain.
+    func setSwitch(control: String, on: Bool) async {
+        await chained { try await $0.rigSwitch(control: control, on: on) }
+    }
+
+    /// Volume is pressed in bursts, so it doesn't go through `perform`, whose
+    /// guard would drop the taps. Each request joins a serial chain.
+    private func chained(_ request: @escaping (CatalogService) async throws -> RigSnapshot) async {
         guard let settings else { return }
         let previous = volumeChain
         let task = Task { @MainActor [weak self] in
             _ = await previous?.result
             guard let self else { return }
             do {
-                self.snapshot = try await CatalogService(settings: settings).rigTone(control: control, direction: direction)
+                self.snapshot = try await request(CatalogService(settings: settings))
                 self.actionError = nil
             } catch {
                 self.actionError = error.localizedForDisplay

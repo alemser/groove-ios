@@ -265,7 +265,7 @@ struct AmplifierRemoteTab: View {
     /// show, as before. A panel with nothing to show isn't drawn.
     private func isShown(_ c: RigLayoutControl) -> Bool {
         switch c.widget {
-        case "input_select", "volume", "tone":
+        case "input_select", "volume", "tone", "amp_settings":
             return true
         case "power":
             return c.target == "amplifier" || resolvedPower(c.target) != nil
@@ -320,10 +320,47 @@ struct AmplifierRemoteTab: View {
             }
         case "tone":
             toneControls
+        case "amp_settings":
+            ampSettingsControls
         default:
             remoteButton(c.label, icon: c.icon) {
                 Task { await equipmentModel.fire(targetId: c.target, action: c.action ?? "") }
             }
+        }
+    }
+
+    // MARK: - Balance, loudness and speakers (the amp's control endpoint)
+
+    private var ampSettingsControls: some View {
+        let reading = stateModel.observation?.state
+        return VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Balance")
+                        .font(.subheadline.weight(.semibold))
+                    Text(reading?.balance?.displayText ?? "—")
+                        .font(.caption)
+                }
+                .foregroundStyle(Brand.muted)
+                .frame(width: 96, alignment: .leading)
+                stepButton("minus", accessibilityLabel: "Balance down") { Task { await model.balance(direction: "down") } }
+                    .frame(maxWidth: .infinity)
+                stepButton("plus", accessibilityLabel: "Balance up") { Task { await model.balance(direction: "up") } }
+                    .frame(maxWidth: .infinity)
+            }
+            settingToggle("loudness", label: "Loudness", value: reading?.loudness)
+            settingToggle("speakers", label: "Speakers", value: reading?.speakers)
+        }
+    }
+
+    private func settingToggle(_ control: String, label: String, value: Bool?) -> some View {
+        Toggle(isOn: Binding(
+            get: { value == true },
+            set: { on in Task { await model.setSwitch(control: control, on: on) } }
+        )) {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Brand.muted)
         }
     }
 

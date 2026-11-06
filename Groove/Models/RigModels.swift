@@ -67,6 +67,13 @@ struct RigAmplifierBalance: Decodable, Equatable {
         case left = "L"
         case right = "R"
     }
+
+    /// As the amp's display reads it.
+    var displayText: String {
+        if db == 0 { return "Centre" }
+        let prefix = side.map { "\($0.rawValue) " } ?? ""
+        return prefix + String(format: "%.2f dB", db)
+    }
 }
 
 /// `active`/`activeUntil` are set while the amp is in bass/treble mode
@@ -87,6 +94,15 @@ struct RigToneConfig: Codable, Hashable {
 struct RigToneRequest: Encodable {
     var control: String
     var direction: String
+}
+
+struct RigBalanceRequest: Encodable {
+    var direction: String
+}
+
+struct RigSwitchRequest: Encodable {
+    var control: String
+    var on: Bool
 }
 
 struct RigTargetActionStatus: Decodable {
