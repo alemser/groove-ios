@@ -23,11 +23,15 @@ final class AmplifierModel {
         amplifierTarget?.actions[action]?.learned ?? false
     }
 
+    /// The amp takes commands through its own device: no IR bridge or codes needed.
+    var hasControlEndpoint: Bool { amplifier?.controlEndpoint == true }
+
     /// The remote shows only with a paired IR bridge and something to
     /// press: a learned (or built-in) amplifier code, or equipment with a
     /// remote. Built-in codes count as learned, so without the bridge check
     /// a new SP103 would show buttons that reach nothing.
     func remoteAvailable(with equipment: EquipmentRemoteModel) -> Bool {
+        if hasControlEndpoint { return true }
         guard snapshot?.irBridgePaired ?? false else { return false }
         let ampLearned = amplifierTarget?.actions.values.contains { $0.learned } ?? false
         return ampLearned || equipment.equipment.contains { $0.hasRemote }
@@ -101,7 +105,7 @@ final class AmplifierModel {
     /// Only discrete on/off codes go through ensure_on/ensure_off.
     func togglePower() async {
         guard let settings else { return }
-        if isLearned("power_toggle") {
+        if hasControlEndpoint || isLearned("power_toggle") {
             await perform {
                 self.snapshot = try await CatalogService(settings: settings).rigAction(action: "power_toggle")
             }

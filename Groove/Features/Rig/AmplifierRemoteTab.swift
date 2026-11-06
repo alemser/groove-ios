@@ -392,7 +392,7 @@ struct AmplifierRemoteTab: View {
     }
 
     private func toneRow(_ control: String, label: String, icon: String, enabled: Bool, active: Bool) -> some View {
-        let learned = enabled && equipmentModel.isLearned(targetId: "amplifier", action: control)
+        let learned = model.hasControlEndpoint || (enabled && equipmentModel.isLearned(targetId: "amplifier", action: control))
         return HStack(spacing: 12) {
             Label(label, systemImage: icon)
                 .font(.subheadline.weight(.semibold))

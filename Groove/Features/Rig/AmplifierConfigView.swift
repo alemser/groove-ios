@@ -36,6 +36,9 @@ struct AmplifierConfigView: View {
     @State private var deviceModel = ""
     @State private var inputMode = "cycle"
     @State private var warmUpSecs = ""
+    @State private var stateProviderUrl = ""
+    @State private var controlUrl = ""
+    @State private var showAdvanced = false
     @State private var standbyTimeoutMins = ""
     @State private var inputs: [RigInputConfig] = []
     @State private var useInputForFormat = true
@@ -180,11 +183,32 @@ struct AmplifierConfigView: View {
                     .foregroundStyle(Brand.muted)
             }
 
+            advancedSection
+
             if let error = model.actionError {
                 Section { Text(error).foregroundStyle(Brand.err) }
             }
         }
         .scrollContentBackground(.hidden)
+    }
+
+    /// For amplifiers their owner customised; always starts collapsed.
+    private var advancedSection: some View {
+        Section {
+            DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
+                TextField("State provider URL", text: $stateProviderUrl)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                TextField("Control URL", text: $controlUrl)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+        } footer: {
+            Text("For amplifiers customised by their owner, with a device inside that reads and controls them. A standard amplifier leaves these empty. With a control URL, the amplifier needs no IR bridge.")
+                .foregroundStyle(Brand.muted)
+        }
     }
 
     @ViewBuilder
@@ -385,6 +409,8 @@ struct AmplifierConfigView: View {
         deviceModel = config.model ?? ""
         inputMode = config.inputMode ?? "cycle"
         warmUpSecs = config.warmUpSecs.map(String.init) ?? ""
+        stateProviderUrl = config.stateProvider?.url ?? ""
+        controlUrl = config.stateProvider?.controlUrl ?? ""
         standbyTimeoutMins = config.standbyTimeoutMins.map(String.init) ?? ""
         inputs = config.inputs ?? []
         useInputForFormat = model.useAmplifierInputForFormat
@@ -409,7 +435,11 @@ struct AmplifierConfigView: View {
             warmUpSecs: Int(warmUpSecs),
             standbyTimeoutMins: Int(standbyTimeoutMins),
             cycle: model.config?.cycle,
-            inputs: outboundInputs
+            inputs: outboundInputs,
+            stateProvider: RigStateProvider(
+                url: stateProviderUrl.trimmingCharacters(in: .whitespaces),
+                controlUrl: controlUrl.trimmingCharacters(in: .whitespaces)
+            )
         )
         await model.save(patch, useAmplifierInputForFormat: useInputForFormat)
     }

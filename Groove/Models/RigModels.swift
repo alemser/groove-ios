@@ -26,6 +26,9 @@ struct RigAmplifierStatus: Decodable {
     var activeInputLabel: String?
     var inputs: [RigInputStatus]?
     var power: RigPowerStatus?
+    /// The amp takes commands through its own device, so its remote needs no
+    /// IR bridge.
+    var controlEndpoint: Bool?
     /// Set when the profile has remote tone control.
     var tone: RigToneStatus?
 }
@@ -498,6 +501,14 @@ struct RigAmplifierConfig: Codable, Hashable {
     var cycle: RigCycleConfig?
     var inputs: [RigInputConfig]?
     var tone: RigToneConfig?
+    var stateProvider: RigStateProvider?
+}
+
+/// A device in a customised amplifier: `url` reports its state, `controlUrl`
+/// takes commands.
+struct RigStateProvider: Codable, Hashable {
+    var url: String
+    var controlUrl: String?
 }
 
 /// Whether the amplifier's selected input may be read as evidence of which
