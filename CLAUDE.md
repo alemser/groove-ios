@@ -7,17 +7,17 @@ this file is the whole thing.
 
 **groove-ios** is the native SwiftUI companion app for the Groove/Oceano stack — manage your
 library and catalog from your phone, watch recognitions land live, browse releases and tracks,
-fix up metadata, clear the enrichment review queue, control the rig, and (as of 2026-09-02, in
-progress) onboard a new headless device over Bluetooth. It talks entirely to a `groove-catalog`
+fix up metadata, clear the enrichment review queue, control the rig, and set up a new headless
+device's Wi-Fi through the device's own setup network. It talks entirely to a `groove-catalog`
 server over HTTP on the LAN; it does not talk to `groove-identity`/`groove-detector`/
 `groove-listener` directly, and does not persist a library of its own beyond `AppSettings`'
 connection info.
 
 **Consumer-facing brand name is "Oceano"**, not "Groove" — the `groove-*` prefix is an internal
 codebase convention only (see `CFBundleDisplayName` in `Info.plist`, `OceanoWordmark`,
-`ConnectView`'s copy). Never let an internal repo name leak into UI copy, an advertised BLE
-device name, or anything else a user sees — this shipped wrong once already (BLE peripheral
-advertised as "Groove-A909" before being caught and fixed).
+`ConnectView`'s copy). Never let an internal repo name leak into UI copy, a network name, or
+anything else a user sees — this shipped wrong once already (a device advertised as
+"Groove-A909" before being caught and fixed).
 
 ## iOS and Android stay in step (hard rule)
 
@@ -44,7 +44,7 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
    ```bash
    xcrun simctl spawn booted defaults write com.alemser.groove catalog.host 192.168.178.105
    ```
-   Bonjour discovery, CoreBluetooth provisioning and the camera still need a real device, and
+   Bonjour discovery, Wi-Fi setup against a real board and the camera still need a real device, and
    nothing reaches the phone until the operator rebuilds and reinstalls from Xcode themselves —
    there is no CI/OTA path. Say which of the two you verified rather than claiming it works.
 2. **Don't mirror a web Studio UI decision onto iOS sight-unseen.** What reads as decluttering
@@ -52,8 +52,8 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
    code does exactly what was asked — this has been wrong before and only caught once the
    operator saw it running. Propose the port and ask, or name the concrete on-screen effect
    explicitly, before committing.
-3. **New risky/unverified functionality (real Bluetooth pairing, anything touching real device
-   credentials) goes on a feature branch, not `main`** — same branch-first + field-test
+3. **New risky/unverified functionality (Wi-Fi setup against a real board, anything touching real
+   device credentials) goes on a feature branch, not `main`** — same branch-first + field-test
    discipline as the backend repos, even though this repo has no service to restart. Low-risk
    UI/bugfix work has historically landed directly on `main` here; use judgment, but anything
    that can only be proven by a live device test belongs on a branch until that test happens.
@@ -76,9 +76,11 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   the *primary* fetch only — a secondary fetch failing should degrade to the previous value
   (`(try? await x) ?? previousValue`), not blank the whole screen. This exact bug shipped in
   `ReleasesModel` and 3 other models before being caught and fixed as a batch.
-- `Core/BLEProvisioningClient.swift` / `Features/Onboarding/` — CoreBluetooth central for
-  headless-device WiFi onboarding (groove-provision's BLE GATT protocol). See groove-provision's
-  `PROTOCOL.md` for the wire contract; UUIDs must match exactly on both sides.
+- `Core/WifiSetupClient.swift` / `Features/Onboarding/` — the board's Wi-Fi setup routes
+  (groove-provision's `PROTOCOL.md`); the setup network's prefix, password and address must match
+  it exactly. iOS joins a network from an app only with the Hotspot Configuration capability, which
+  this app doesn't have, so the person joins the setup network in Settings → Wi-Fi; groove-android
+  joins it from the app.
 
 ## Code quality (mandatory)
 
@@ -96,4 +98,4 @@ each rule, and fix every deviation or name it in the report.
 |---|---|
 | New settings/connection fields | `AppSettings.swift`, this file if the behavior is non-obvious |
 | A screen's error-handling pattern changes | Check it doesn't reintroduce the all-or-nothing `async let` bug above |
-| BLE protocol changes | groove-provision's `PROTOCOL.md` (shared contract, both sides must agree) |
+| Wi-Fi setup protocol changes | groove-provision's `PROTOCOL.md` (shared contract, both sides must agree) |

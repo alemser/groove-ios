@@ -9,7 +9,7 @@ struct SettingsView: View {
 
     @State private var streamingStatusText: String?
     @State private var showSwitchServer = false
-    @State private var showBLEProvisioning = false
+    @State private var showWifiSetup = false
     @State private var pendingPower: PowerAction?
     @State private var isSendingPower = false
     @State private var powerStatus: String?
@@ -82,10 +82,11 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     Button {
-                        showBLEProvisioning = true
+                        showWifiSetup = true
                     } label: {
-                        Label("Reconfigure Wi-Fi via Bluetooth", systemImage: "wifi")
+                        Label("Change Wi-Fi Network", systemImage: "wifi")
                     }
+                    .disabled(!settings.isConfigured)
                 } header: {
                     Text("Catalog Server")
                 } footer: {
@@ -158,12 +159,10 @@ struct SettingsView: View {
                     }
             }
         }
-        .sheet(isPresented: $showBLEProvisioning) {
-            // This device is presumably already configured (you're in
-            // Settings) -- always-advertise on the groove-provision side
-            // means "reconfigure" is the exact same flow as first-run, just
-            // reached from a different entry point.
-            BLEProvisioningView()
+        .sheet(isPresented: $showWifiSetup) {
+            // Over the home network: the board opens its setup network,
+            // which lets it take a new one.
+            WifiSetupView(homeHost: settings.host)
         }
         .task { await loadStreamingStatus() }
     }

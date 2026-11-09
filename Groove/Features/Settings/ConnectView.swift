@@ -1,10 +1,10 @@
 import SwiftUI
 
 /// Find your Oceano: the first-run screen, and Settings' "Switch Server".
-/// Two discovery paths run side by side from the moment this screen appears —
-/// Bonjour (silent, works when the device is already on this Wi-Fi) and
-/// Bluetooth (works even for a brand-new device that isn't on any network
-/// yet) — rather than hiding Bluetooth behind a timeout as a last resort.
+/// Two paths are offered side by side from the moment this screen appears —
+/// Bonjour discovery (silent, works when the device is already on this Wi-Fi)
+/// and Wi-Fi setup through the board's own setup network (a brand-new device
+/// that isn't on any network yet) — rather than hiding setup behind a timeout.
 /// Manual host/IP entry is a fallback tucked behind a link. A home can have
 /// more than one Oceano, so every one found is listed to choose from; only a
 /// first run with a single Oceano on the network connects on its own.
@@ -18,7 +18,7 @@ struct ConnectView: View {
     @State private var probe = ProbeState.idle
     @State private var discovery = CatalogDiscovery()
     @State private var showManualEntry = false
-    @State private var showBLEProvisioning = false
+    @State private var showWifiSetup = false
     @State private var autoConnectAttemptedIDs: Set<String> = []
     @State private var autoConnectTask: Task<Void, Never>?
     /// Set by select() right before connect() when the host came from
@@ -120,8 +120,8 @@ struct ConnectView: View {
                     .font(.headline)
                     .foregroundStyle(Brand.text)
                 Text(settings.isConfigured
-                     ? "Every Oceano on your Wi-Fi shows up here. Brand new? Set it up over Bluetooth below."
-                     : "Already on your Wi-Fi, it'll connect automatically. Brand new? Set it up over Bluetooth below.")
+                     ? "Every Oceano on your Wi-Fi shows up here. Brand new? Set it up below."
+                     : "Already on your Wi-Fi, it'll connect automatically. Brand new? Set it up below.")
                     .font(.subheadline)
                     .foregroundStyle(Brand.muted)
                     .multilineTextAlignment(.center)
@@ -129,9 +129,9 @@ struct ConnectView: View {
 
             VStack(spacing: 12) {
                 Button {
-                    showBLEProvisioning = true
+                    showWifiSetup = true
                 } label: {
-                    Label("Set Up via Bluetooth", systemImage: "dot.radiowaves.left.and.right")
+                    Label("Set Up a New Oceano", systemImage: "wifi")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -149,12 +149,12 @@ struct ConnectView: View {
             }
         }
         .padding(.horizontal, 8)
-        .sheet(isPresented: $showBLEProvisioning) {
+        .sheet(isPresented: $showWifiSetup) {
             // No extra handoff logic needed here: discovery.startBrowsing()
             // is already running for the lifetime of this view, so once the
-            // device joins WiFi and starts advertising over mDNS instead,
-            // the existing Bonjour search picks it up on its own.
-            BLEProvisioningView()
+            // device joins Wi-Fi and the phone is back on it, the existing
+            // Bonjour search picks it up on its own.
+            WifiSetupView()
         }
     }
 

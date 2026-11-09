@@ -30,18 +30,28 @@ extension Error {
     }
 }
 
-/// Thin async HTTP client for the groove-catalog management API. Stateless apart
-/// from the injected `AppSettings`, so it is cheap to construct per request.
+/// Thin async HTTP client for the groove-catalog management API, and for the
+/// board's Wi-Fi setup routes (`WifiSetupClient`). Stateless apart from where
+/// it sends requests, so it is cheap to construct per request.
 struct APIClient {
-    let settings: AppSettings
+    /// Read on every request: the catalog's address can change in Settings.
+    let baseURL: () -> URL?
     var session: URLSession = .shared
+
+    init(settings: AppSettings) {
+        baseURL = { settings.baseURL }
+    }
+
+    init(baseURL: URL) {
+        self.baseURL = { baseURL }
+    }
 
     /// `path` keeps the encoding `pathSegment` gave it. Assigning it to
     /// `URLComponents.path` would encode the `%` a second time, and assigning
     /// `percentEncodedPath` traps on an invalid escape; resolving against the base
     /// URL does neither. Query parameters go in `query`, never in `path`.
     private func makeURL(_ path: String, query: [URLQueryItem] = []) throws -> URL {
-        guard let baseURL = settings.baseURL else { throw APIError.notConfigured }
+        guard let baseURL = baseURL() else { throw APIError.notConfigured }
         guard let resolved = URL(string: path, relativeTo: baseURL)?.absoluteURL,
               var comps = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
