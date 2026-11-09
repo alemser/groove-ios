@@ -616,6 +616,41 @@ struct RigSelectAudioOutputRequest: Encodable {
     var device: String
 }
 
+/// A streaming receiver the user turns on (groove-detector's `/extras`).
+/// Both are third-party open-source projects, off until the user turns them on.
+enum StreamingExtraName: String, Decodable {
+    case airplay, bluetooth
+
+    var title: String {
+        switch self {
+        case .airplay: "AirPlay"
+        case .bluetooth: "Bluetooth"
+        }
+    }
+}
+
+struct StreamingExtra: Decodable, Identifiable {
+    var name: StreamingExtraName
+    var installed: Bool
+    var enabled: Bool
+    /// Where a running change is moving the switch; nil when idle.
+    var pending: Bool?
+    /// The last failed change's output; nil after one that worked.
+    var error: String?
+
+    var id: StreamingExtraName { name }
+}
+
+struct StreamingExtrasResponse: Decodable {
+    /// False where the board can't switch extras at all.
+    var available: Bool
+    var extras: [StreamingExtra]
+}
+
+struct SetStreamingExtraRequest: Encodable {
+    var enabled: Bool
+}
+
 // MARK: - Audio input (capture level calibration — proxied `/rig/capture/*` →
 // groove-rig → groove-detector's `/capture/*`)
 

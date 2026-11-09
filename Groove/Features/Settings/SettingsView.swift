@@ -62,7 +62,7 @@ struct SettingsView: View {
                         )
                     }
                 } footer: {
-                    Text("Where AirPlay and Bluetooth play out to the amplifier.")
+                    Text("AirPlay and Bluetooth receivers, and where they play out to the amplifier.")
                         .foregroundStyle(Brand.muted)
                 }
 
@@ -171,9 +171,8 @@ struct SettingsView: View {
     private func loadStreamingStatus() async {
         guard settings.isConfigured else { return }
         do {
-            let response = try await CatalogService(settings: settings).rigAudioOutputs()
-            let label = response.outputs.first { $0.id == response.selected }?.label
-            streamingStatusText = label ?? "Not set"
+            let on = try await CatalogService(settings: settings).streamingExtras().extras.filter(\.enabled)
+            streamingStatusText = on.isEmpty ? "Off" : on.map(\.name.title).joined(separator: ", ")
         } catch {
             streamingStatusText = "Unavailable"
         }

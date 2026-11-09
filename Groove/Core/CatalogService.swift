@@ -689,9 +689,19 @@ struct CatalogService {
         try await api.delete("/rig/targets/\(target)/actions/\(action)")
     }
 
-    // MARK: Streaming (AirPlay output device — `/rig/streaming/*`, groove-rig's
-    // own reverse proxy to groove-detector's `/audio-outputs*`, chained through
-    // the same `/rig/*` hop everything else here goes through)
+    // MARK: Streaming (`/rig/streaming/*`, groove-rig's own reverse proxy to
+    // groove-detector's `/extras*` and `/audio-outputs*`, chained through the
+    // same `/rig/*` hop everything else here goes through)
+
+    func streamingExtras() async throws -> StreamingExtrasResponse {
+        try await api.get("/rig/streaming/extras")
+    }
+
+    /// Starts the change; it runs on the board and `pending` shows it until done.
+    @discardableResult
+    func setStreamingExtra(_ name: StreamingExtraName, enabled: Bool) async throws -> StreamingExtrasResponse {
+        try await api.post("/rig/streaming/extras/\(name.rawValue)", body: SetStreamingExtraRequest(enabled: enabled))
+    }
 
     func rigAudioOutputs() async throws -> RigAudioOutputsResponse {
         try await api.get("/rig/streaming/audio-outputs")
