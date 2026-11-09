@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// App-level settings: catalog server connection and recognition/enrichment
-/// configuration. Rig stays focused on physical hardware; this is everything
-/// else about how the app is wired up.
+/// App-level settings: catalog server connection, recognition/enrichment
+/// configuration and streaming, which is part of Oceano itself rather than
+/// the rig around it. Rig stays focused on physical hardware; this is
+/// everything else about how Oceano is wired up.
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
 
+    @State private var streamingStatusText: String?
     @State private var showSwitchServer = false
     @State private var showBLEProvisioning = false
     @State private var pendingPower: PowerAction?
@@ -45,6 +47,22 @@ struct SettingsView: View {
                     }
                 } footer: {
                     Text("What fills in a confirmed track's metadata.")
+                        .foregroundStyle(Brand.muted)
+                }
+
+                Section {
+                    NavigationLink {
+                        StreamingView()
+                    } label: {
+                        row(
+                            title: "Streaming",
+                            subtitle: streamingStatusText ?? "Loading…",
+                            icon: "airplayaudio",
+                            tint: Brand.ok
+                        )
+                    }
+                } footer: {
+                    Text("Where AirPlay and Bluetooth play out to the amplifier.")
                         .foregroundStyle(Brand.muted)
                 }
 
@@ -146,6 +164,18 @@ struct SettingsView: View {
             // means "reconfigure" is the exact same flow as first-run, just
             // reached from a different entry point.
             BLEProvisioningView()
+        }
+        .task { await loadStreamingStatus() }
+    }
+
+    private func loadStreamingStatus() async {
+        guard settings.isConfigured else { return }
+        do {
+            let response = try await CatalogService(settings: settings).rigAudioOutputs()
+            let label = response.outputs.first { $0.id == response.selected }?.label
+            streamingStatusText = label ?? "Not set"
+        } catch {
+            streamingStatusText = "Unavailable"
         }
     }
 

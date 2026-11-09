@@ -19,8 +19,8 @@ the enrichment review queue — all against your `groove-catalog` server on the 
 | **Review** | Pending associations (accept suggestion / dismiss) and enrich jobs; open a job to confirm or discard release candidates with tracklists. | `…/plays/pending-association`, `…/associate`, `…/enrich/jobs`, `…/enrich/releases/{id}/confirm` |
 | **Settings** | Connect to a server (with live test), toggle metadata enrichers, view stack health. | `GET /status`, `GET /enrich/providers`, `PATCH /enrich/providers/{id}` |
 | **Settings → Recognition Providers** | What identifies a spinning record: offline (local-only) mode, chain mode/order/min-confidence, ACRCloud/AudD credentials, up to 3 custom HTTP providers (auth, request, response field mapping, paste-a-sample auto-fill), local-index/provider usage KPIs. | `GET/PATCH /identity/recognition/{providers,settings}`, `PUT …/providers/{id}/credentials`, `PUT …/providers/order`, `POST/PUT/DELETE …/custom-providers(/{slug})`, `GET /identity/observability/providers` |
+| **Settings → Streaming** | Which ALSA device AirPlay and Bluetooth both play through, out to the amplifier — one wire, one setting. Tap a device to select it. | `GET/POST /rig/streaming/audio-outputs(/select)` |
 | **Rig → Amplifier** | Model, inputs and profiles, plus whether the selected input may tell vinyl from digital. | `GET/PATCH /rig/amplifier`, `GET/PATCH /rig/amplifier/format-hint` |
-| **Rig → Streaming** | Which ALSA device AirPlay and Bluetooth both play through, out to the amplifier — one wire, one setting. Tap a device to select it. | `GET/POST /rig/streaming/audio-outputs(/select)` |
 
 ### Which pressing is playing
 

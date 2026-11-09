@@ -286,7 +286,6 @@
 				15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */,
 				672B702C305D95A110E0B197 /* RigView.swift */,
 				5692B96AF11DD835C1F1819A /* RulesView.swift */,
-				7C54B427D95192B93FFCA854 /* StreamingView.swift */,
 				431A7B81109A3032AF631217 /* StylusModel.swift */,
 				C562BF700C03B7623BADB564 /* StylusView.swift */,
 			);
@@ -304,6 +303,7 @@
 				079EA02FD5EEB96870D9F79B /* RecognitionProvidersModel.swift */,
 				AFE068A0C26C2762FB17A905 /* RecognitionProvidersScreen.swift */,
 				D5EB40C22B18DFB61CAA5600 /* SettingsView.swift */,
+				7C54B427D95192B93FFCA854 /* StreamingView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";

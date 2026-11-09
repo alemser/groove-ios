@@ -1,17 +1,16 @@
 import SwiftUI
 
-/// Physical hardware: stylus tracking, audio input and streaming, and the
-/// rig — the amplifier, the equipment around it and the IR bridge that
-/// controls them — behind the "Rig" switch (off on a new installation).
-/// Catalog server connection and recognition/enrichment config live in
-/// Settings, not here.
+/// Physical hardware: stylus tracking, audio input, and the rig — the
+/// amplifier, the equipment around it and the IR bridge that controls
+/// them — behind the "Rig" switch (off on a new installation). Catalog
+/// server connection, recognition/enrichment config and streaming live
+/// in Settings, not here.
 struct RigView: View {
     @Environment(AppSettings.self) private var settings
 
     @State private var stylusStatusText: String?
     @State private var ampStatusText: String?
     @State private var bridgeStatusText: String?
-    @State private var streamingStatusText: String?
     @State private var audioInputStatusText: String?
     @State private var rulesStatusText: String?
     /// The "Rig" switch; nil until loaded.
@@ -40,16 +39,6 @@ struct RigView: View {
                             subtitle: audioInputStatusText ?? "Loading…",
                             icon: "waveform",
                             tint: Brand.teal
-                        )
-                    }
-                    NavigationLink {
-                        StreamingView()
-                    } label: {
-                        hardwareRow(
-                            title: "Streaming",
-                            subtitle: streamingStatusText ?? "Loading…",
-                            icon: "airplayaudio",
-                            tint: Brand.ok
                         )
                     }
                 }
@@ -108,7 +97,6 @@ struct RigView: View {
         }
         .task { await loadStylusStatus() }
         .task { await loadRig() }
-        .task { await loadStreamingStatus() }
         .task { await loadAudioInputStatus() }
     }
 
@@ -180,17 +168,6 @@ struct RigView: View {
         } catch {
             ampStatusText = "Unavailable"
             bridgeStatusText = "Unavailable"
-        }
-    }
-
-    private func loadStreamingStatus() async {
-        guard settings.isConfigured else { return }
-        do {
-            let response = try await CatalogService(settings: settings).rigAudioOutputs()
-            let label = response.outputs.first { $0.id == response.selected }?.label
-            streamingStatusText = label ?? "Not set"
-        } catch {
-            streamingStatusText = "Unavailable"
         }
     }
 
