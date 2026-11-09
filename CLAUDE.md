@@ -34,7 +34,7 @@ and engineering principles shared across every `groove-*` repo live in
 
 ## Response language
 
-Respond in **English**. Code, comments, commit messages, and docs are English regardless.
+Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs stay in English.
 
 ## Hard rules specific to this repo
 
