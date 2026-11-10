@@ -77,10 +77,10 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   (`(try? await x) ?? previousValue`), not blank the whole screen. This exact bug shipped in
   `ReleasesModel` and 3 other models before being caught and fixed as a batch.
 - `Core/WifiSetupClient.swift` / `Features/Onboarding/` — the board's Wi-Fi setup routes
-  (groove-provision's `PROTOCOL.md`); the setup network's prefix, password and address must match
+  (groove-provision's `PROTOCOL.md`); the setup network's prefix and address must match
   it exactly. iOS joins a network from an app only with the Hotspot Configuration capability, which
   this app doesn't have, so the person joins the setup network in Settings → Wi-Fi; groove-android
-  joins it from the app.
+  joins it from the app. The password is the board's own, on its label: the app never holds one.
 
 ## Code quality (mandatory)
 

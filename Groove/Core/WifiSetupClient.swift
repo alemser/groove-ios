@@ -1,12 +1,11 @@
 import Foundation
 
 /// The board's Wi-Fi setup, groove-provision's PROTOCOL.md. A board with no
-/// working network opens a setup network named `prefix` + its name, with the
-/// fixed `key`; on it the board answers at `host`. The same routes answer on
-/// the home network, on port 80.
+/// working network opens a setup network named `prefix` + its name, with its
+/// own password, printed on its label; on it the board answers at `host`. The
+/// same routes answer on the home network, on port 80.
 enum WifiSetup {
     static let prefix = "Oceano-"
-    static let key = "oceano-setup"
     static let host = "192.168.4.1"
 
     /// The board's part of its setup network's name: "Oceano-A909" → "A909".

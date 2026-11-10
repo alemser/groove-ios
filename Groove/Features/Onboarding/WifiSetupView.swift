@@ -37,20 +37,8 @@ struct WifiSetupView: View {
             statusScreen(
                 icon: { symbol("wifi", Brand.teal) },
                 title: "Join Oceano's setup network",
-                subtitle: "In Settings → Wi-Fi, join the network starting with “\(WifiSetup.prefix)”. Then come back here.",
-                footer: {
-                    VStack(spacing: 14) {
-                        LabeledContent("Password") {
-                            Text(WifiSetup.key)
-                                .font(.body.monospaced())
-                                .textSelection(.enabled)
-                        }
-                        .padding(16)
-                        .grooveCard()
-                        primaryButton("I've Joined") { model.joinedByHand() }
-                    }
-                    .padding(.horizontal, 24)
-                }
+                subtitle: "In Settings → Wi-Fi, join the network starting with “\(WifiSetup.prefix)”. Its password is printed on Oceano's label. Then come back here.",
+                footer: { primaryButton("I've Joined") { model.joinedByHand() } }
             )
         case .loading:
             statusScreen(
