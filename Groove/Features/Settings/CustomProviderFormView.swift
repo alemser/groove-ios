@@ -153,15 +153,15 @@ struct CustomProviderFormView: View {
             }
             switch authMode {
             case .bearerToken:
-                SecureField("Token", text: $token)
+                SecretField("Token", text: $token)
             case .headerToken:
-                SecureField("Token", text: $token)
+                SecretField("Token", text: $token)
                 TextField("Token Header (default X-API-Key)", text: $tokenHeader)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             case .headerKeySecret:
-                SecureField("API Key", text: $apiKey)
-                SecureField("API Secret", text: $apiSecret)
+                SecretField("API Key", text: $apiKey)
+                SecretField("API Secret", text: $apiSecret)
                 TextField("Key Header (default X-API-Key)", text: $keyHeader)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -169,13 +169,13 @@ struct CustomProviderFormView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             case .formToken:
-                SecureField("Token", text: $token)
+                SecretField("Token", text: $token)
                 TextField("Token Field (default api_token)", text: $tokenField)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             case .formKeySecret:
-                SecureField("API Key", text: $apiKey)
-                SecureField("API Secret", text: $apiSecret)
+                SecretField("API Key", text: $apiKey)
+                SecretField("API Secret", text: $apiSecret)
                 TextField("Key Field (default api_key)", text: $keyField)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

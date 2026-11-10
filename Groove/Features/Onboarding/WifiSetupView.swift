@@ -157,9 +157,7 @@ struct WifiSetupView: View {
                 }
                 .padding(.top, 24)
 
-                SecureField("Password", text: $password)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                SecretField("Password", text: $password)
                     .padding(16)
                     .foregroundStyle(Brand.text)
                     .grooveCard()

@@ -21,8 +21,8 @@ struct ProviderCredentialsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                    SecureField("API Key", text: $apiKey)
-                    SecureField("API Secret", text: $apiSecret)
+                    SecretField("API Key", text: $apiKey)
+                    SecretField("API Secret", text: $apiSecret)
                 } footer: {
                     Text("Leave a field showing •••••••• unchanged to keep its current value.")
                         .foregroundStyle(Brand.muted)

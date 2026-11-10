@@ -188,6 +188,43 @@ struct ErrorStateView: View {
     }
 }
 
+// MARK: - Secret field
+
+/// A field that hides what is typed, with a button that shows it, so a long
+/// password or key can be checked before it is sent.
+struct SecretField: View {
+    let title: String
+    @Binding var text: String
+    @State private var shown = false
+
+    init(_ title: String, text: Binding<String>) {
+        self.title = title
+        _text = text
+    }
+
+    var body: some View {
+        HStack {
+            Group {
+                if shown {
+                    TextField(title, text: $text)
+                } else {
+                    SecureField(title, text: $text)
+                }
+            }
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            Button {
+                shown.toggle()
+            } label: {
+                Image(systemName: shown ? "eye.slash" : "eye")
+                    .foregroundStyle(Brand.muted)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(shown ? "Hide" : "Show")
+        }
+    }
+}
+
 // MARK: - Source / status coloring shared across features
 
 enum SourceStyle {

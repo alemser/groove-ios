@@ -65,7 +65,7 @@ struct EnricherCredentialsForm: View {
             }
         case "discogs":
             Section {
-                SecureField("Personal access token", text: $apiKey)
+                SecretField("Personal access token", text: $apiKey)
             } footer: {
                 Text("Leave blank to keep the current token.")
                     .foregroundStyle(Brand.muted)
