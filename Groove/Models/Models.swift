@@ -432,8 +432,9 @@ struct IdentifySearchHit: Codable, Identifiable, Hashable {
     var label: String?
     var artworkUrl: String?
 
+    /// One recording comes back once per release it is on, so the release is part of the id.
     var id: String {
-        "\(source):\(recordingId ?? releaseId ?? "")|\(artist ?? "")|\(title ?? "")"
+        "\(source):\(recordingId ?? ""):\(releaseId ?? "")|\(artist ?? "")|\(title ?? "")"
     }
 }
 
