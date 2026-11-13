@@ -42,7 +42,7 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
    the iOS Simulator freely. It shares the Mac's network, so it reaches the catalog on
    oceano; preset the server to skip the Connect screen:
    ```bash
-   xcrun simctl spawn booted defaults write com.alemser.groove catalog.host 192.168.178.105
+   xcrun simctl spawn booted defaults write com.alemser.groove catalog.host 192.168.178.111
    ```
    Bonjour discovery, Wi-Fi setup against a real board and the camera still need a real device, and
    nothing reaches the phone until the operator rebuilds and reinstalls from Xcode themselves —
