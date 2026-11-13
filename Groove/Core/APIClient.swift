@@ -6,6 +6,13 @@ enum APIError: LocalizedError {
     case http(status: Int, body: String)
     case decoding(String)
     case transport(String)
+    /// Nothing answered at the address: refused, no such name, or no reply in
+    /// time. A board that moved to another address or network fails this way
+    /// (groove-system#10). groove-android says the same.
+    case unanswered
+
+    /// The URLSession failures that mean `unanswered`.
+    static let unansweredCodes: Set<URLError.Code> = [.cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .timedOut]
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +23,7 @@ enum APIError: LocalizedError {
             return "Server returned \(status)\(detail)"
         case let .decoding(msg): return "Couldn't read the server response: \(msg)"
         case let .transport(msg): return msg
+        case .unanswered: return "Oceano isn't answering. Check that it's on and on the same Wi-Fi as this phone."
         }
     }
 }
@@ -231,7 +239,11 @@ struct APIClient {
             } catch let error as APIError {
                 throw error
             } catch {
-                lastTransportError = .transport(error.localizedDescription)
+                if let urlError = error as? URLError, APIError.unansweredCodes.contains(urlError.code) {
+                    lastTransportError = .unanswered
+                } else {
+                    lastTransportError = .transport(error.localizedDescription)
+                }
                 if attempt < maxAttempts {
                     try? await Task.sleep(for: .milliseconds(500 * attempt))
                 }
