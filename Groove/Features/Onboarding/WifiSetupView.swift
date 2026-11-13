@@ -154,6 +154,13 @@ struct WifiSetupView: View {
                     Text(network.ssid)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Brand.text)
+                    // A first setup sent the person to the label a step earlier.
+                    if !model.isChange {
+                        Text("The password of this Wi-Fi network, not the one on Oceano's label.")
+                            .font(.footnote)
+                            .foregroundStyle(Brand.muted)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(.top, 24)
 

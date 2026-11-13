@@ -106,6 +106,9 @@ final class WifiSetupModel {
             if outcome?.state == .connected {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 phase = .joined(ssid: network.ssid)
+            } else if let outcome, network.secure {
+                // A refused password is fixed where it was typed, which keeps the text.
+                phase = .enteringPassword(network, error: outcome.detail)
             } else if let outcome {
                 await loadNetworks(note: "Didn't join \(network.ssid): \(outcome.detail)")
             } else if isChange {
