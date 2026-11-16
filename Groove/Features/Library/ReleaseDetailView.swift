@@ -90,6 +90,11 @@ struct ReleaseDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                if let question = nowPlaying.editionQuestion,
+                   question.offers(source: release.source, releaseId: release.releaseId) {
+                    EditionQuestionBanner(question: question)
+                }
+
                 Artwork(raw: release.artworkUrl, cornerRadius: 18)
                     .frame(maxWidth: 260)
                     .aspectRatio(1, contentMode: .fit)

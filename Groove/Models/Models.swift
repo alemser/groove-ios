@@ -549,25 +549,34 @@ struct PlayingEdition: Decodable, Equatable {
     var album: String?
 
     func matches(source: String, releaseId: String) -> Bool {
-        let sameRelease = releaseId.trimmingCharacters(in: .whitespacesAndNewlines)
-            == self.releaseId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard sameRelease else { return false }
-        // Source is advisory: identity defaults it to "user" when a session
-        // carries none, so a release id that matches is a match.
-        let mine = self.source.trimmingCharacters(in: .whitespacesAndNewlines)
-        let theirs = source.trimmingCharacters(in: .whitespacesAndNewlines)
-        return mine.isEmpty || theirs.isEmpty || mine.caseInsensitiveCompare(theirs) == .orderedSame
+        sameEdition(self.source, self.releaseId, source, releaseId)
     }
+}
+
+/// Whether two (source, release id) pairs name the same library edition.
+/// Source is advisory: identity defaults it to "user" when a session carries
+/// none, so a release id that matches is a match.
+func sameEdition(_ sourceA: String, _ releaseIdA: String, _ sourceB: String, _ releaseIdB: String) -> Bool {
+    let sameRelease = releaseIdA.trimmingCharacters(in: .whitespacesAndNewlines)
+        == releaseIdB.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard sameRelease else { return false }
+    let a = sourceA.trimmingCharacters(in: .whitespacesAndNewlines)
+    let b = sourceB.trimmingCharacters(in: .whitespacesAndNewlines)
+    return a.isEmpty || b.isEmpty || a.caseInsensitiveCompare(b) == .orderedSame
 }
 
 /// An unanswered "which pressing is this?".
 ///
-/// Only reaches the app when the evidence genuinely ran out: a track exclusive
-/// to one edition, or the detector's acoustic reading of the medium, resolves it
-/// silently, and so does a previously remembered answer. What is left is the
-/// case where guessing gets the cover, the year and the track numbering wrong —
-/// the vinyl numbers sides A1-A5 / B1-B5 where the CD runs 1-12.
+/// Only reaches the app when nothing settles it: a track that exists on only
+/// one of the editions is resolved silently. The amplifier's input and the
+/// detector's reading of the medium are hints that mark an option as likely;
+/// they never answer. What is left is the case where guessing gets the cover,
+/// the year and the track numbering wrong — the vinyl numbers sides A1-A5 /
+/// B1-B5 where the CD runs 1-12.
 struct EditionQuestion: Decodable, Equatable {
+    /// How the question is put to the operator, wherever it appears.
+    static let heading = "Which pressing is playing?"
+
     var artist: String?
     var album: String?
     var trackId: Int64?
@@ -577,6 +586,21 @@ struct EditionQuestion: Decodable, Equatable {
     /// redraw of the same one.
     var key: String {
         [artist ?? "", album ?? "", candidates.map(\.releaseId).joined(separator: ",")].joined(separator: "|")
+    }
+
+    /// "Artist — Album", for the question's heading and the banners that lead
+    /// to it.
+    var albumLabel: String {
+        [artist, album]
+            .compactMap { $0?.nonEmpty }
+            .joined(separator: " — ")
+            .nonEmpty ?? "this album"
+    }
+
+    /// Whether this edition is one of the answers, so its album screen can
+    /// carry the question.
+    func offers(source: String, releaseId: String) -> Bool {
+        candidates.contains { sameEdition($0.source, $0.releaseId, source, releaseId) }
     }
 }
 

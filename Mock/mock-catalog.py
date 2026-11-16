@@ -9,10 +9,16 @@ Run:   python3 Mock/mock-catalog.py
 Then:  launch the app in a simulator and connect to host 127.0.0.1, port 7073.
 
 Pure Python 3 standard library. Leave it running in a terminal; Ctrl-C to stop.
+
+MOCK_EDITION_QUESTION=1 opens a "which pressing is playing?" question on
+/status, offering two of the library's releases (rel-0 and rel-3); choosing or
+dismissing closes it.
 """
 
-import json, struct, zlib, http.server, socketserver, re
+import json, os, struct, zlib, http.server, socketserver, re
 from urllib.parse import urlparse, parse_qs
+
+EDITION_QUESTION_OPEN = os.environ.get("MOCK_EDITION_QUESTION") == "1"
 
 def png(r,g,b):
     w=h=160
@@ -68,6 +74,16 @@ def release(i):
         "label":"Columbia","country":"US","artwork_url":"/catalog/artwork/tracks/%d"%(100+i),
         "owned": i%3==0,"deletable": i%3==0,"tracklist_count":10+i,"catalog_tracks":i%4,
         "confirmed_at":"2026-07-10T12:00:00Z"}
+
+def edition_question():
+    a, b = release(0), release(3)
+    return {"artist": a["artist"], "album": a["album"], "track_id": 100, "candidates": [
+        {"source": a["source"], "release_id": a["release_id"], "album": a["album"], "year": "1977",
+         "release_format": "vinyl", "artwork_url": a["artwork_url"], "tracklist_count": 10,
+         "position": "A1", "suggested": True, "suggested_why": "the detector hears vinyl"},
+        {"source": b["source"], "release_id": b["release_id"], "album": b["album"], "year": "2001",
+         "release_format": "cd", "artwork_url": b["artwork_url"], "tracklist_count": 12, "position": "1"},
+    ]}
 
 def stylus_state():
     return {"active":True,"profile":{"id":1,"catalog_id":9,"brand":"Ortofon","model":"2M Blue",
@@ -211,12 +227,15 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","image/png"); self.send_header("Content-Length",str(len(b)))
             self.end_headers(); self.wfile.write(b); return
         if path=="/status":
-            return self._json({"playback":{"active":True,"epoch":5001,"track_id":100,
+            status = {"playback":{"active":True,"epoch":5001,"track_id":100,
                 "artist":"Midnight Oil","title":"The Dead Heart","album":"Diesel and Dust",
                 "source":"acrcloud","position_ms":74000,"duration_ms":275000,"confidence":0.95,
                 "artwork_url":"/catalog/artwork/tracks/100","media_format":"vinyl"},
                 "catalog_schema_version":7,"catalog_db_path":"/var/lib/groove-catalog/catalog.db",
-                "enricher_chain":["musicbrainz","discogs","itunes"]})
+                "enricher_chain":["musicbrainz","discogs","itunes"]}
+            if EDITION_QUESTION_OPEN:
+                status["edition_question"] = edition_question()
+            return self._json(status)
         if path=="/catalog/plays":
             return self._json({"items":[play(i) for i in range(24)],"page":1,"limit":50,"total":24,"total_pages":1})
         if path=="/catalog/tracks":
@@ -279,7 +298,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 "backend":"broadlink","target_id":"cd_player","action":"stop"})
         self._json({"error":"not found"},404)
     def do_POST(self):
+        global EDITION_QUESTION_OPEN
         if self.path=="/catalog/stylus/replace": return self._json(stylus_state())
+        if self.path in ("/identity/album-programme/choose-edition", "/identity/album-programme/dismiss-edition-question"):
+            EDITION_QUESTION_OPEN = False
+            self.send_response(204); self.end_headers(); return
         m=re.match(r"/catalog/library/suggestions/(\d+)/(accept|fork|dismiss)",self.path)
         if m:
             sg=SUGGESTIONS.get(int(m.group(1)))
