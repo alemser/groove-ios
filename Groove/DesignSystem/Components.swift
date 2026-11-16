@@ -1,5 +1,49 @@
 import SwiftUI
 
+// MARK: - BannerCard
+
+/// A tinted row that leads to something waiting for the operator: plays to
+/// associate, albums to add, a question about the record playing. One shape for
+/// all of them, as Android's `BannerCard`.
+struct BannerCard: View {
+    let systemImage: String
+    let tint: Color
+    let title: String
+    let subtitle: String
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.title3)
+                    .foregroundStyle(tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.text)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Brand.muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Brand.muted)
+            }
+            .padding(12)
+            .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(tint.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 // MARK: - Badge
 
 /// Small pill used for source, status, and format tags.

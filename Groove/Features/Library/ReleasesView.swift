@@ -230,6 +230,10 @@ struct ReleasesView: View {
                     nowPlayingBanner(pb)
                 }
 
+                if let question = nowPlaying.editionQuestion {
+                    EditionQuestionBanner(question: question)
+                }
+
                 if model.associationsCount > 0 {
                     associationsBanner
                 }
@@ -404,70 +408,27 @@ struct ReleasesView: View {
     }
 
     private var associationsBanner: some View {
-        Button {
-            showAssociations = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "waveform.badge.exclamationmark")
-                    .font(.title3)
-                    .foregroundStyle(Brand.warn)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(model.associationsCount) play\(model.associationsCount == 1 ? "" : "s") need\(model.associationsCount == 1 ? "s" : "") association")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Brand.text)
-                    Text("The recognizer couldn't confidently match these to a track.")
-                        .font(.caption)
-                        .foregroundStyle(Brand.muted)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Brand.muted)
-            }
-            .padding(12)
-            .background(Brand.warn.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Brand.warn.opacity(0.3), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Review plays needing association")
+        let count = model.associationsCount
+        return BannerCard(
+            systemImage: "waveform.badge.exclamationmark",
+            tint: Brand.warn,
+            title: "\(count) play\(count == 1 ? "" : "s") need\(count == 1 ? "s" : "") association",
+            subtitle: "The recognizer couldn't confidently match these to a track.",
+            accessibilityLabel: "Review plays needing association"
+        ) { showAssociations = true }
     }
 
-    /// Same shape as `associationsBanner`, in the accent color rather than
-    /// the warning one: nothing is wrong, an album just isn't in the library.
+    /// In the accent color rather than the warning one: nothing is wrong, an
+    /// album just isn't in the library.
     private var suggestionsBanner: some View {
         let count = model.suggestionsCount
-        return Button {
-            showSuggestions = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "plus.square.on.square")
-                    .font(.title3)
-                    .foregroundStyle(Brand.teal)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(count) album\(count == 1 ? "" : "s") to add to your library")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Brand.text)
-                    Text("Recognized while playing — pick the edition you own.")
-                        .font(.caption)
-                        .foregroundStyle(Brand.muted)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Brand.muted)
-            }
-            .padding(12)
-            .background(Brand.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Brand.teal.opacity(0.3), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Review albums to add to your library")
+        return BannerCard(
+            systemImage: "plus.square.on.square",
+            tint: Brand.teal,
+            title: "\(count) album\(count == 1 ? "" : "s") to add to your library",
+            subtitle: "Recognized while playing — pick the edition you own.",
+            accessibilityLabel: "Review albums to add to your library"
+        ) { showSuggestions = true }
     }
 }
 

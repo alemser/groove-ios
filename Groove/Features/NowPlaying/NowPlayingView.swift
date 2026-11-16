@@ -256,11 +256,7 @@ struct NowPlayingView: View {
         ZStack {
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
-            EditionQuestionCard(question: question, onChoose: { option in
-                Task { await model.chooseEdition(option, settings: settings) }
-            }, onDismiss: {
-                Task { await model.dismissEditionQuestion(settings: settings) }
-            }, errorMessage: model.editionErrorMessage)
+            EditionQuestionPrompt(question: question)
             .padding(20)
             .frame(maxWidth: 520)
         }

@@ -21,20 +21,13 @@ struct EditionQuestionCard: View {
     @State private var answering: String?
     var errorMessage: String?
 
-    private var albumLabel: String {
-        [question.artist, question.album]
-            .compactMap { $0?.nonEmpty }
-            .joined(separator: " — ")
-            .nonEmpty ?? "this album"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Which pressing is playing?")
+                Text(EditionQuestion.heading)
                     .font(.headline)
                     .foregroundStyle(Brand.text)
-                Text(albumLabel)
+                Text(question.albumLabel)
                     .font(.subheadline)
                     .foregroundStyle(Brand.muted)
             }
@@ -145,5 +138,51 @@ struct EditionQuestionCard: View {
             bits.append(why)
         }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
+    }
+}
+
+/// The open question with its answers wired to the app's Now Playing model:
+/// the one wiring every screen that shows the question uses.
+struct EditionQuestionPrompt: View {
+    let question: EditionQuestion
+
+    @Environment(AppSettings.self) private var settings
+    @Environment(NowPlayingModel.self) private var model
+
+    var body: some View {
+        EditionQuestionCard(question: question, onChoose: { option in
+            Task { await model.chooseEdition(option, settings: settings) }
+        }, onDismiss: {
+            Task { await model.dismissEditionQuestion(settings: settings) }
+        }, errorMessage: model.editionErrorMessage)
+    }
+}
+
+/// Leads to the open question from the Library, where the operator may be
+/// looking at the album rather than at Now Playing. It is about the record
+/// playing now, so it exists only while the question is open: the parent shows
+/// it for `NowPlayingModel.editionQuestion`, and when the answer closes the
+/// question the banner, and the sheet it opened, go with it.
+struct EditionQuestionBanner: View {
+    let question: EditionQuestion
+
+    @State private var showing = false
+
+    var body: some View {
+        BannerCard(
+            systemImage: "opticaldisc",
+            tint: Brand.teal,
+            title: EditionQuestion.heading,
+            subtitle: "\(question.albumLabel) · answer while it plays",
+            accessibilityLabel: "Answer which pressing of \(question.albumLabel) is playing"
+        ) { showing = true }
+        .sheet(isPresented: $showing) {
+            ScrollView {
+                EditionQuestionPrompt(question: question)
+                    .padding(20)
+            }
+            .grooveScreenBackground()
+            .presentationDetents([.medium, .large])
+        }
     }
 }

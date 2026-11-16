@@ -98,8 +98,8 @@ final class NowPlayingModel {
     }
 
     /// Answers the edition question. The session moves to that edition's
-    /// tracklist and the choice is remembered for the album; the next poll
-    /// clears the card because the question is gone server-side.
+    /// tracklist and is not asked again this sitting; the next poll clears the
+    /// card because the question is gone server-side.
     func chooseEdition(_ option: EditionOption, settings: AppSettings) async {
         let service = CatalogService(settings: settings)
         do {
