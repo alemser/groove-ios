@@ -19,7 +19,13 @@ struct EquipmentDetailView: View {
     var body: some View {
         Form {
             Section("Info") {
-                InfoRow(label: "Role", value: currentItem.role.replacingOccurrences(of: "_", with: " ").capitalized)
+                if let name = currentItem.devicelink {
+                    InfoRow(label: "DeviceLink", value: name, mono: true)
+                    if let device = model.deviceLinkDevice(for: currentItem) {
+                        InfoRow(label: "Status", value: device.online ? "Online" : "Offline")
+                    }
+                }
+                InfoRow(label: "Role", value: currentItem.role.idWords)
                 if currentItem.physicalFormat != "unspecified" {
                     InfoRow(label: "Format", value: currentItem.physicalFormat.capitalized)
                 }
@@ -28,7 +34,13 @@ struct EquipmentDetailView: View {
                 }
             }
 
-            if currentItem.hasRemote, !(model.snapshot?.irBridgePaired ?? true) {
+            if let state = model.deviceState(targetId: currentItem.id) {
+                DeviceStateSection(state: state)
+            }
+
+            if currentItem.devicelink != nil {
+                EquipmentButtonsSection(item: currentItem, model: model, onLearn: { _ in }, onAddButton: {})
+            } else if currentItem.hasRemote, !(model.snapshot?.irBridgePaired ?? true) {
                 Section {
                     Text("Its remote buttons appear once an IR bridge is paired, in Rig › IR Bridge.")
                         .foregroundStyle(Brand.muted)
@@ -57,7 +69,7 @@ struct EquipmentDetailView: View {
                     Button(role: .destructive) {
                         showDeleteConfirm = true
                     } label: {
-                        Label("Delete Equipment", systemImage: "trash")
+                        Label(currentItem.devicelink == nil ? "Delete Equipment" : "Remove Device", systemImage: "trash")
                     }
                 }
             }
@@ -92,17 +104,21 @@ struct EquipmentDetailView: View {
             EquipmentEditForm(item: currentItem, model: model)
         }
         .confirmationDialog(
-            "Delete \(currentItem.label)?",
+            currentItem.devicelink == nil ? "Delete \(currentItem.label)?" : "Remove \(currentItem.label)?",
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
+            Button(currentItem.devicelink == nil ? "Delete" : "Remove", role: .destructive) {
                 Task {
-                    await model.deleteEquipment(id: currentItem.id)
+                    await model.remove(currentItem)
                     dismiss()
                 }
             }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            if currentItem.devicelink != nil {
+                Text("Everything adding it created goes with it. It can be added again from Rig › Found on Your Network.")
+            }
         }
     }
 }
@@ -137,34 +153,43 @@ struct EquipmentEditForm: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    TextField("Label", text: $label)
-                    Picker("Role", selection: $role) {
-                        Text("Physical Media").tag("physical_media")
-                        Text("Streaming").tag("streaming")
-                        Text("Other").tag("other")
-                    }
-                    Picker("Format", selection: $physicalFormat) {
-                        Text("Unspecified").tag("unspecified")
-                        Text("Vinyl").tag("vinyl")
-                        Text("CD").tag("cd")
-                        Text("Tape").tag("tape")
-                        Text("Mixed").tag("mixed")
-                    }
-                    Toggle("Show on Remote", isOn: $hasRemote)
-                }
-
-                if !modelChoices.isEmpty {
+                if item.devicelink != nil {
                     Section {
-                        Picker("Model", selection: $modelId) {
-                            Text("Other / not listed").tag("")
-                            ForEach(modelChoices) { Text($0.label).tag($0.id) }
-                        }
+                        TextField("Label", text: $label)
                     } footer: {
-                        Text(modelId.isEmpty
-                             ? "Pick its model if listed: Oceano already knows that remote's buttons, so they work without teaching them."
-                             : "Its main buttons are added and work without teaching; the rest are in Add Button. Choosing “Other” keeps them, but they'll need teaching.")
+                        Text("The rest comes from the device itself.")
                             .foregroundStyle(Brand.muted)
+                    }
+                } else {
+                    Section {
+                        TextField("Label", text: $label)
+                        Picker("Role", selection: $role) {
+                            Text("Physical Media").tag("physical_media")
+                            Text("Streaming").tag("streaming")
+                            Text("Other").tag("other")
+                        }
+                        Picker("Format", selection: $physicalFormat) {
+                            Text("Unspecified").tag("unspecified")
+                            Text("Vinyl").tag("vinyl")
+                            Text("CD").tag("cd")
+                            Text("Tape").tag("tape")
+                            Text("Mixed").tag("mixed")
+                        }
+                        Toggle("Show on Remote", isOn: $hasRemote)
+                    }
+
+                    if !modelChoices.isEmpty {
+                        Section {
+                            Picker("Model", selection: $modelId) {
+                                Text("Other / not listed").tag("")
+                                ForEach(modelChoices) { Text($0.label).tag($0.id) }
+                            }
+                        } footer: {
+                            Text(modelId.isEmpty
+                                 ? "Pick its model if listed: Oceano already knows that remote's buttons, so they work without teaching them."
+                                 : "Its main buttons are added and work without teaching; the rest are in Add Button. Choosing “Other” keeps them, but they'll need teaching.")
+                                .foregroundStyle(Brand.muted)
+                        }
                     }
                 }
 

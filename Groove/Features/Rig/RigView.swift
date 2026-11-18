@@ -16,6 +16,7 @@ struct RigView: View {
     /// The "Rig" switch; nil until loaded.
     @State private var rigEnabled: Bool?
     @State private var rigSwitchError: String?
+    @State private var deviceLink = DeviceLinkModel()
 
     var body: some View {
         NavigationStack {
@@ -77,6 +78,7 @@ struct RigView: View {
                 }
 
                 if rigEnabled == true {
+                    DeviceLinkSections(model: deviceLink)
                     Section("Automations") {
                         NavigationLink {
                             RulesView()
@@ -136,9 +138,11 @@ struct RigView: View {
             rigEnabled = true
         }
         guard rigEnabled == true else { return }
+        deviceLink.configure(settings)
         async let amp: Void = loadAmpStatus()
         async let rules: Void = loadRulesStatus()
-        _ = await (amp, rules)
+        async let devices: Void = deviceLink.load()
+        _ = await (amp, rules, devices)
     }
 
     private func setRig(_ on: Bool) async {
@@ -163,7 +167,7 @@ struct RigView: View {
                 return
             }
             let device = [amp.maker, amp.model].compactMap { $0.nonEmpty }.joined(separator: " ")
-            let power = (amp.power?.state ?? "unknown").replacingOccurrences(of: "_", with: " ").capitalized
+            let power = (amp.power?.state ?? "unknown").idWords
             ampStatusText = device.isEmpty ? power : "\(device) · \(power)"
         } catch {
             ampStatusText = "Unavailable"

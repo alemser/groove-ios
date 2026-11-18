@@ -13,12 +13,17 @@ Pure Python 3 standard library. Leave it running in a terminal; Ctrl-C to stop.
 MOCK_EDITION_QUESTION=1 opens a "which pressing is playing?" question on
 /status, offering two of the library's releases (rel-0 and rel-3); choosing or
 dismissing closes it.
+
+RIG_URL=http://127.0.0.1:7099 sends /rig/* (but /rig/capture/*) to a groove-rig
+running there instead of the canned rig answers, as groove-catalog does: a
+local groove-rig with a fake DeviceLink bridge shows the DeviceLink screens.
 """
 
 import json, os, struct, zlib, http.server, socketserver, re
 from urllib.parse import urlparse, parse_qs
 
 EDITION_QUESTION_OPEN = os.environ.get("MOCK_EDITION_QUESTION") == "1"
+RIG_URL = os.environ.get("RIG_URL", "").rstrip("/")
 
 def png(r,g,b):
     w=h=160
@@ -214,12 +219,34 @@ def pending_suggestions(alts=5):
     return [suggestion_view(sg,alts) for sg in SUGGESTIONS.values() if sg["status"]=="pending"]
 
 class H(http.server.BaseHTTPRequestHandler):
+    def _rig_proxied(self):
+        """Forwards a /rig/* request to RIG_URL when set; True when it did."""
+        if not RIG_URL or not self.path.startswith("/rig/") or self.path.startswith("/rig/capture/"):
+            return False
+        import urllib.request, urllib.error
+        n = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(n) if n else None
+        req = urllib.request.Request(RIG_URL + self.path[len("/rig"):], data=body, method=self.command,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r:
+                code, data = r.status, r.read()
+        except urllib.error.HTTPError as e:
+            code, data = e.code, e.read()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+        return True
+
     def log_message(self,*a): pass
     def _json(self,obj,code=200):
         b=json.dumps(obj).encode(); self.send_response(code)
         self.send_header("Content-Type","application/json"); self.send_header("Content-Length",str(len(b)))
         self.end_headers(); self.wfile.write(b)
     def do_GET(self):
+        if self._rig_proxied(): return
         p=urlparse(self.path); path=p.path
         m=re.match(r"/catalog/artwork/tracks/(\d+)",path)
         if m:
@@ -298,6 +325,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 "backend":"broadlink","target_id":"cd_player","action":"stop"})
         self._json({"error":"not found"},404)
     def do_POST(self):
+        if self._rig_proxied(): return
         global EDITION_QUESTION_OPEN
         if self.path=="/catalog/stylus/replace": return self._json(stylus_state())
         if self.path in ("/identity/album-programme/choose-edition", "/identity/album-programme/dismiss-edition-question"):
@@ -342,6 +370,7 @@ class H(http.server.BaseHTTPRequestHandler):
         n=int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}")
     def do_PUT(self):
+        if self._rig_proxied(): return
         if self.path=="/catalog/stylus": return self._json(stylus_state())
         if self.path=="/rig/capture/input-level":
             to=self._body().get("input_level","fixed"); frm=CAPTURE["input_level"]
@@ -363,10 +392,13 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._json(recognition_providers())
         self._json({"ok":True})
     def do_PATCH(self):
+        if self._rig_proxied(): return
         if self.path.startswith("/identity/recognition/providers/"):
             return self._json(recognition_providers())
         self._json(track(0))
-    def do_DELETE(self): self._json({"ok":True})
+    def do_DELETE(self):
+        if self._rig_proxied(): return
+        self._json({"ok":True})
 
 # Threaded: the app fires several requests at once (and URLSession may hold
 # an idle connection open), which a single-threaded server serialises into a

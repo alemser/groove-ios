@@ -116,7 +116,7 @@ struct AddEquipmentView: View {
     /// "Play, Stop and Record" from the buttons registered on create.
     private func buttonList(_ m: RigEquipmentModel) -> String {
         let names = (m.defaultActions ?? m.actions).map { action in
-            model.vocabulary.first { $0.id == action }?.label ?? action.replacingOccurrences(of: "_", with: " ").capitalized
+            model.vocabulary.first { $0.id == action }?.label ?? action.idWords
         }
         guard let last = names.last else { return "its buttons" }
         return names.count == 1 ? last : names.dropLast().joined(separator: ", ") + " and " + last

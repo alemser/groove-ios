@@ -686,8 +686,13 @@ extension String {
         case "programme_end": return "Programme end"
         case "expected_next_track": return "Next track in album sequence"
         case "last_known_track_no_next": return "Last confirmed track (no next expected)"
-        default: return nonEmpty?.replacingOccurrences(of: "_", with: " ").capitalized
+        default: return nonEmpty?.idWords
         }
+    }
+
+    /// An id as words: "physical_media" → "Physical Media".
+    var idWords: String {
+        replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
 

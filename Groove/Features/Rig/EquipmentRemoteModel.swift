@@ -17,6 +17,9 @@ final class EquipmentRemoteModel {
     /// Built-in makes/models that ship IR codes. Supplementary like
     /// templates: empty on a server without GET /rig/equipment/models.
     var builtInModels: [RigEquipmentModel] = []
+    /// DeviceLink devices discovery lists now, for their online state;
+    /// empty while the switch is off. Supplementary like templates.
+    var deviceLinkDevices: [RigDeviceLinkDevice] = []
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
@@ -107,7 +110,7 @@ final class EquipmentRemoteModel {
 
     func vocabularyLabel(_ action: String) -> String {
         if Self.powerKeys.contains(action) { return "Power" }
-        return vocabulary.first { $0.id == action }?.label ?? action.replacingOccurrences(of: "_", with: " ").capitalized
+        return vocabulary.first { $0.id == action }?.label ?? action.idWords
     }
 
     func renameButton(targetId: String, action: String, label: String) async {
@@ -159,6 +162,7 @@ final class EquipmentRemoteModel {
         async let vocab = service.rigActionVocabulary()
         async let tpls = service.rigEquipmentTemplates()
         async let models = service.rigEquipmentModels()
+        async let found = service.rigDeviceLinkDevices()
         do {
             equipment = try await eq
         } catch {
@@ -175,6 +179,8 @@ final class EquipmentRemoteModel {
         vocabulary = (try? await vocab)?.items ?? vocabulary
         templates = (try? await tpls) ?? templates
         builtInModels = (try? await models) ?? builtInModels
+        // Fails (409) while discovery is off: then nothing is listed.
+        deviceLinkDevices = (try? await found) ?? []
         phase = .loaded
     }
 
@@ -230,6 +236,44 @@ final class EquipmentRemoteModel {
         } catch {
             actionError = error.localizedForDisplay
             return false
+        }
+    }
+
+    /// The DeviceLink device `item` came from, as discovery lists it now
+    /// (nil while discovery is off or doesn't hear it).
+    func deviceLinkDevice(for item: RigEquipmentItem) -> RigDeviceLinkDevice? {
+        guard let name = item.devicelink else { return nil }
+        return deviceLinkDevices.first { $0.name == name }
+    }
+
+    /// The state `targetId`'s DeviceLink bridge streams, while it does.
+    func deviceState(targetId: String) -> RigDeviceState? {
+        snapshot?.targets.first { $0.id == targetId }?.state
+    }
+
+    /// Removes a DeviceLink device and everything adding it created; true
+    /// when it was.
+    @discardableResult
+    func removeDeviceLinkDevice(name: String) async -> Bool {
+        guard let settings else { return false }
+        do {
+            try await CatalogService(settings: settings).rigRemoveDeviceLinkDevice(name: name)
+            actionError = nil
+            await load()
+            return true
+        } catch {
+            actionError = error.localizedForDisplay
+            return false
+        }
+    }
+
+    /// Removes `item`: a DeviceLink device's with the device, any other
+    /// as equipment.
+    func remove(_ item: RigEquipmentItem) async {
+        if let name = item.devicelink {
+            await removeDeviceLinkDevice(name: name)
+        } else {
+            await deleteEquipment(id: item.id)
         }
     }
 

@@ -131,7 +131,7 @@ struct AmplifierRemoteTab: View {
     private var powerState: String {
         stateModel.power?.rawValue ?? model.amplifier?.power?.state ?? "unknown"
     }
-    private var powerLabel: String { powerState.replacingOccurrences(of: "_", with: " ").capitalized }
+    private var powerLabel: String { powerState.idWords }
 
     private var powerColor: Color {
         switch powerState {
@@ -441,7 +441,7 @@ struct AmplifierRemoteTab: View {
                     Button {
                         Task { await equipmentModel.fire(targetId: item.id, action: action) }
                     } label: {
-                        Text(action.replacingOccurrences(of: "_", with: " ").capitalized)
+                        Text(action.idWords)
                             .font(.caption.weight(.semibold))
                             .frame(maxWidth: .infinity)
                             .frame(height: 40)

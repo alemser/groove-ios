@@ -602,6 +602,39 @@ struct CatalogService {
         try await api.patch("/rig/control", body: RigControl(enabled: enabled))
     }
 
+    // MARK: DeviceLink devices (groove-rig docs/devicelink.md)
+
+    /// The "DeviceLink devices" switch: whether the rig looks for DeviceLink
+    /// bridges on the network. Same `{enabled}` shape as the Rig switch.
+    func rigDeviceLink() async throws -> RigControl {
+        try await api.get("/rig/devicelink")
+    }
+
+    @discardableResult
+    func rigSetDeviceLink(enabled: Bool) async throws -> RigControl {
+        try await api.patch("/rig/devicelink", body: RigControl(enabled: enabled))
+    }
+
+    /// The devices found, added or not; fails (409) while the switch is off.
+    func rigDeviceLinkDevices() async throws -> [RigDeviceLinkDevice] {
+        try await api.get("/rig/devicelink/devices", as: RigDeviceLinkListResponse.self).items
+    }
+
+    /// Runs a discovery round now (~2 s) and answers the same list.
+    func rigScanDeviceLink() async throws -> [RigDeviceLinkDevice] {
+        try await api.post("/rig/devicelink/scan", body: Empty(), as: RigDeviceLinkListResponse.self).items
+    }
+
+    @discardableResult
+    func rigAddDeviceLinkDevice(name: String) async throws -> RigDeviceLinkDevice {
+        try await api.post("/rig/devicelink/devices/\(name)/add", body: Empty())
+    }
+
+    /// Removes everything adding the device created.
+    func rigRemoveDeviceLinkDevice(name: String) async throws {
+        try await api.delete("/rig/devicelink/devices/\(name)")
+    }
+
     func rigBackends() async throws -> [RigBackend] {
         try await api.get("/rig/backends", as: RigBackendListResponse.self).items
     }

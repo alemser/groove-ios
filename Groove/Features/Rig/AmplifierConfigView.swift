@@ -53,6 +53,7 @@ struct AmplifierConfigView: View {
     @State private var exportDocument: AmplifierProfileDocument?
     @State private var showExporter = false
     @State private var showImporter = false
+    @State private var confirmRemoveDevice = false
 
     var body: some View {
         Group {
@@ -106,6 +107,24 @@ struct AmplifierConfigView: View {
         } message: {
             Text("Its settings and learned remote codes are kept, for if you choose it again.")
         }
+        .confirmationDialog(
+            "Remove \(selectedProfile?.name ?? "the device")?",
+            isPresented: $confirmRemoveDevice,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                Task {
+                    guard let name = selectedProfile?.devicelink else { return }
+                    if await equipmentModel.removeDeviceLinkDevice(name: name) {
+                        selectionSeeded = false
+                        await model.load()
+                        await reloadRig()
+                    }
+                }
+            }
+        } message: {
+            Text("Everything adding it created goes with it; the amplifier it replaced comes back. It can be added again from Rig › Found on Your Network.")
+        }
         .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .json, defaultFilename: "amplifier-profile") { _ in }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
             Task { await handleImport(result) }
@@ -126,20 +145,34 @@ struct AmplifierConfigView: View {
         Form {
             profileSection
 
-            Section("Device") {
-                TextField("Maker", text: $maker)
-                TextField("Model", text: $deviceModel)
-                Picker("Input Mode", selection: $inputMode) {
-                    Text("Cycle").tag("cycle")
-                    Text("Direct").tag("direct")
+            Section {
+                Group {
+                    TextField("Maker", text: $maker)
+                    TextField("Model", text: $deviceModel)
+                    Picker("Input Mode", selection: $inputMode) {
+                        Text("Cycle").tag("cycle")
+                        Text("Direct").tag("direct")
+                    }
                 }
+                .disabled(activeDeviceLink != nil)
                 TextField("Warm-up (secs)", text: $warmUpSecs)
                     .keyboardType(.numberPad)
                 TextField("Standby timeout (mins)", text: $standbyTimeoutMins)
                     .keyboardType(.numberPad)
+            } header: {
+                Text("Device")
+            } footer: {
+                if let name = activeDeviceLink {
+                    Text("From DeviceLink: \(name). Its model, inputs and controls come from the device and follow it; warm-up and standby are yours.")
+                        .foregroundStyle(Brand.muted)
+                }
             }
 
-            if bridgePaired {
+            // A DeviceLink amplifier is switched and read through its own
+            // bridge: no IR commands to teach, no input to tell by hand.
+            if activeDeviceLink != nil {
+                EmptyView()
+            } else if bridgePaired {
                 commandsSection
             } else {
                 currentInputSection
@@ -149,6 +182,7 @@ struct AmplifierConfigView: View {
                 ForEach($inputs) { $input in
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Label", text: $input.label)
+                            .disabled(activeDeviceLink != nil)
                         Toggle("Visible", isOn: $input.visible)
                         Picker("Recognition", selection: Binding(
                             get: { input.recognitionPolicy ?? "auto" },
@@ -162,12 +196,14 @@ struct AmplifierConfigView: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .onDelete { inputs.remove(atOffsets: $0) }
+                .onDelete(perform: activeDeviceLink == nil ? { inputs.remove(atOffsets: $0) } : nil)
 
-                Button {
-                    inputs.append(RigInputConfig(id: "_new_\(UUID().uuidString)", label: "New Input", visible: true, recognitionPolicy: "auto"))
-                } label: {
-                    Label("Add Input", systemImage: "plus")
+                if activeDeviceLink == nil {
+                    Button {
+                        inputs.append(RigInputConfig(id: "_new_\(UUID().uuidString)", label: "New Input", visible: true, recognitionPolicy: "auto"))
+                    } label: {
+                        Label("Add Input", systemImage: "plus")
+                    }
                 }
             } header: {
                 Text("Inputs")
@@ -183,9 +219,11 @@ struct AmplifierConfigView: View {
                     .foregroundStyle(Brand.muted)
             }
 
-            advancedSection
+            if activeDeviceLink == nil {
+                advancedSection
+            }
 
-            if let error = model.actionError {
+            if let error = model.actionError ?? equipmentModel.actionError {
                 Section { Text(error).foregroundStyle(Brand.err) }
             }
         }
@@ -240,6 +278,11 @@ struct AmplifierConfigView: View {
         model.profiles.first { $0.id == selectedProfileId }
     }
 
+    /// The DeviceLink device of the active profile, nil when it isn't one.
+    private var activeDeviceLink: String? {
+        model.profiles.first { $0.id == model.activeProfileId }?.devicelink
+    }
+
     /// Edits are saved into the active profile (a built-in's override, or
     /// the custom profile) by groove-rig itself, so there's no "save as new
     /// profile" step — Duplicate is the only thing that makes a copy.
@@ -261,7 +304,9 @@ struct AmplifierConfigView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Amplifier")
-                    if selectedProfile?.customised == true {
+                    if let name = selectedProfile?.devicelink {
+                        Text("From DeviceLink: \(name)").font(.caption).foregroundStyle(Brand.muted)
+                    } else if selectedProfile?.customised == true {
                         Text("Customised").font(.caption).foregroundStyle(Brand.muted)
                     }
                 }
@@ -357,7 +402,14 @@ struct AmplifierConfigView: View {
                     Label("Reset to Factory Settings", systemImage: "arrow.counterclockwise")
                 }
             }
-            if let profile = selectedProfile, profile.origin != "builtin", !isSelectedProfileActive {
+            if selectedProfile?.devicelink != nil {
+                Divider()
+                Button(role: .destructive) {
+                    confirmRemoveDevice = true
+                } label: {
+                    Label("Remove Device", systemImage: "trash")
+                }
+            } else if let profile = selectedProfile, profile.origin != "builtin", !isSelectedProfileActive {
                 Divider()
                 Button(role: .destructive) {
                     Task { await model.deleteProfile(id: profile.id) }
