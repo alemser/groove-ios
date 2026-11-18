@@ -11,6 +11,8 @@ struct LearnRequestItem: Identifiable {
 /// button on its remote. Tap a learned one to send it, an unlearned one to
 /// teach it; long-press for Re-learn / Rename / Forget Code / Remove. New
 /// buttons are added by learning them ("Add Button…", "Teach the Remote").
+/// A DeviceLink device's buttons are its own keys: each one only sends, and
+/// the device decides which there are.
 struct EquipmentButtonsSection: View {
     let item: RigEquipmentItem
     let model: EquipmentRemoteModel
@@ -50,38 +52,46 @@ struct EquipmentButtonsSection: View {
         return out
     }
 
+    private var fromDevice: Bool { item.devicelink != nil }
+
     private func learned(_ row: Row) -> Bool {
         row.keys.contains { model.isLearned(targetId: item.id, action: $0) }
     }
 
     var body: some View {
         Section {
-            ForEach(rows) { row in rowView(row) }
-            Button(action: onAddButton) {
-                Label("Add Button…", systemImage: "plus.circle.fill")
+            ForEach(rows) { row in
+                if fromDevice { deviceRowView(row) } else { rowView(row) }
             }
-            // Only standard buttons still missing prompt a walkthrough —
-            // optional extras are offered under Add Button instead, so a
-            // complete remote never looks unfinished.
-            let missing = model.missingStandardButtons(for: item, extra: extraStandard)
-            if !missing.isEmpty {
-                Button {
-                    onLearn(missing.map { LearnStep(action: $0, label: model.vocabularyLabel($0)) })
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label(rows.isEmpty ? "Teach the Remote (\(missing.count))" : "Teach the Missing Buttons (\(missing.count))",
-                              systemImage: "list.number")
-                        Text(missing.map(model.vocabularyLabel).joined(separator: ", "))
-                            .font(.caption)
-                            .foregroundStyle(Brand.muted)
-                            .padding(.leading, 36)
+            if !fromDevice {
+                Button(action: onAddButton) {
+                    Label("Add Button…", systemImage: "plus.circle.fill")
+                }
+                // Only standard buttons still missing prompt a walkthrough —
+                // optional extras are offered under Add Button instead, so a
+                // complete remote never looks unfinished.
+                let missing = model.missingStandardButtons(for: item, extra: extraStandard)
+                if !missing.isEmpty {
+                    Button {
+                        onLearn(missing.map { LearnStep(action: $0, label: model.vocabularyLabel($0)) })
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(rows.isEmpty ? "Teach the Remote (\(missing.count))" : "Teach the Missing Buttons (\(missing.count))",
+                                  systemImage: "list.number")
+                            Text(missing.map(model.vocabularyLabel).joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundStyle(Brand.muted)
+                                .padding(.leading, 36)
+                        }
                     }
                 }
             }
         } header: {
             Text("Buttons")
         } footer: {
-            Text("Tap a learned button to send it, an unlearned one to teach it. Touch and hold for more.")
+            Text(fromDevice
+                 ? "Tap a button to send it to the device itself, with no IR bridge and nothing to learn."
+                 : "Tap a learned button to send it, an unlearned one to teach it. Touch and hold for more.")
                 .foregroundStyle(Brand.muted)
         }
         .alert("Rename Button", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
@@ -96,6 +106,21 @@ struct EquipmentButtonsSection: View {
         } message: {
             Text("Leave empty to restore its default name.")
         }
+    }
+
+    private func deviceRowView(_ row: Row) -> some View {
+        Button {
+            Task { await model.fire(targetId: item.id, action: row.action) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: model.icon(for: row.action) ?? "circle")
+                    .foregroundStyle(Brand.accent)
+                    .frame(width: 24)
+                Text(row.label).foregroundStyle(Brand.text)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isPerformingAction)
     }
 
     private func rowView(_ row: Row) -> some View {

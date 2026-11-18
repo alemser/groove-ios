@@ -8,7 +8,7 @@ struct LearnSessionSheet: View {
     let equipmentLabel: String
     let steps: [LearnStep]
     /// Names other buttons on this target, for the duplicate warning.
-    var labelFor: (String) -> String = { $0.replacingOccurrences(of: "_", with: " ").capitalized }
+    var labelFor: (String) -> String = { $0.idWords }
     var onFinished: () -> Void = {}
 
     @Environment(AppSettings.self) private var settings

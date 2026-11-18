@@ -90,6 +90,7 @@
 		F2B4B2AAD3DA41B951841086 /* RemoteLayoutModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */; };
 		F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C276B60479555871B884B5E /* NavigationState.swift */; };
 		F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5692B96AF11DD835C1F1819A /* RulesView.swift */; };
+		EA8E0EFCBCB96187CF1586E0 /* DeviceLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
 /* End PBXBuildFile section */
@@ -124,6 +125,7 @@
 		535882879A217CB2085F866E /* ReleasesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasesView.swift; sourceTree = "<group>"; };
 		54307373692AB53DC1F59A33 /* EnricherCredentialsForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnricherCredentialsForm.swift; sourceTree = "<group>"; };
 		5692B96AF11DD835C1F1819A /* RulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesView.swift; sourceTree = "<group>"; };
+		DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLink.swift; sourceTree = "<group>"; };
 		569411080918D04DCBAC649F /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
 		599238D9601A338235548EB9 /* GrooveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrooveApp.swift; sourceTree = "<group>"; };
 		5C276B60479555871B884B5E /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */,
 				672B702C305D95A110E0B197 /* RigView.swift */,
 				5692B96AF11DD835C1F1819A /* RulesView.swift */,
+				DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */,
 				431A7B81109A3032AF631217 /* StylusModel.swift */,
 				C562BF700C03B7623BADB564 /* StylusView.swift */,
 			);
@@ -565,6 +568,7 @@
 				A5C8565C906430EC7A80EA7E /* RigView.swift in Sources */,
 				3E248FD660D01CE13FD67284 /* RootView.swift in Sources */,
 				F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */,
+				EA8E0EFCBCB96187CF1586E0 /* DeviceLink.swift in Sources */,
 				0BA058B9DB3B8E645C1A48C3 /* SettingsView.swift in Sources */,
 				B6F5E689AE626381519804A0 /* StreamingView.swift in Sources */,
 				0ECA80898AF1C05367635A39 /* StylusModel.swift in Sources */,

@@ -131,6 +131,8 @@ struct RigTargetStatus: Decodable, Identifiable {
     var backend: String?
     var capabilities: [String]?
     var actions: [String: RigTargetActionStatus]
+    /// A DeviceLink device's state, only while its bridge streams it.
+    var state: RigDeviceState?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -139,10 +141,11 @@ struct RigTargetStatus: Decodable, Identifiable {
         backend = try c.decodeIfPresent(String.self, forKey: .backend)
         capabilities = try c.decodeIfPresent([String].self, forKey: .capabilities)
         actions = try c.decodeIfPresent([String: RigTargetActionStatus].self, forKey: .actions) ?? [:]
+        state = try c.decodeIfPresent(RigDeviceState.self, forKey: .state)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, label, backend, capabilities, actions
+        case id, label, backend, capabilities, actions, state
     }
 }
 
@@ -328,10 +331,14 @@ struct RigEquipmentItem: Decodable, Identifiable, Hashable {
     var modelId: String?
     /// Wiring per amplifier profile id; `inputIds` is the active one's.
     var inputsByProfile: [String: [String]]?
+    /// The DeviceLink device it came from (for the amplifier, the device
+    /// whose profile is active). Its buttons are the device's own keys,
+    /// sent with nothing to learn and no IR bridge.
+    var devicelink: String?
 
     func label(for action: String) -> String {
         if ["power_toggle", "power_on", "power_off"].contains(action) { return "Power" }
-        return actionLabels?[action] ?? action.replacingOccurrences(of: "_", with: " ").capitalized
+        return actionLabels?[action] ?? action.idWords
     }
 }
 
@@ -530,6 +537,9 @@ struct RigStoredAmplifierProfile: Codable, Identifiable, Hashable {
     /// A built-in with this installation's changes applied (`config` is the
     /// effective one). "Reset to Factory Settings" clears it.
     var customised: Bool?
+    /// The DeviceLink device it was built from: the device decides its
+    /// model and inputs; it is removed with the device.
+    var devicelink: String?
 }
 
 /// `POST /amplifier/profiles` for a duplicate: the source profile's config
@@ -735,4 +745,118 @@ struct CaptureGainApplied: Decodable {
 
 struct CaptureInputLevelBody: Codable {
     var inputLevel: CaptureInputLevel
+}
+
+// MARK: - DeviceLink (groove-rig docs/devicelink.md)
+
+/// A value of a DeviceLink device's state, as its bridge sends it.
+enum RigStateJSON: Decodable, Hashable {
+    case null
+    case bool(Bool)
+    case number(Double)
+    case string(String)
+    case array([RigStateJSON])
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() {
+            self = .null
+        } else if let v = try? c.decode(Bool.self) {
+            self = .bool(v)
+        } else if let v = try? c.decode(Double.self) {
+            self = .number(v)
+        } else if let v = try? c.decode(String.self) {
+            self = .string(v)
+        } else if let v = try? c.decode([RigStateJSON].self) {
+            self = .array(v)
+        } else {
+            // An object: no state field the contract lists holds one.
+            self = .null
+        }
+    }
+}
+
+/// One field of a DeviceLink device's state, as its description lists it
+/// (contract §State fields), with its value.
+struct RigStateValue: Decodable, Hashable, Identifiable {
+    var id: String
+    var type: String
+    var label: String?
+    var unit: String?
+    var value: RigStateJSON
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        type = try c.decode(String.self, forKey: .type)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        unit = try c.decodeIfPresent(String.self, forKey: .unit)
+        value = try c.decodeIfPresent(RigStateJSON.self, forKey: .value) ?? .null
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, label, unit, value
+    }
+
+    /// Its label, or the words of its id's last step ("transport").
+    var title: String { label ?? (id.split(separator: ".").last.map(String.init) ?? id).idWords }
+
+    /// Monospaced, as on the device's own display.
+    var isLines: Bool { type == "lines" }
+}
+
+/// `/rig/status` `targets[].state`.
+struct RigDeviceState: Decodable, Hashable {
+    var fields: [RigStateValue]
+}
+
+/// A DeviceLink device found on the network (`GET /rig/devicelink/devices`).
+struct RigDeviceLinkDevice: Decodable, Identifiable, Hashable {
+    var name: String
+    var ip: String
+    var kind: String
+    var label: String
+    var model: String
+    var online: Bool
+    var preview: RigDeviceLinkPreview?
+    var previewError: String?
+    var added: RigDeviceLinkAdded?
+
+    var id: String { name }
+
+    var displayName: String { label.nonEmpty ?? model.nonEmpty ?? name }
+
+    /// The word for its kind (contract §GET /device).
+    var kindLabel: String { Self.kindLabels[kind] ?? kind.idWords }
+
+    private static let kindLabels = ["cd_player": "CD Player", "dac": "DAC"]
+}
+
+/// What adding a device would create.
+struct RigDeviceLinkPreview: Decodable, Hashable {
+    var targetId: String
+    /// Set for an amplifier: it becomes the rig's amplifier.
+    var profileId: String?
+    var inputs: [RigDeviceLinkInput]?
+    var buttons: [RigDeviceLinkButton]
+}
+
+struct RigDeviceLinkInput: Decodable, Hashable {
+    var id: String
+    var label: String
+}
+
+struct RigDeviceLinkButton: Decodable, Hashable {
+    var action: String
+    var label: String
+}
+
+/// What an added device became.
+struct RigDeviceLinkAdded: Decodable, Hashable {
+    var targetId: String
+    var profileId: String?
+}
+
+struct RigDeviceLinkListResponse: Decodable {
+    var items: [RigDeviceLinkDevice]
 }

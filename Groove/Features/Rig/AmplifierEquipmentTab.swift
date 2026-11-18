@@ -42,15 +42,15 @@ struct AmplifierEquipmentTab: View {
             Button("Remove", role: .destructive) {
                 if let offsets = pendingDeleteOffsets {
                     for index in offsets {
-                        let id = model.otherEquipment[index].id
-                        Task { await model.deleteEquipment(id: id) }
+                        let item = model.otherEquipment[index]
+                        Task { await model.remove(item) }
                     }
                 }
                 pendingDeleteOffsets = nil
             }
             Button("Cancel", role: .cancel) { pendingDeleteOffsets = nil }
         } message: {
-            Text("Its learned remote commands are removed too — you'd have to re-teach them if you add it back.")
+            Text("Its learned remote commands are removed too — you'd have to re-teach them if you add it back. A DeviceLink device can be added again from Rig › Found on Your Network.")
         }
     }
 
@@ -101,8 +101,12 @@ struct AmplifierEquipmentTab: View {
     }
 
     private func subtitle(_ item: RigEquipmentItem) -> String {
-        let roleLabel = item.role.replacingOccurrences(of: "_", with: " ").capitalized
+        let roleLabel = item.role.idWords
         let actions = item.actions ?? []
+        if item.devicelink != nil {
+            let online = model.deviceLinkDevice(for: item).map { $0.online ? " · Online" : " · Offline" } ?? ""
+            return "DeviceLink\(online) · \(actions.count) buttons"
+        }
         let learned = actions.filter { model.isLearned(targetId: item.id, action: $0) }.count
         return "\(roleLabel) · \(learned)/\(actions.count) commands learned"
     }
