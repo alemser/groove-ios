@@ -138,6 +138,9 @@ final class EquipmentRemoteModel {
 
     private var settings: AppSettings?
 
+    /// The active amplifier's inputs, every one, visible or not: what equipment can be plugged into.
+    var amplifierInputs: [RigInputStatus] { snapshot?.amplifier?.inputs ?? [] }
+
     /// The amplifier is registered as a target like any other, but it already
     /// has its own screen — listing it again here would just be confusing.
     var otherEquipment: [RigEquipmentItem] { equipment.filter { $0.id != "amplifier" } }

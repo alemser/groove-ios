@@ -14,6 +14,7 @@ struct AddEquipmentView: View {
     @State private var templateId = ""
     /// "" = no built-in model.
     @State private var modelId = ""
+    @State private var ticked: Set<String> = []
     @State private var isSaving = false
 
     /// The amplifier template describes the amplifier itself, not new gear.
@@ -63,6 +64,8 @@ struct AddEquipmentView: View {
                             .foregroundStyle(Brand.muted)
                     }
                 }
+
+                ConnectedToSection(inputs: model.amplifierInputs, ticked: $ticked)
             }
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
@@ -91,6 +94,7 @@ struct AddEquipmentView: View {
         isSaving = true
         defer { isSaving = false }
         let name = label.trimmingCharacters(in: .whitespaces)
+        let wired = wiringToSend(ticked, model.amplifierInputs)
         let req = RigEquipmentSaveRequest(
             id: nil,
             label: name.isEmpty ? (selectedModel?.label ?? selected?.label) : name,
@@ -98,7 +102,7 @@ struct AddEquipmentView: View {
             actions: [], // learned afterwards — or, with a model, its shipped ones
             role: nil,
             physicalFormat: nil,
-            inputIds: nil,
+            inputIds: wired.isEmpty ? nil : wired, // nothing ticked: no wiring to record
             hasRemote: nil,
             templateId: selected?.id,
             modelId: selectedModel?.id
