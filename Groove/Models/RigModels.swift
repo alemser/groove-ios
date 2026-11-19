@@ -340,6 +340,36 @@ struct RigEquipmentItem: Decodable, Identifiable, Hashable {
         if ["power_toggle", "power_on", "power_off"].contains(action) { return "Power" }
         return actionLabels?[action] ?? action.idWords
     }
+
+    /// The labels of the active amplifier's inputs this is plugged into, in
+    /// wiring order. An id `inputs` doesn't have (wiring made on another
+    /// amplifier) reads as the id, as `/studio` shows it.
+    func wiredInputLabels(_ inputs: [RigInputStatus]) -> [String] {
+        (inputIds ?? []).map { id in inputs.first { $0.id == id }?.label ?? id }
+    }
+
+    /// What the Remote shows by its card, as groove-rig's `/remote` does:
+    /// "Current input" when it is plugged into the input the amplifier is on
+    /// now, else the inputs it is plugged into; nil when it isn't wired.
+    func wiringHint(_ inputs: [RigInputStatus], currentInputId: String?) -> WiringHint? {
+        let labels = wiredInputLabels(inputs)
+        if labels.isEmpty { return nil }
+        if let current = currentInputId, (inputIds ?? []).contains(current) {
+            return WiringHint(text: "Current input", current: true)
+        }
+        return WiringHint(text: labels.joined(separator: ", "), current: false)
+    }
+}
+
+/// The text by a piece of equipment's Remote card; `current` when its input is the one on now.
+struct WiringHint: Equatable {
+    var text: String
+    var current: Bool
+}
+
+/// The `input_ids` to send for the ticked inputs: in the amplifier's order, only inputs it has.
+func wiringToSend(_ ticked: Set<String>, _ inputs: [RigInputStatus]) -> [String] {
+    inputs.map(\.id).filter { ticked.contains($0) }
 }
 
 struct RigEquipmentListResponse: Decodable {

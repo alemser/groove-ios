@@ -226,6 +226,32 @@ struct AmplifierRemoteTab: View {
         }
     }
 
+    /// The input the amp is on: its own reading when it has one, else the one groove-rig tracks.
+    private var currentInputId: String? { stateModel.inputId ?? model.amplifier?.activeInputId }
+
+    private func wiringHint(_ item: RigEquipmentItem) -> WiringHint? {
+        item.wiringHint(model.amplifier?.inputs ?? [], currentInputId: currentInputId)
+    }
+
+    /// The equipment a layout panel belongs to; nil for the amplifier's own panels.
+    private func panelEquipment(_ panel: RigLayoutPanel) -> RigEquipmentItem? {
+        guard let target = panel.target, target != "amplifier" else { return nil }
+        return equipmentModel.equipment.first { $0.id == target }
+    }
+
+    /// A card's title, with the wiring hint of the equipment it belongs to.
+    private func cardTitle(_ text: String, hint: WiringHint?) -> some View {
+        HStack(spacing: 8) {
+            SectionLabel(text: text)
+            if let hint {
+                Text(hint.text)
+                    .font(.caption)
+                    .foregroundStyle(hint.current ? Brand.ok : Brand.muted)
+                    .lineLimit(1)
+            }
+        }
+    }
+
     /// The amp's own reading when it has one — an input changed with its
     /// own remote shows at once — named with the rig's label for that id;
     /// otherwise the input groove-rig tracks.
@@ -285,7 +311,7 @@ struct AmplifierRemoteTab: View {
         let controls = panel.controls.filter(isShown)
         if !controls.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                SectionLabel(text: panel.label)
+                cardTitle(panel.label, hint: panelEquipment(panel).flatMap(wiringHint))
                 SpanGrid(columns: layoutModel.layout?.columns ?? 4) {
                     ForEach(controls) { c in
                         controlView(c).gridSpan(c.span)
@@ -434,7 +460,7 @@ struct AmplifierRemoteTab: View {
 
     private func equipmentCard(_ item: RigEquipmentItem) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(text: item.label)
+            cardTitle(item.label, hint: wiringHint(item))
             let columns = [GridItem(.adaptive(minimum: 96), spacing: 8)]
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(learnedActions(for: item), id: \.self) { action in
