@@ -23,7 +23,8 @@ final class EquipmentRemoteModel {
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
-    static let powerKeys = Set(rigPowerKeys)
+    /// A constant: readable off the main actor, as `EquipmentButtonsSection.Row` does.
+    nonisolated static let powerKeys = Set(rigPowerKeys)
 
     func icon(for action: String) -> String? {
         if Self.powerKeys.contains(action) { return "power" }

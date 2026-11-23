@@ -264,14 +264,16 @@ struct EditReleaseView: View {
             .frame(width: 64, height: 64)
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
+            // Read here: the picker's label closure is Sendable and can't touch the main-actor model.
+            let isUploading = model.isUploadingArtwork
             PhotosPicker(selection: $artworkItem, matching: .images) {
-                if model.isUploadingArtwork {
+                if isUploading {
                     HStack { ProgressView(); Text("Uploading…") }
                 } else {
                     Text("Choose Photo")
                 }
             }
-            .disabled(model.isUploadingArtwork)
+            .disabled(isUploading)
             Spacer()
         }
     }
