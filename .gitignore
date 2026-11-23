@@ -21,3 +21,7 @@ Groove.xcodeproj/project.xcworkspace/xcuserdata/
 # SwiftPM
 .build/
 .swiftpm/
+
+# Python (Mock/)
+__pycache__/
+*.pyc

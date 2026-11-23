@@ -23,7 +23,7 @@ final class EquipmentRemoteModel {
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
-    static let powerKeys: Set<String> = ["power_toggle", "power_on", "power_off"]
+    static let powerKeys = Set(rigPowerKeys)
 
     func icon(for action: String) -> String? {
         if Self.powerKeys.contains(action) { return "power" }

@@ -337,7 +337,7 @@ struct RigEquipmentItem: Decodable, Identifiable, Hashable {
     var devicelink: String?
 
     func label(for action: String) -> String {
-        if ["power_toggle", "power_on", "power_off"].contains(action) { return "Power" }
+        if rigPowerKeys.contains(action) { return "Power" }
         return actionLabels?[action] ?? action.idWords
     }
 
@@ -859,8 +859,14 @@ struct RigDeviceLinkDevice: Decodable, Identifiable, Hashable {
     /// The word for its kind (contract §GET /device).
     var kindLabel: String { Self.kindLabels[kind] ?? kind.idWords }
 
+    /// "Online" or "Offline", as discovery last heard it.
+    var statusLabel: String { online ? "Online" : "Offline" }
+
     private static let kindLabels = ["cd_player": "CD Player", "dac": "DAC"]
 }
+
+/// The power actions, in the order the one Power button prefers them.
+let rigPowerKeys = ["power_toggle", "power_on", "power_off"]
 
 /// What adding a device would create.
 struct RigDeviceLinkPreview: Decodable, Hashable {

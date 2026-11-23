@@ -134,7 +134,7 @@ private struct DeviceLinkRow: View {
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.displayName).foregroundStyle(Brand.text)
-                Text("\(device.kindLabel) · \(device.online ? "Online" : "Offline")")
+                Text("\(device.kindLabel) · \(device.statusLabel)")
                     .font(.caption)
                     .foregroundStyle(device.online ? Brand.muted : Brand.err)
             }
@@ -157,7 +157,7 @@ struct DeviceLinkDeviceView: View {
                 InfoRow(label: "Model", value: device.model)
                 InfoRow(label: "Name", value: device.name, mono: true)
                 InfoRow(label: "Address", value: device.ip, mono: true)
-                InfoRow(label: "Status", value: device.online ? "Online" : "Offline")
+                InfoRow(label: "Status", value: device.statusLabel)
             }
             if let preview = device.preview {
                 if preview.profileId != nil {

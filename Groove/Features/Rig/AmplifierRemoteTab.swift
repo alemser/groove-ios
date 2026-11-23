@@ -303,7 +303,7 @@ struct AmplifierRemoteTab: View {
     /// The one Power button's action: power_toggle if learned, else
     /// whichever of power_on/power_off is.
     private func resolvedPower(_ target: String) -> String? {
-        ["power_toggle", "power_on", "power_off"].first { equipmentModel.isLearned(targetId: target, action: $0) }
+        rigPowerKeys.first { equipmentModel.isLearned(targetId: target, action: $0) }
     }
 
     @ViewBuilder

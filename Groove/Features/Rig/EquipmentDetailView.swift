@@ -22,7 +22,7 @@ struct EquipmentDetailView: View {
                 if let name = currentItem.devicelink {
                     InfoRow(label: "DeviceLink", value: name, mono: true)
                     if let device = model.deviceLinkDevice(for: currentItem) {
-                        InfoRow(label: "Status", value: device.online ? "Online" : "Offline")
+                        InfoRow(label: "Status", value: device.statusLabel)
                     }
                 }
                 InfoRow(label: "Role", value: currentItem.role.idWords)

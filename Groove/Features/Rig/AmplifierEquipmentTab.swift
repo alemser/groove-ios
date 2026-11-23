@@ -104,7 +104,7 @@ struct AmplifierEquipmentTab: View {
         let roleLabel = item.role.idWords
         let actions = item.actions ?? []
         if item.devicelink != nil {
-            let online = model.deviceLinkDevice(for: item).map { $0.online ? " · Online" : " · Offline" } ?? ""
+            let online = model.deviceLinkDevice(for: item).map { " · \($0.statusLabel)" } ?? ""
             return "DeviceLink\(online) · \(actions.count) buttons"
         }
         let learned = actions.filter { model.isLearned(targetId: item.id, action: $0) }.count
