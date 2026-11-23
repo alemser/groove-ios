@@ -8,6 +8,16 @@ struct RigInputStatus: Decodable, Identifiable, Hashable {
     var visible: Bool
 }
 
+/// `RigPowerStatus.state` values this app reacts to; others read as unknown.
+enum RigPowerState {
+    static let on = "on"
+    static let warmingUp = "warming_up"
+    static let standby = "standby"
+    static let unknown = "unknown"
+
+    static func isOn(_ state: String) -> Bool { state == on || state == warmingUp }
+}
+
 struct RigPowerStatus: Decodable {
     var state: String
     var confidence: String
@@ -53,6 +63,18 @@ struct RigAmplifierReading: Decodable, Equatable {
     var balance: RigAmplifierBalance?
     var loudness: Bool?
     var speakers: Bool?
+    /// Warm-up seconds left after a power-on the provider saw (the MR 780
+    /// bridge reads its display's countdown); nil outside the warm-up.
+    var warmupS: Double?
+
+    /// The power as a `RigPowerStatus.state` value: `warming_up` while the
+    /// amp is on with warm-up seconds left, the reading groove-rig makes of
+    /// the same fields (its `docs/state-provider.md`); nil when unknown.
+    var powerState: String? {
+        guard let power else { return nil }
+        if power == .on, let left = warmupS, left > 0 { return RigPowerState.warmingUp }
+        return power.rawValue
+    }
 }
 
 enum RigAmplifierPower: String, Decodable {

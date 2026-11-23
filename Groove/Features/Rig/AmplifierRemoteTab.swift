@@ -124,14 +124,18 @@ struct AmplifierRemoteTab: View {
     /// The amp's own reading when it has a state provider; otherwise the
     /// rig's inference from REC OUT level and its own IR history.
     private var powerState: String {
-        stateModel.power?.rawValue ?? model.amplifier?.power?.state ?? "unknown"
+        stateModel.powerState ?? model.amplifier?.power?.state ?? RigPowerState.unknown
     }
-    private var powerLabel: String { powerState.idWords }
+    /// "Warming Up · 19 s" while the amp counts its warm-up down.
+    private var powerLabel: String {
+        guard powerState == RigPowerState.warmingUp, let left = stateModel.warmupS else { return powerState.idWords }
+        return "\(powerState.idWords) · \(Int(left.rounded(.up))) s"
+    }
 
     private var powerColor: Color {
         switch powerState {
-        case "on", "warming_up": return Brand.ok
-        case "standby": return Brand.warn
+        case RigPowerState.on, RigPowerState.warmingUp: return Brand.ok
+        case RigPowerState.standby: return Brand.warn
         default: return Brand.muted
         }
     }
@@ -157,7 +161,7 @@ struct AmplifierRemoteTab: View {
         .grooveCard()
     }
 
-    private var isOn: Bool { powerState == "on" || powerState == "warming_up" }
+    private var isOn: Bool { RigPowerState.isOn(powerState) }
 
     // MARK: - Input
 

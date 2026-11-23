@@ -93,8 +93,7 @@ final class AmplifierModel {
     /// can't always see whether the amp is on (a silent input reads like
     /// off).
     var isPowerOn: Bool {
-        let state = amplifier?.power?.state ?? "unknown"
-        return state == "on" || state == "warming_up"
+        RigPowerState.isOn(amplifier?.power?.state ?? RigPowerState.unknown)
     }
 
     /// Most amplifier remotes have a single physical power button (one

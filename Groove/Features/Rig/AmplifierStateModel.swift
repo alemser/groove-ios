@@ -20,9 +20,13 @@ final class AmplifierStateModel {
     /// volume presses reads as one notice that keeps updating.
     static let hudDuration: Duration = .seconds(2)
 
-    /// The amp's power as it reads it itself; nil when there's no provider
-    /// reading to go on (fall back to the rig's inference).
-    var power: RigAmplifierPower? { observation?.state?.power }
+    /// The amp's power as it reads it itself, as a `RigPowerStatus.state`
+    /// value (warming up included); nil when there's no provider reading to
+    /// go on (fall back to the rig's inference).
+    var powerState: String? { observation?.state?.powerState }
+
+    /// The warm-up seconds left as the amp counts them; nil outside it.
+    var warmupS: Double? { observation?.state?.warmupS }
 
     /// The amp's active input id as it reads it itself; nil when there's no
     /// provider reading (fall back to the rig's tracking). Matched to the

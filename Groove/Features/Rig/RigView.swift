@@ -169,7 +169,7 @@ struct RigView: View {
                 return
             }
             let device = [amp.maker, amp.model].compactMap { $0.nonEmpty }.joined(separator: " ")
-            let power = (amp.power?.state ?? "unknown").idWords
+            let power = (amp.power?.state ?? RigPowerState.unknown).idWords
             ampStatusText = device.isEmpty ? power : "\(device) · \(power)"
         } catch {
             ampStatusText = "Unavailable"

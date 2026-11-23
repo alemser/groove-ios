@@ -20,8 +20,8 @@ struct AmplifierHUD: Equatable {
         to new: RigAmplifierReading,
         inputLabel: (String) -> String
     ) -> AmplifierHUD? {
-        if let p = new.power, p != old.power {
-            return AmplifierHUD(symbol: "power", title: "Amplifier", value: p == .on ? "On" : "Standby")
+        if let p = new.powerState, p != old.powerState {
+            return AmplifierHUD(symbol: "power", title: "Amplifier", value: p.idWords)
         }
         if let id = new.inputId, id != old.inputId {
             return AmplifierHUD(symbol: "cable.connector", title: "Input", value: inputLabel(id))
