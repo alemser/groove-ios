@@ -1,10 +1,11 @@
 import SwiftUI
 import Observation
 
-/// Cross-tab UI state: which tab is active and whether the global Now Playing
-/// sheet is presented. App-owned (like `AppSettings`/`AttentionCenter`) so the tab
-/// bar, the persistent mini-bar, and Home's summary card can all open the same
-/// sheet without threading callbacks through view hierarchies.
+/// Cross-tab UI state: which tab is active, the global Now Playing sheet, and
+/// the screens a notification tap opens from outside their tab. App-owned (like
+/// `AppSettings`/`AttentionCenter`) so the tab bar, the persistent mini-bar,
+/// Home's summary card and the notification delegate can all reach them without
+/// threading callbacks through view hierarchies.
 @Observable
 final class NavigationState {
     enum Tab: String, Hashable {
@@ -19,6 +20,8 @@ final class NavigationState {
     }
 
     var isNowPlayingSheetPresented = false
+    var isAssociationReviewPresented = false
+    var isStylusPresented = false
 
     init() {
         let stored = defaults.string(forKey: Self.selectedTabKey).flatMap(Tab.init(rawValue:))
@@ -27,5 +30,19 @@ final class NavigationState {
 
     func openNowPlaying() {
         isNowPlayingSheetPresented = true
+    }
+
+    func open(_ destination: NotificationDestination) {
+        // An app-wide sheet left open would cover the destination.
+        isNowPlayingSheetPresented = false
+        isAssociationReviewPresented = false
+        switch destination {
+        case .associations:
+            selectedTab = .library
+            isAssociationReviewPresented = true
+        case .stylus:
+            selectedTab = .rig
+            isStylusPresented = true
+        }
     }
 }

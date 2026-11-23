@@ -7,6 +7,7 @@ import SwiftUI
 /// in Settings, not here.
 struct RigView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(NavigationState.self) private var navigation
 
     @State private var stylusStatusText: String?
     @State private var ampStatusText: String?
@@ -19,6 +20,7 @@ struct RigView: View {
     @State private var deviceLink = DeviceLinkModel()
 
     var body: some View {
+        @Bindable var navigation = navigation
         NavigationStack {
             Form {
                 Section("Hardware") {
@@ -96,6 +98,8 @@ struct RigView: View {
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
             .navigationTitle("Rig")
+            // A stylus notification tap opens Stylus Tracking from outside this tab.
+            .navigationDestination(isPresented: $navigation.isStylusPresented) { StylusView() }
         }
         .task { await loadStylusStatus() }
         .task { await loadRig() }

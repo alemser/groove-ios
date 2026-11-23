@@ -99,7 +99,6 @@ struct ReleasesView: View {
     @Environment(AttentionCenter.self) private var attention
     @State private var model = ReleasesModel()
     @State private var search = ""
-    @State private var showAssociations = false
     @State private var showSuggestions = false
     @State private var showAddRelease = false
     @State private var showAllReleases = false
@@ -111,6 +110,7 @@ struct ReleasesView: View {
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
     var body: some View {
+        @Bindable var navigation = navigation
         content
             .task { model.configure(settings) }
             // configure() only loads once (guarded on settings == nil), and
@@ -140,7 +140,7 @@ struct ReleasesView: View {
             .onChange(of: navigation.selectedTab) { _, tab in
                 if tab == .library { Task { await model.load(query: search) } }
             }
-            .sheet(isPresented: $showAssociations, onDismiss: { Task { await model.load(query: search) } }) {
+            .sheet(isPresented: $navigation.isAssociationReviewPresented, onDismiss: { Task { await model.load(query: search) } }) {
                 AssociationReviewSheet()
             }
             .sheet(isPresented: $showSuggestions, onDismiss: { Task { await model.load(query: search) } }) {
@@ -415,7 +415,7 @@ struct ReleasesView: View {
             title: "\(count) play\(count == 1 ? "" : "s") need\(count == 1 ? "s" : "") association",
             subtitle: "The recognizer couldn't confidently match these to a track.",
             accessibilityLabel: "Review plays needing association"
-        ) { showAssociations = true }
+        ) { navigation.isAssociationReviewPresented = true }
     }
 
     /// In the accent color rather than the warning one: nothing is wrong, an

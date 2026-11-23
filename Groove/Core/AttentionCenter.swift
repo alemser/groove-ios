@@ -1,6 +1,5 @@
 import SwiftUI
 import Observation
-import UserNotifications
 
 /// Tracks how many items need the user's attention (pending associations plus
 /// tracks still awaiting a confirmed release), so the Library tab can carry a
@@ -34,7 +33,7 @@ final class AttentionCenter {
     func start(_ settings: AppSettings) {
         self.settings = settings
         guard poller == nil else { return }
-        Task { await ensureNotificationPermissionIfNeeded() }
+        Task { await Notifier.requestPermissionIfNeeded() }
         let p = Poller(interval: .seconds(30)) { [weak self] in await self?.refresh() }
         poller = p
         p.start()
@@ -98,34 +97,23 @@ final class AttentionCenter {
         for item in unseen {
             notifiedPendingEpochs.insert(item.listenerEpoch)
         }
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
-
-        let content = UNMutableNotificationContent()
-        content.sound = .default
+        let title: String
+        let body: String
         if unseen.count == 1, let only = unseen.first {
-            content.title = "Track needs identification"
+            title = "Track needs identification"
             let name = only.suggestedTitle?.nonEmpty ?? only.suggestion?.title?.nonEmpty
-            content.body = name.map { "\"\($0)\" couldn't be recognized automatically." }
+            body = name.map { "\"\($0)\" couldn't be recognized automatically." }
                 ?? "A play couldn't be recognized automatically."
         } else {
-            content.title = "\(unseen.count) tracks need identification"
-            content.body = "They couldn't be recognized automatically — open Oceano to pick them from your library."
+            title = "\(unseen.count) tracks need identification"
+            body = "They couldn't be recognized automatically — open Oceano to pick them from your library."
         }
-        let request = UNNotificationRequest(
-            identifier: "pending-association-\(unseen.map { String($0.listenerEpoch) }.joined(separator: "-"))",
-            content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        await Notifier.post(
+            id: "pending-association-\(unseen.map { String($0.listenerEpoch) }.joined(separator: "-"))",
+            title: title,
+            body: body,
+            destination: .associations
         )
-        try? await center.add(request)
-    }
-
-    private func ensureNotificationPermissionIfNeeded() async {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .notDetermined else { return }
-        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
     }
 
     private func refreshRigAttention(_ service: CatalogService) async {

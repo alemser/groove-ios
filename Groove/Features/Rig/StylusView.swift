@@ -1,5 +1,4 @@
 import SwiftUI
-import UserNotifications
 
 /// Register, update, and monitor the turntable's stylus/cartridge. Wear is
 /// computed server-side from vinyl-format play duration
@@ -52,7 +51,7 @@ struct StylusView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             model.configure(settings)
-            if stylusAlertEnabled { await ensureNotificationPermissionIfNeeded() }
+            if stylusAlertEnabled { await Notifier.requestPermissionIfNeeded() }
         }
         .onChange(of: model.phase) { _, phase in
             if phase == .loaded {
@@ -64,7 +63,7 @@ struct StylusView: View {
         .onChange(of: model.state?.profile?.id) { _, _ in evaluateStylusAlert() }
         .onChange(of: stylusAlertEnabled) { _, isEnabled in
             if isEnabled {
-                Task { await ensureNotificationPermissionIfNeeded() }
+                Task { await Notifier.requestPermissionIfNeeded() }
             }
             evaluateStylusAlert()
         }
@@ -255,36 +254,18 @@ struct StylusView: View {
         if left <= stylusAlertThresholdLeftPercent {
             guard stylusAlertLastProfileID != profileIDInt else { return }
             stylusAlertLastProfileID = profileIDInt
-            Task { await scheduleReplacementLocalNotification(leftPercent: left, profileID: profileIDInt) }
+            Task {
+                await Notifier.post(
+                    id: "stylus-replacement-\(profileIDInt)",
+                    title: "Stylus Replacement Reminder",
+                    body: "Only \(left)% stylus life left. Plan replacement soon.",
+                    destination: .stylus
+                )
+            }
         } else if stylusAlertLastProfileID == profileIDInt {
             // Rearm the alert for the same profile if usage moves back above threshold.
             stylusAlertLastProfileID = 0
         }
-    }
-
-    private func ensureNotificationPermissionIfNeeded() async {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .notDetermined else { return }
-        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-    }
-
-    private func scheduleReplacementLocalNotification(leftPercent: Int, profileID: Int) async {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
-
-        let content = UNMutableNotificationContent()
-        content.title = "Stylus Replacement Reminder"
-        content.body = "Only \(leftPercent)% stylus life left. Plan replacement soon."
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-            identifier: "stylus-replacement-\(profileID)",
-            content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        )
-        try? await center.add(request)
     }
 
     // MARK: - Actions
