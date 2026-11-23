@@ -261,6 +261,8 @@ struct ManualIdentifySheet: View {
 struct IdentifyHitRow: View {
     let hit: IdentifySearchHit
     let busy: Bool
+    var note: String? = nil
+    var noteColor: Color = Brand.muted
 
     var body: some View {
         HStack(spacing: 12) {
@@ -277,6 +279,7 @@ struct IdentifyHitRow: View {
                     if let album = hit.album?.nonEmpty { Text(album).font(.caption2).foregroundStyle(Brand.muted).lineLimit(1) }
                     if let year = hit.releaseDate?.prefix(4), !year.isEmpty { Text(String(year)).font(.caption2).foregroundStyle(Brand.muted) }
                 }
+                if let note { Text(note).font(.caption2).foregroundStyle(noteColor) }
             }
             Spacer(minLength: 0)
             if busy {

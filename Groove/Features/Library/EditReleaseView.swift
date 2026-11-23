@@ -300,9 +300,9 @@ struct EditReleaseView: View {
                             .keyboardType(.numbersAndPunctuation)
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
-                            .foregroundStyle((entry.durationMs ?? 0) > 0 ? Brand.text : Brand.err)
+                            .foregroundStyle(entry.hasDuration ? Brand.text : Brand.err)
                             .overlay(alignment: .trailing) {
-                                if (entry.durationMs ?? 0) <= 0 {
+                                if !entry.hasDuration {
                                     RoundedRectangle(cornerRadius: 4)
                                         .strokeBorder(Brand.err.opacity(0.5), lineWidth: 1)
                                         .frame(width: 64, height: 24)
@@ -489,7 +489,7 @@ struct EditReleaseView: View {
     /// hours later as a mislabelled track, never as anything pointing back here.
     private var tracksMissingDuration: [String] {
         tracklist
-            .filter { ($0.durationMs ?? 0) <= 0 }
+            .filter { !$0.hasDuration }
             .map { entry in
                 let where_ = entry.position?.nonEmpty ?? "#\(entry.ordinal)"
                 guard let title = entry.title?.nonEmpty else { return where_ }

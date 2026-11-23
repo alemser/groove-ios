@@ -1,6 +1,31 @@
 import SwiftUI
 import Observation
 
+/// Whether a search hit's edition has every track's duration, which confirming it needs.
+enum TrackTimes {
+    /// Not looked up yet: the search itself sends a tracklist for one hit at most.
+    case unknown
+    case checking
+    case timed
+    case untimed
+    /// The provider didn't answer. The hit stays listed: nothing says it lacks times.
+    case failed
+
+    /// The answer is in: a lookup finished, or the search's own tracklist settled it.
+    var isSettled: Bool { self != .unknown && self != .checking }
+
+    /// The line under a result saying what is known, and its colour.
+    var note: (text: String?, color: Color) {
+        switch self {
+        case .unknown: return (nil, Brand.muted)
+        case .checking: return ("Checking track times…", Brand.muted)
+        case .timed: return ("Every track timed", Brand.ok)
+        case .untimed: return ("No track times", Brand.warn)
+        case .failed: return ("Couldn't check track times", Brand.muted)
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class AddReleaseModel {
@@ -12,9 +37,37 @@ final class AddReleaseModel {
     enum Phase: Equatable { case idle, loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    /// What a lookup found, by hit id; a hit missing here is judged by its own tracklist.
+    private var lookedUp: [String: TrackTimes] = [:]
+    /// Lookups already made, so picking a checked hit doesn't ask the provider again.
+    @ObservationIgnored private var prefilled: [String: PendingRelease] = [:]
 
     func configure(_ settings: AppSettings) {
         self.settings = settings
+    }
+
+    func trackTimes(_ hit: IdentifySearchHit) -> TrackTimes {
+        if let known = lookedUp[hit.id] { return known }
+        guard let tracklist = hit.tracklist else { return .unknown }
+        return hasTrackTimes(tracklist) ? .timed : .untimed
+    }
+
+    /// Looks up each hit whose times are unknown, one at a time: every lookup reaches the
+    /// provider, within its rate limit. A cancelled lookup leaves its hit unknown.
+    func checkTrackTimes(_ hits: [IdentifySearchHit]) async {
+        guard let settings else { return }
+        let service = CatalogService(settings: settings)
+        for hit in hits where trackTimes(hit) == .unknown {
+            if Task.isCancelled { return }
+            lookedUp[hit.id] = .checking
+            do {
+                let release = try await service.prefillUserRelease(from: hit)
+                prefilled[hit.id] = release
+                lookedUp[hit.id] = hasTrackTimes(release.tracklist) ? .timed : .untimed
+            } catch {
+                lookedUp[hit.id] = Task.isCancelled ? nil : .failed
+            }
+        }
     }
 
     /// Explicit lookup, fired only when the user taps Search (or submits a
@@ -23,6 +76,8 @@ final class AddReleaseModel {
     /// wins outright — same precedence identify/search itself applies server
     /// side — otherwise falls back to the separate Artist/Album fields.
     func search(artist: String, album: String, barcode: String) {
+        lookedUp = [:]
+        prefilled = [:]
         let artist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let album = album.trimmingCharacters(in: .whitespacesAndNewlines)
         let barcodeDigits = Barcode.digits(from: barcode)
@@ -50,6 +105,7 @@ final class AddReleaseModel {
     /// metadata and tracklist. Writes nothing — the release is created when
     /// the editor saves.
     func prefill(from hit: IdentifySearchHit) async -> PendingRelease? {
+        if let known = prefilled[hit.id] { return known }
         guard let settings else { return nil }
         busyId = hit.id
         actionError = nil
@@ -82,6 +138,7 @@ struct AddReleaseView: View {
     @State private var newRelease: NewRelease?
     @State private var selectedFormat: String?
     @State private var selectedCountry: String?
+    @State private var onlyTimed = false
 
     private enum Field { case artist, album, barcode }
 
@@ -179,6 +236,10 @@ struct AddReleaseView: View {
             }
         }
         .task { model.configure(settings) }
+        // Off, or a format or country change, cancels the lookups; what they found is kept.
+        .task(id: onlyTimed ? narrowedResults.map(\.id) : []) {
+            if onlyTimed { await model.checkTrackTimes(narrowedResults) }
+        }
         .onAppear { focusedField = .barcode }
     }
 
@@ -203,7 +264,7 @@ struct AddReleaseView: View {
                     Text("No result matches those filters. The pressing you want may not be in the providers — clear the filters to see everything that came back, or continue with just artist and album below.")
                         .font(.caption)
                         .foregroundStyle(Brand.muted)
-                    Button("Clear filters") { selectedFormat = nil; selectedCountry = nil }
+                    Button("Clear filters") { clearFilters() }
                 }
             } else {
                 Section("Results") {
@@ -211,7 +272,8 @@ struct AddReleaseView: View {
                         Button {
                             Task { await createFromHit(hit) }
                         } label: {
-                            IdentifyHitRow(hit: hit, busy: model.busyId == hit.id)
+                            let note = model.trackTimes(hit).note
+                            IdentifyHitRow(hit: hit, busy: model.busyId == hit.id, note: note.text, noteColor: note.color)
                         }
                         .buttonStyle(.plain)
                         .disabled(model.busyId != nil)
@@ -252,7 +314,7 @@ struct AddReleaseView: View {
     private var formatOptions: [FilterOption] { options(\.releaseFormat) }
     private var countryOptions: [FilterOption] { options(\.country) }
 
-    private var filteredResults: [IdentifySearchHit] {
+    private var narrowedResults: [IdentifySearchHit] {
         model.results.filter { hit in
             let f = (hit.releaseFormat ?? "").trimmingCharacters(in: .whitespaces).lowercased()
             let c = (hit.country ?? "").trimmingCharacters(in: .whitespaces).lowercased()
@@ -261,9 +323,17 @@ struct AddReleaseView: View {
         }
     }
 
+    /// A hit not looked up yet stays listed until its lookup says it has no times.
+    private var filteredResults: [IdentifySearchHit] {
+        guard onlyTimed else { return narrowedResults }
+        return narrowedResults.filter { model.trackTimes($0) != .untimed }
+    }
+
+    private var showPickers: Bool { formatOptions.count > 1 || countryOptions.count > 1 }
+
     @ViewBuilder
     private var filterSection: some View {
-        if model.phase == .loaded, formatOptions.count > 1 || countryOptions.count > 1 {
+        if model.phase == .loaded, !model.results.isEmpty {
             Section {
                 if formatOptions.count > 1 {
                     Picker("Format", selection: $selectedFormat) {
@@ -281,21 +351,46 @@ struct AddReleaseView: View {
                         }
                     }
                 }
+                Toggle(isOn: $onlyTimed) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Only releases with track times")
+                        Text(timedToggleSubtitle).font(.caption).foregroundStyle(Brand.muted)
+                    }
+                }
+                .tint(Brand.accent)
             } header: {
                 Text("Narrow the results")
             } footer: {
-                Text("Only what this search returned is offered. A format or country missing from these lists means the providers hold no such pressing of this record.")
-                    .foregroundStyle(Brand.muted)
+                Text(filterFooter).foregroundStyle(Brand.muted)
             }
         }
+    }
+
+    private var timedToggleSubtitle: String {
+        let settled = narrowedResults.filter { model.trackTimes($0).isSettled }.count
+        guard onlyTimed, settled < narrowedResults.count else {
+            return "An edition without them has to be edited before it can be confirmed."
+        }
+        return "Checking \(settled) of \(narrowedResults.count)…"
+    }
+
+    private var filterFooter: String {
+        let lookups = "Track times are looked up one release at a time, so the list narrows as they come in."
+        guard showPickers else { return lookups }
+        return "Only what this search returned is offered. A format or country missing from these lists means the providers hold no such pressing of this record. " + lookups
+    }
+
+    private func clearFilters() {
+        selectedFormat = nil
+        selectedCountry = nil
+        onlyTimed = false
     }
 
     private func search() {
         focusedField = nil
         // A new search is a new set of results; carrying the old filters over
         // would silently hide most of it.
-        selectedFormat = nil
-        selectedCountry = nil
+        clearFilters()
         model.search(artist: artist, album: album, barcode: barcode)
     }
 

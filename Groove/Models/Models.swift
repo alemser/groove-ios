@@ -217,6 +217,17 @@ struct TracklistEntry: Codable, Identifiable, Hashable {
     var durationMs: Int64?
 
     var id: Int { ordinal }
+
+    /// Mirrors groove-catalog `domain.ValidateTracklistForConfirm` ("missing_durations",
+    /// "empty_tracklist"), which refuses to confirm an edition otherwise; the app only uses
+    /// it to say so ahead of time.
+    var hasDuration: Bool { (durationMs ?? 0) > 0 }
+}
+
+/// A tracklist the catalog can confirm without editing: at least one track, every one timed.
+func hasTrackTimes(_ tracklist: [TracklistEntry]?) -> Bool {
+    guard let tracklist, !tracklist.isEmpty else { return false }
+    return tracklist.allSatisfy(\.hasDuration)
 }
 
 // MARK: - User release editing
@@ -431,6 +442,9 @@ struct IdentifySearchHit: Codable, Identifiable, Hashable {
     var country: String?
     var label: String?
     var artworkUrl: String?
+    /// Sent for one hit per search at most: the catalog fetches a full release only for its
+    /// first match, within the providers' rate limits. Nil is "not fetched", not "no tracks".
+    var tracklist: [TracklistEntry]?
 
     /// One recording comes back once per release it is on, so the release is part of the id.
     var id: String {
