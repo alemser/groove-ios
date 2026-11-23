@@ -10,17 +10,18 @@ final class ReleasesModel {
     /// Recognized albums with no edition in the library yet, waiting for the
     /// user to pick one (groove-catalog#24).
     var suggestionsCount = 0
-    var actionError: String?
     var phase: Phase = .loading
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     private var searchTask: Task<Void, Never>?
     private var lastQuery = ""
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load(query: "") }
         }
     }
@@ -67,13 +68,11 @@ final class ReleasesModel {
     /// Attaches `trackId` to `release` by copying metadata from a track it already
     /// owns — the primitive behind dragging a pending track onto an album card.
     func attach(trackId: Int64, to release: LibraryRelease) async {
-        guard let settings, let fromId = release.sampleTrackId else { return }
-        do {
+        guard let settings, let messages, let fromId = release.sampleTrackId else { return }
+        await messages.attempt {
             try await CatalogService(settings: settings).applyRelease(trackId: trackId, fromTrackId: fromId)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            await load(query: lastQuery)
-        } catch {
-            actionError = error.localizedForDisplay
+            await self.load(query: self.lastQuery)
         }
     }
 
@@ -94,6 +93,7 @@ final class ReleasesModel {
 
 struct ReleasesView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(NowPlayingModel.self) private var nowPlaying
     @Environment(NavigationState.self) private var navigation
     @Environment(AttentionCenter.self) private var attention
@@ -112,7 +112,7 @@ struct ReleasesView: View {
     var body: some View {
         @Bindable var navigation = navigation
         content
-            .task { model.configure(settings) }
+            .task { model.configure(settings, messages: messages) }
             // configure() only loads once (guarded on settings == nil), and
             // none of the reload triggers below fire for a release edited via
             // ReleaseDetailView — reached by pushing onto the tab's own
@@ -302,9 +302,6 @@ struct ReleasesView: View {
                     }
                 }
 
-                if let err = model.actionError {
-                    Text(err).font(.caption).foregroundStyle(Brand.err)
-                }
             }
             .padding()
         }

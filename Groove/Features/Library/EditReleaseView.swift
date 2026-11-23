@@ -18,6 +18,7 @@ struct EditReleaseView: View {
     var onSaved: () -> Void = {}
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model: EditReleaseModel
 
@@ -35,7 +36,8 @@ struct EditReleaseView: View {
     @State private var artworkPreview: Image?
 
     @State private var showDetachConfirm = false
-    @State private var showForceSave = false
+    /// Form validation: said under the tracklist it is about, not as a message.
+    @State private var missingTimes: String?
     @State private var didSeed = false
 
     private enum PendingTrackAction: Identifiable {
@@ -106,7 +108,7 @@ struct EditReleaseView: View {
                 }
             }
         }
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
         // The `jobId`/`newRelease` inits start with `model.edition` already
         // set — no transition ever happens for `onChange` below to catch, so
         // the form would stay blank without this explicit first pass.
@@ -168,14 +170,9 @@ struct EditReleaseView: View {
 
             tracklistSection
 
-            if let error = model.actionError {
+            if let missingTimes {
                 Section {
-                    Text(error).foregroundStyle(Brand.err)
-                    if showForceSave {
-                        Button("Save Anyway", role: .destructive) {
-                            Task { await save(force: true) }
-                        }
-                    }
+                    Text(missingTimes).foregroundStyle(Brand.err)
                 }
             }
 
@@ -195,6 +192,16 @@ struct EditReleaseView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .alert(
+            "Save anyway?",
+            isPresented: Binding(get: { model.forceSavePrompt != nil }, set: { if !$0 { model.forceSavePrompt = nil } }),
+            presenting: model.forceSavePrompt
+        ) { _ in
+            Button("Save Anyway", role: .destructive) { Task { await save(force: true) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { explanation in
+            Text(explanation)
+        }
         .confirmationDialog(
             "Detach all tracks from this release?",
             isPresented: $showDetachConfirm,
@@ -509,17 +516,15 @@ struct EditReleaseView: View {
         // tracks, in the screen where the fields are, rather than being handed a
         // refusal after a round trip.
         guard tracksMissingDuration.isEmpty else {
-            model.actionError = missingDurationMessage
-            // Never offered for this: a missing duration is not a judgement call
-            // the operator can overrule — the schedule simply cannot be built.
-            showForceSave = false
+            // Never forceable: a missing duration is not a judgement call the
+            // operator can overrule — the schedule simply cannot be built.
+            missingTimes = missingDurationMessage
             return
         }
+        missingTimes = nil
         if await model.save(formFields(), force: force) {
             onSaved()
             dismiss()
-        } else {
-            showForceSave = true
         }
     }
 

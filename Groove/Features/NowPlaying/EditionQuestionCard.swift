@@ -15,11 +15,10 @@ import SwiftUI
 /// never moved.
 struct EditionQuestionCard: View {
     let question: EditionQuestion
-    let onChoose: (EditionOption) -> Void
-    var onDismiss: (() -> Void)?
+    let onChoose: (EditionOption) async -> Void
+    var onDismiss: (() async -> Void)?
 
     @State private var answering: String?
-    var errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,7 +34,11 @@ struct EditionQuestionCard: View {
             ForEach(question.candidates) { option in
                 Button {
                     answering = option.id
-                    onChoose(option)
+                    // An answer that failed leaves the card to answer again; one that went through closes it.
+                    Task {
+                        await onChoose(option)
+                        answering = nil
+                    }
                 } label: {
                     row(option)
                 }
@@ -44,20 +47,14 @@ struct EditionQuestionCard: View {
                 .opacity(answering == nil || answering == option.id ? 1 : 0.45)
             }
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(Brand.warn)
-            } else {
-                Text("More than one release in your library matches. Nothing here is certain enough to choose for you.")
-                    .font(.footnote)
-                    .foregroundStyle(Brand.muted)
-            }
+            Text("More than one release in your library matches. Nothing here is certain enough to choose for you.")
+                .font(.footnote)
+                .foregroundStyle(Brand.muted)
 
             // Without this the question blocks the screen until it is answered,
             // which locked the app for anyone happy with what was showing.
             if let onDismiss {
-                Button("Keep what is showing", action: onDismiss)
+                Button("Keep what is showing") { Task { await onDismiss() } }
                     .font(.footnote)
                     .foregroundStyle(Brand.muted)
                     .disabled(answering != nil)
@@ -148,13 +145,14 @@ struct EditionQuestionPrompt: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(NowPlayingModel.self) private var model
+    @Environment(MessageCenter.self) private var messages
 
     var body: some View {
         EditionQuestionCard(question: question, onChoose: { option in
-            Task { await model.chooseEdition(option, settings: settings) }
+            await messages.attempt { try await model.chooseEdition(option, settings: settings) }
         }, onDismiss: {
-            Task { await model.dismissEditionQuestion(settings: settings) }
-        }, errorMessage: model.editionErrorMessage)
+            await messages.attempt { try await model.dismissEditionQuestion(settings: settings) }
+        })
     }
 }
 

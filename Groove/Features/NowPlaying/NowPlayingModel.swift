@@ -32,10 +32,6 @@ final class NowPlayingModel {
 
     private var poller: Poller?
 
-    /// Set when answering the edition question failed, so the card can say so
-    /// beside the buttons rather than failing silently.
-    var editionErrorMessage: String?
-
     /// The open "which pressing is this?" question, if any (groove-identity#38).
     var editionQuestion: EditionQuestion? { status?.editionQuestion }
 
@@ -100,26 +96,16 @@ final class NowPlayingModel {
     /// Answers the edition question. The session moves to that edition's
     /// tracklist and is not asked again this sitting; the next poll clears the
     /// card because the question is gone server-side.
-    func chooseEdition(_ option: EditionOption, settings: AppSettings) async {
+    func chooseEdition(_ option: EditionOption, settings: AppSettings) async throws {
         let service = CatalogService(settings: settings)
-        do {
-            try await service.chooseAlbumProgrammeEdition(source: option.source, releaseId: option.releaseId)
-            editionErrorMessage = nil
-            await refresh(service)
-        } catch {
-            editionErrorMessage = error.localizedForDisplay
-        }
+        try await service.chooseAlbumProgrammeEdition(source: option.source, releaseId: option.releaseId)
+        await refresh(service)
     }
 
-    func dismissEditionQuestion(settings: AppSettings) async {
+    func dismissEditionQuestion(settings: AppSettings) async throws {
         let service = CatalogService(settings: settings)
-        do {
-            try await service.dismissAlbumProgrammeEditionQuestion()
-            editionErrorMessage = nil
-            await refresh(service)
-        } catch {
-            editionErrorMessage = error.localizedForDisplay
-        }
+        try await service.dismissAlbumProgrammeEditionQuestion()
+        await refresh(service)
     }
 
     /// Interpolated position in ms at `now` — of the stream when one plays,

@@ -6,17 +6,18 @@ import Observation
 final class AllReleasesModel {
     var releases: [LibraryRelease] = []
     var phase: Phase = .loading
-    var actionError: String?
     var deletingId: String?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     private var searchTask: Task<Void, Never>?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load(query: "") }
         }
     }
@@ -45,13 +46,11 @@ final class AllReleasesModel {
     }
 
     func delete(_ release: LibraryRelease) async {
-        guard let settings else { return }
+        guard let settings, let messages else { return }
         deletingId = release.id
-        do {
+        await messages.attempt {
             try await CatalogService(settings: settings).deleteLibraryRelease(source: release.source, releaseId: release.releaseId)
-            releases.removeAll { $0.id == release.id }
-        } catch {
-            actionError = error.localizedForDisplay
+            self.releases.removeAll { $0.id == release.id }
         }
         deletingId = nil
     }
@@ -63,6 +62,7 @@ final class AllReleasesModel {
 /// where those live on to be edited or removed.
 struct AllReleasesView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model = AllReleasesModel()
     @State private var search = ""
@@ -79,7 +79,7 @@ struct AllReleasesView: View {
         content
             .navigationTitle("All Releases")
             .navigationBarTitleDisplayMode(.inline)
-            .task { model.configure(settings) }
+            .task { model.configure(settings, messages: messages) }
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search artist or album")
             .onChange(of: search) { _, q in model.search(q) }
             .toolbar {
@@ -166,9 +166,6 @@ struct AllReleasesView: View {
                                 }
                                 .tint(Brand.accent)
                             }
-                    }
-                    if let err = model.actionError {
-                        Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
                     }
                 }
                 .listStyle(.insetGrouped)

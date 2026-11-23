@@ -32,18 +32,19 @@ final class AddReleaseModel {
     var results: [IdentifySearchHit] = []
     var phase: Phase = .idle
     var busyId: String?
-    var actionError: String?
 
     enum Phase: Equatable { case idle, loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     /// What a lookup found, by hit id; a hit missing here is judged by its own tracklist.
     private var lookedUp: [String: TrackTimes] = [:]
     /// Lookups already made, so picking a checked hit doesn't ask the provider again.
     @ObservationIgnored private var prefilled: [String: PendingRelease] = [:]
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         self.settings = settings
+        self.messages = messages
     }
 
     func trackTimes(_ hit: IdentifySearchHit) -> TrackTimes {
@@ -106,16 +107,10 @@ final class AddReleaseModel {
     /// the editor saves.
     func prefill(from hit: IdentifySearchHit) async -> PendingRelease? {
         if let known = prefilled[hit.id] { return known }
-        guard let settings else { return nil }
+        guard let settings, let messages else { return nil }
         busyId = hit.id
-        actionError = nil
         defer { busyId = nil }
-        do {
-            return try await CatalogService(settings: settings).prefillUserRelease(from: hit)
-        } catch {
-            actionError = error.localizedForDisplay
-            return nil
-        }
+        return await messages.attempt { try await CatalogService(settings: settings).prefillUserRelease(from: hit) }
     }
 }
 
@@ -128,6 +123,7 @@ struct AddReleaseView: View {
     let onCreated: () -> Void
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedField: Field?
     @State private var model = AddReleaseModel()
@@ -209,11 +205,6 @@ struct AddReleaseView: View {
                     .disabled(!canCreate)
                 }
 
-                if let err = model.actionError {
-                    Section {
-                        Text(err).foregroundStyle(Brand.err)
-                    }
-                }
             }
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()
@@ -235,7 +226,7 @@ struct AddReleaseView: View {
                 }
             }
         }
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
         // Off, or a format or country change, cancels the lookups; what they found is kept.
         .task(id: onlyTimed ? narrowedResults.map(\.id) : []) {
             if onlyTimed { await model.checkTrackTimes(narrowedResults) }

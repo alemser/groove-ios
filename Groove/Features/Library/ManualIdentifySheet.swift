@@ -11,15 +11,16 @@ final class ManualIdentifyModel {
     /// (very common for offline-mode users with none configured at all).
     var libraryResults: [LibraryReleaseSearchHit] = []
     var busyId: String?
-    var actionError: String?
 
     enum Phase: Equatable { case idle, loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     private var searchTask: Task<Void, Never>?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         self.settings = settings
+        self.messages = messages
     }
 
     func search(_ text: String) {
@@ -59,10 +60,10 @@ final class ManualIdentifyModel {
     }
 
     func submit(epoch: UInt64, hit: IdentifySearchHit) async -> Bool {
-        guard let settings else { return false }
+        guard let settings, let messages else { return false }
         busyId = hit.id
-        actionError = nil
-        do {
+        defer { busyId = nil }
+        return await messages.attempt {
             _ = try await CatalogService(settings: settings).manualIdentify(
                 epoch: epoch,
                 artist: hit.artist?.nonEmpty ?? "Unknown artist",
@@ -70,25 +71,14 @@ final class ManualIdentifyModel {
                 album: hit.album,
                 hit: hit
             )
-            busyId = nil
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            busyId = nil
-            return false
-        }
+        } != nil
     }
 
     func submitManual(epoch: UInt64, artist: String, title: String, album: String?) async -> Bool {
-        guard let settings else { return false }
-        actionError = nil
-        do {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
             _ = try await CatalogService(settings: settings).manualIdentify(epoch: epoch, artist: artist, title: title, album: album)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 }
 
@@ -103,6 +93,7 @@ struct ManualIdentifySheet: View {
     let onResolved: () -> Void
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model = ManualIdentifyModel()
     @State private var query: String
@@ -173,7 +164,7 @@ struct ManualIdentifySheet: View {
             }
         }
         .task {
-            model.configure(settings)
+            model.configure(settings, messages: messages)
             if !query.isEmpty { model.search(query) }
         }
         .sheet(isPresented: $showManualEntry) {
@@ -219,9 +210,6 @@ struct ManualIdentifySheet: View {
                 }
             }
         }
-        if let err = model.actionError {
-            Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
-        }
     }
 
     private var manualEntryButton: some View {
@@ -246,15 +234,15 @@ struct ManualIdentifySheet: View {
         }
     }
 
-    private func submitManual(artist: String, title: String, album: String?) async -> String? {
+    /// True when it went through; a failure is the message center's to tell.
+    private func submitManual(artist: String, title: String, album: String?) async -> Bool {
         let ok = await model.submitManual(epoch: epoch, artist: artist, title: title, album: album)
         if ok {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onResolved()
             dismiss()
-            return nil
         }
-        return model.actionError ?? "Could not identify this play."
+        return ok
     }
 }
 
@@ -298,14 +286,14 @@ struct ManualEntryForm: View {
     var seedArtist: String?
     var seedTitle: String?
     var seedAlbum: String?
-    let onSave: (String, String, String?) async -> String?
+    /// True when it went through; a failure is the message center's to tell.
+    let onSave: (String, String, String?) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var artist = ""
     @State private var title = ""
     @State private var album = ""
     @State private var saving = false
-    @State private var error: String?
 
     private var canSave: Bool {
         !artist.trimmingCharacters(in: .whitespaces).isEmpty && !title.trimmingCharacters(in: .whitespaces).isEmpty && !saving
@@ -319,11 +307,7 @@ struct ManualEntryForm: View {
                     TextField("Title", text: $title)
                     TextField("Album (optional)", text: $album)
                 } footer: {
-                    if let error {
-                        Text(error).foregroundStyle(Brand.err)
-                    } else {
-                        Text("You can pick the exact release and tracklist afterward from Library's Needs Review section.")
-                    }
+                    Text("You can pick the exact release and tracklist afterward from Library's Needs Review section.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -336,17 +320,13 @@ struct ManualEntryForm: View {
                     Button(saving ? "Saving…" : "Save") {
                         Task {
                             saving = true
-                            let result = await onSave(
+                            let saved = await onSave(
                                 artist.trimmingCharacters(in: .whitespaces),
                                 title.trimmingCharacters(in: .whitespaces),
                                 album.trimmingCharacters(in: .whitespaces).nonEmpty
                             )
                             saving = false
-                            if let result {
-                                error = result
-                            } else {
-                                dismiss()
-                            }
+                            if saved { dismiss() }
                         }
                     }
                     .disabled(!canSave)
@@ -395,11 +375,11 @@ struct ReleaseTracklistPickerSheet: View {
     let onResolved: () -> Void
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var edition: PendingRelease?
     @State private var loadError: String?
     @State private var submittingOrdinal: Int?
-    @State private var submitError: String?
     @State private var showSessionPrompt = false
     @State private var confirmingSession = false
 
@@ -428,9 +408,6 @@ struct ReleaseTracklistPickerSheet: View {
                 EmptyStateView(icon: "list.bullet", title: "No tracklist", message: "This release has no tracklist to pick a position from yet.")
             } else {
                 List {
-                    if let submitError {
-                        Text(submitError).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
-                    }
                     ForEach(tracks) { entry in
                         Button {
                             Task { await submit(ordinal: entry.ordinal) }
@@ -473,10 +450,12 @@ struct ReleaseTracklistPickerSheet: View {
     private func submit(ordinal: Int) async {
         guard let source = hit.source, let releaseId = hit.releaseId else { return }
         submittingOrdinal = ordinal
-        submitError = nil
-        do {
-            try await CatalogService(settings: settings).associatePlayToReleaseRow(epoch: epoch, source: source, releaseId: releaseId, ordinal: ordinal)
-            submittingOrdinal = nil
+        let service = CatalogService(settings: settings)
+        let associated = await messages.attempt {
+            try await service.associatePlayToReleaseRow(epoch: epoch, source: source, releaseId: releaseId, ordinal: ordinal)
+        } != nil
+        submittingOrdinal = nil
+        if associated {
             // A multi-track release is worth asking about — turning the session
             // user-confirmed here lets offline mode assign the rest of the
             // tracklist automatically for the rest of this sitting, with no more
@@ -486,9 +465,6 @@ struct ReleaseTracklistPickerSheet: View {
             } else {
                 onResolved()
             }
-        } catch {
-            submittingOrdinal = nil
-            submitError = error.localizedForDisplay
         }
     }
 

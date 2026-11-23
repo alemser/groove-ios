@@ -13,7 +13,6 @@ final class LibrarySuggestionsModel {
     var phase: Phase = .loading
     /// `key(_:_:)` of the edition whose request is in flight.
     var busyKey: String?
-    var actionError: String?
     /// A refused add the user may still force (tracklist warnings — never a
     /// missing duration, which has no override).
     var pendingForce: PendingForce?
@@ -36,12 +35,14 @@ final class LibrarySuggestionsModel {
     }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     /// Suggestions the user asked to see every alternative of.
     private var expanded: Set<Int64> = []
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -69,7 +70,7 @@ final class LibrarySuggestionsModel {
             if suggestions.isEmpty {
                 phase = .error(error.localizedForDisplay)
             } else {
-                actionError = error.localizedForDisplay
+                messages?.error(error, retry: { [weak self] in await self?.load() })
             }
         }
     }
@@ -83,28 +84,23 @@ final class LibrarySuggestionsModel {
         guard let settings else { return }
         busyKey = key(suggestion, edition)
         defer { busyKey = nil }
-        actionError = nil
         do {
             try await CatalogService(settings: settings).acceptLibrarySuggestion(id: suggestion.id, edition: edition, force: force)
             suggestions.removeAll { $0.id == suggestion.id }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch APIError.http(let status, let body) where status == 422 {
-            let refusal = Self.decodeRefusal(body)
-            let issues = (refusal?.preflightIssues ?? []).compactMap { $0.message?.nonEmpty }.joined(separator: "\n")
-            let parts: [String?] = [refusal?.error?.nonEmpty ?? "The tracklist failed the release check.", issues.nonEmpty]
-            let message = parts
-                .compactMap { $0 }
-                .joined(separator: "\n\n")
-            if refusal?.forceable == false || force {
-                actionError = message + "\n\nUse Edit First to fix the tracklist."
-            } else {
-                pendingForce = PendingForce(suggestion: suggestion, edition: edition, message: message)
-            }
         } catch APIError.http(let status, _) where status == 409 {
             // Already added or put away elsewhere (the web Studio, another phone).
             await load()
         } catch {
-            actionError = Self.message(for: error)
+            if let refusal = error.refusal {
+                if refusal.forceable == false || force {
+                    messages?.error(refusal.explanation + "\n\nUse Edit First to fix the tracklist.")
+                } else {
+                    pendingForce = PendingForce(suggestion: suggestion, edition: edition, message: refusal.explanation)
+                }
+            } else {
+                messages?.error(error, retry: { [weak self] in await self?.add(suggestion, edition, force: force) })
+            }
         }
     }
 
@@ -114,14 +110,13 @@ final class LibrarySuggestionsModel {
         guard let settings else { return }
         busyKey = key(suggestion, edition)
         defer { busyKey = nil }
-        actionError = nil
         do {
             let resp = try await CatalogService(settings: settings).forkLibrarySuggestion(id: suggestion.id, edition: edition)
             forked = ForkedEdition(jobId: resp.job.id, draft: resp.draft)
         } catch APIError.http(let status, _) where status == 409 {
             await load()
         } catch {
-            actionError = Self.message(for: error)
+            messages?.error(error, retry: { [weak self] in await self?.edit(suggestion, edition) })
         }
     }
 
@@ -134,28 +129,13 @@ final class LibrarySuggestionsModel {
             await load()
         }
     }
-
-    private static func decodeRefusal(_ body: String) -> ConfirmPreflightError? {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try? decoder.decode(ConfirmPreflightError.self, from: Data(body.utf8))
-    }
-
-    /// These endpoints answer errors as `{"error": "…"}` — show the sentence,
-    /// not the raw JSON `localizedForDisplay` would print.
-    private static func message(for error: Error) -> String {
-        if let apiError = error as? APIError, case let .http(_, body) = apiError,
-           let text = decodeRefusal(body)?.error?.nonEmpty {
-            return text
-        }
-        return error.localizedForDisplay
-    }
 }
 
 /// Sheet for the "add to library" suggestions — presented from a banner in the
 /// Library grid, like the association queue.
 struct LibrarySuggestionsSheet: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model = LibrarySuggestionsModel()
 
@@ -171,7 +151,7 @@ struct LibrarySuggestionsSheet: View {
                 }
                 .grooveScreenBackground()
         }
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
         .sheet(item: $model.forked, onDismiss: { Task { await model.load() } }) { forked in
             EditReleaseView(jobId: forked.jobId, edition: forked.draft)
         }
@@ -205,12 +185,6 @@ struct LibrarySuggestionsSheet: View {
                                message: "Every album you've played is in your library or was put away.")
             } else {
                 List {
-                    if let err = model.actionError {
-                        Section {
-                            Text(err).font(.caption).foregroundStyle(Brand.err)
-                        }
-                        .listRowBackground(Brand.surface)
-                    }
                     ForEach(model.suggestions) { suggestion in
                         Section {
                             rows(for: suggestion)

@@ -13,7 +13,8 @@ final class EditReleaseModel {
     /// edit in place through) rather than the original release.
     var isCopy = false
     var phase: Phase = .loading
-    var actionError: String?
+    /// A save the release check refused but allows forcing: its explanation, until the person decides.
+    var forceSavePrompt: String?
     var isSaving = false
     var isUploadingArtwork = false
     var isDetaching = false
@@ -33,6 +34,7 @@ final class EditReleaseModel {
 
     private let release: LibraryRelease?
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     /// The search hit a new release was prefilled from, sent with its first
     /// save so the release keeps its origin.
     private var prefilledFrom: IdentifySearchHit?
@@ -64,9 +66,10 @@ final class EditReleaseModel {
         self.phase = .loaded
     }
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         guard self.settings == nil else { return }
         self.settings = settings
+        self.messages = messages
         if release != nil { Task { await load() } }
     }
 
@@ -127,7 +130,7 @@ final class EditReleaseModel {
     /// returns true. A new release is created by this call, with every field.
     @discardableResult
     func save(_ fields: UserReleaseFields, force: Bool = false) async -> Bool {
-        guard let settings else { return false }
+        guard let settings, let messages else { return false }
         isSaving = true
         defer { isSaving = false }
         let service = CatalogService(settings: settings)
@@ -141,18 +144,28 @@ final class EditReleaseModel {
             jobId = resp.job.id
             edition = resp.release
             unsavedCopyId = nil
-            actionError = nil
             if let data = pendingArtwork {
                 pendingArtwork = nil
-                if !(await uploadArtwork(data, filename: "artwork.jpg", mimeType: "image/jpeg")) {
-                    actionError = "Release saved, but the cover failed: \(actionError ?? "unknown error")"
+                do {
+                    try await upload(data, filename: "artwork.jpg", mimeType: "image/jpeg")
+                } catch {
+                    messages.error("Release saved, but the cover failed: \(error.localizedForDisplay)")
                     return false
                 }
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         } catch {
-            actionError = error.localizedForDisplay
+            // No Retry: Save is right there, and a save that goes through also closes the editor.
+            if let refusal = error.refusal {
+                if refusal.forceable != false && !force {
+                    forceSavePrompt = refusal.explanation
+                } else {
+                    messages.error(refusal.explanation)
+                }
+            } else {
+                messages.error(error)
+            }
             return false
         }
     }
@@ -167,25 +180,24 @@ final class EditReleaseModel {
 
     @discardableResult
     func uploadArtwork(_ data: Data, filename: String, mimeType: String) async -> Bool {
-        guard let settings else { return false }
-        guard let jobId else {
+        guard let messages else { return false }
+        guard jobId != nil else {
             // Nothing to attach it to until the first save; it goes up then.
             pendingArtwork = data
             return true
         }
         isUploadingArtwork = true
         defer { isUploadingArtwork = false }
-        do {
-            let resp = try await CatalogService(settings: settings).uploadUserReleaseArtwork(
-                jobId: jobId, imageData: data, filename: filename, mimeType: mimeType
-            )
-            edition = resp.draft
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        return await messages.attempt { try await self.upload(data, filename: filename, mimeType: mimeType) } != nil
+    }
+
+    private func upload(_ data: Data, filename: String, mimeType: String) async throws {
+        guard let settings, let jobId else { return }
+        let resp = try await CatalogService(settings: settings).uploadUserReleaseArtwork(
+            jobId: jobId, imageData: data, filename: filename, mimeType: mimeType
+        )
+        edition = resp.draft
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     /// Detaches every catalog track from this edition. Unlike the per-track
@@ -196,7 +208,6 @@ final class EditReleaseModel {
     func detachTracks() async -> Bool {
         guard let settings, let release else { return false }
         isDetaching = true
-        actionError = nil
         detachMessage = nil
         defer { isDetaching = false }
         do {
@@ -209,7 +220,7 @@ final class EditReleaseModel {
                 : "No linked tracks to detach."
             return true
         } catch {
-            actionError = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.detachTracks() })
             return false
         }
     }
@@ -220,35 +231,26 @@ final class EditReleaseModel {
     /// tracklist on success.
     @discardableResult
     func deleteTrack(_ track: Track) async -> Bool {
-        guard let settings else { return false }
-        actionError = nil
-        do {
-            try await CatalogService(settings: settings).deleteTrack(id: track.id)
-            catalogTracks.removeAll { $0.id == track.id }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        await removing(track) { try await $0.deleteTrack(id: track.id) }
     }
 
     /// Detaches ONE catalog track from this edition — the tracklist position
     /// survives, so the caller should leave the tracklist entry alone.
     @discardableResult
     func detachTrack(_ track: Track) async -> Bool {
-        guard let settings, let release else { return false }
-        actionError = nil
-        do {
-            try await CatalogService(settings: settings).detachLibraryEditionTrack(
-                source: release.source, releaseId: release.releaseId, trackId: track.id
-            )
-            catalogTracks.removeAll { $0.id == track.id }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
+        guard let release else { return false }
+        return await removing(track) {
+            try await $0.detachLibraryEditionTrack(source: release.source, releaseId: release.releaseId, trackId: track.id)
         }
+    }
+
+    /// Takes one catalog track off this edition; a failure goes to the message center.
+    private func removing(_ track: Track, _ action: @escaping (CatalogService) async throws -> Void) async -> Bool {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
+            try await action(CatalogService(settings: settings))
+            self.catalogTracks.removeAll { $0.id == track.id }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } != nil
     }
 }

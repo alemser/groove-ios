@@ -7,21 +7,21 @@ final class EnrichJobDetailModel {
     var detail: EnrichJobDetail?
     var phase: Phase = .loading
     var busyReleaseId: Int64?
-    var actionError: String?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     let jobId: Int64
     let trackId: Int64?
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
     init(jobId: Int64, trackId: Int64?) {
         self.jobId = jobId
         self.trackId = trackId
     }
 
-    func configure(_ settings: AppSettings) {
-        if self.settings == nil { self.settings = settings; Task { await load() } }
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
+        if self.settings == nil { self.settings = settings; self.messages = messages; Task { await load() } }
     }
 
     func load() async {
@@ -36,14 +36,12 @@ final class EnrichJobDetailModel {
     }
 
     func confirm(_ release: PendingRelease) async {
-        guard let settings else { return }
+        guard let settings, let messages else { return }
         busyReleaseId = release.id
-        do {
+        await messages.attempt {
             _ = try await CatalogService(settings: settings).confirmRelease(id: release.id)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            await load()
-        } catch {
-            actionError = error.localizedForDisplay
+            await self.load()
         }
         busyReleaseId = nil
     }
@@ -63,21 +61,18 @@ final class EnrichJobDetailModel {
     /// Deletes the underlying track outright — for when none of the
     /// candidates (or lack thereof) are worth keeping around.
     func deleteTrack() async -> Bool {
-        guard let settings, let trackId else { return false }
-        do {
+        guard let settings, let messages, let trackId else { return false }
+        return await messages.attempt {
             try await CatalogService(settings: settings).deleteTrack(id: trackId)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 }
 
 struct EnrichJobDetailView: View {
     let job: EnrichJob
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model: EnrichJobDetailModel
     @State private var showDeleteConfirm = false
@@ -110,7 +105,7 @@ struct EnrichJobDetailView: View {
             } message: {
                 Text("Plays are detached and enrich jobs cleaned up. This can't be undone.")
             }
-            .task { model.configure(settings) }
+            .task { model.configure(settings, messages: messages) }
     }
 
     @ViewBuilder
@@ -140,9 +135,6 @@ struct EnrichJobDetailView: View {
                                 onDiscard: { Task { await model.discard(release) } }
                             )
                         }
-                    }
-                    if let err = model.actionError {
-                        Text(err).font(.caption).foregroundStyle(Brand.err)
                     }
                 }
                 .padding()

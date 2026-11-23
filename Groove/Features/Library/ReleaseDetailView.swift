@@ -60,12 +60,12 @@ struct ReleaseDetailView: View {
     let release: LibraryRelease
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @Environment(NowPlayingModel.self) private var nowPlaying
     @State private var model: ReleaseDetailModel
     @State private var showDeleteConfirm = false
     @State private var deleting = false
-    @State private var errorMessage: String?
     @State private var showEditSheet = false
 
     init(release: LibraryRelease) {
@@ -142,9 +142,6 @@ struct ReleaseDetailView: View {
                     .disabled(deleting)
                 }
 
-                if let errorMessage {
-                    Text(errorMessage).font(.caption).foregroundStyle(Brand.err).multilineTextAlignment(.center)
-                }
             }
             .padding()
             .frame(maxWidth: 520)
@@ -279,14 +276,14 @@ struct ReleaseDetailView: View {
 
     private func delete() async {
         deleting = true
-        errorMessage = nil
-        do {
-            try await CatalogService(settings: settings).deleteLibraryRelease(source: release.source, releaseId: release.releaseId)
+        let service = CatalogService(settings: settings)
+        let removed = await messages.attempt {
+            try await service.deleteLibraryRelease(source: release.source, releaseId: release.releaseId)
+        } != nil
+        deleting = false
+        if removed {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
-        } catch {
-            errorMessage = error.localizedForDisplay
-            deleting = false
         }
     }
 }

@@ -13,15 +13,16 @@ final class ChangeReleaseModel {
     /// works with enrichers unreachable (offline mode / cloud autônomo down).
     var libraryResults: [LibraryReleaseSearchHit] = []
     var busyId: String?
-    var actionError: String?
 
     enum Phase: Equatable { case idle, loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     private var searchTask: Task<Void, Never>?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         self.settings = settings
+        self.messages = messages
     }
 
     func search(_ text: String) {
@@ -60,31 +61,24 @@ final class ChangeReleaseModel {
         }
     }
 
-    /// Applies `hit` as `trackId`'s release, returning an error message on
-    /// failure or nil on success.
-    func apply(trackId: Int64, hit: IdentifySearchHit) async -> String? {
-        guard let settings else { return "Not connected" }
+    /// Applies `hit` as `trackId`'s release; true when it was. A failure goes to the message center.
+    func apply(trackId: Int64, hit: IdentifySearchHit) async -> Bool {
+        guard let settings, let messages else { return false }
         busyId = hit.id
-        actionError = nil
         defer { busyId = nil }
-        do {
-            let result = try await CatalogService(settings: settings).applyReleaseFromSearch(trackId: trackId, hit: hit)
-            if result.applied.contains(trackId) { return nil }
-            let message = result.failed?.first(where: { $0.trackId == trackId })?.message ?? "Could not apply this release."
-            actionError = message
-            return message
-        } catch {
-            let message = error.localizedForDisplay
-            actionError = message
-            return message
-        }
+        guard let result = await messages.attempt({
+            try await CatalogService(settings: settings).applyReleaseFromSearch(trackId: trackId, hit: hit)
+        }) else { return false }
+        if result.applied.contains(trackId) { return true }
+        messages.error(result.failed?.first(where: { $0.trackId == trackId })?.message ?? "Could not apply this release.")
+        return false
     }
 
     /// Same as `apply(trackId:hit:)` but for a hit picked from the library
     /// search — mapped onto the same `apply-release-from-search` wire shape
     /// the web studio uses for its own library-edition results
     /// (`searchHitFromLibrary` in release-matching.js).
-    func apply(trackId: Int64, libraryHit: LibraryReleaseSearchHit) async -> String? {
+    func apply(trackId: Int64, libraryHit: LibraryReleaseSearchHit) async -> Bool {
         await apply(trackId: trackId, hit: IdentifySearchHit(
             source: libraryHit.source ?? "",
             artist: libraryHit.artist,
@@ -120,6 +114,7 @@ struct ChangeReleaseSheet: View {
     let onApplied: () -> Void
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model = ChangeReleaseModel()
     @State private var query: String
@@ -152,7 +147,7 @@ struct ChangeReleaseSheet: View {
                 .grooveScreenBackground()
         }
         .task {
-            model.configure(settings)
+            model.configure(settings, messages: messages)
             if !query.isEmpty { model.search(query) }
         }
     }
@@ -180,9 +175,6 @@ struct ChangeReleaseSheet: View {
             }
             Section(model.libraryResults.isEmpty ? "" : "Enrichers") {
                 enricherRows
-            }
-            if let err = model.actionError {
-                Text(err).font(.caption).foregroundStyle(Brand.err).listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)
@@ -237,8 +229,7 @@ struct ChangeReleaseSheet: View {
     }
 
     private func apply(_ hit: IdentifySearchHit) async {
-        let error = await model.apply(trackId: trackId, hit: hit)
-        if error == nil {
+        if await model.apply(trackId: trackId, hit: hit) {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onApplied()
             dismiss()
@@ -246,8 +237,7 @@ struct ChangeReleaseSheet: View {
     }
 
     private func apply(libraryHit hit: LibraryReleaseSearchHit) async {
-        let error = await model.apply(trackId: trackId, libraryHit: hit)
-        if error == nil {
+        if await model.apply(trackId: trackId, libraryHit: hit) {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onApplied()
             dismiss()

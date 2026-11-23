@@ -47,8 +47,8 @@ final class DeviceLinkModel {
             let service = CatalogService(settings: settings)
             try await service.rigSetDeviceLink(enabled: on)
             self.devices = on ? ((try? await service.rigScanDeviceLink()) ?? []) : []
-        }
-        if done == nil { enabled = previous }
+        } != nil
+        if !done { enabled = previous }
     }
 
     func scan() async {

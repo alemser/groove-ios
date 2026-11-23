@@ -32,9 +32,40 @@ extension Error {
     /// User-facing message for any error surfaced from `CatalogService`/`APIClient`
     /// — the one place this app decides how an error reads on screen, instead of
     /// every call site repeating `(error as? APIError)?.localizedDescription ??
-    /// error.localizedDescription`.
+    /// error.localizedDescription`. groove-catalog and groove-rig answer errors as
+    /// `{"error": "…"}`; that sentence reads, not the JSON.
     var localizedForDisplay: String {
-        (self as? APIError)?.localizedDescription ?? localizedDescription
+        if case let .http(_, body)? = self as? APIError, let sentence = decodeRefusal(body)?.error?.nonEmpty {
+            return sentence
+        }
+        return (self as? APIError)?.localizedDescription ?? localizedDescription
+    }
+
+    /// The release check's refusal this error is, or nil for any other error. A
+    /// refusal whose body didn't decode still counts: it says only that the check failed.
+    var refusal: ConfirmPreflightError? {
+        guard case let .http(status, body)? = self as? APIError, status == httpUnprocessable else { return nil }
+        return decodeRefusal(body) ?? ConfirmPreflightError()
+    }
+}
+
+/// The status groove-catalog answers when its release check refuses a tracklist.
+private let httpUnprocessable = 422
+
+/// The refusal body of a failed confirm or save, when the server sent one.
+func decodeRefusal(_ body: String) -> ConfirmPreflightError? {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    return try? decoder.decode(ConfirmPreflightError.self, from: Data(body.utf8))
+}
+
+extension ConfirmPreflightError {
+    /// The refusal's sentence, then what the check found, one per line.
+    var explanation: String {
+        let issues = (preflightIssues ?? []).compactMap { $0.message?.nonEmpty }.joined(separator: "\n")
+        return [error?.nonEmpty ?? "The tracklist failed the release check.", issues.nonEmpty]
+            .compactMap { $0 }
+            .joined(separator: "\n\n")
     }
 }
 
