@@ -12,6 +12,7 @@ struct AmplifierView: View {
     }
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.scenePhase) private var scenePhase
     @State private var model = AmplifierModel()
     @State private var equipmentModel = EquipmentRemoteModel()
@@ -45,8 +46,8 @@ struct AmplifierView: View {
         .navigationTitle("Amplifier")
         .navigationBarTitleDisplayMode(.inline)
         .grooveScreenBackground()
-        .task { model.configure(settings) }
-        .task { equipmentModel.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
+        .task { equipmentModel.configure(settings, messages: messages) }
         .onChange(of: remoteAvailable) { _, available in
             if !available, section == .remote { section = .configuration }
         }

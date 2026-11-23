@@ -66,11 +66,6 @@ struct AmplifierCommandsView: View {
                     .foregroundStyle(Brand.muted)
             }
 
-            if let error = model.actionError {
-                Section {
-                    Text(error).foregroundStyle(Brand.err)
-                }
-            }
         }
         .scrollContentBackground(.hidden)
         .grooveScreenBackground()

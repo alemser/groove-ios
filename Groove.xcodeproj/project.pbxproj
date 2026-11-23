@@ -26,6 +26,7 @@
 		3A8A37604B08D0A2453217CD /* AmplifierHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38DB3CA3242A96763802819B /* AmplifierHUD.swift */; };
 		3DC92DF1917A2059D79AD808 /* EditTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C822D3C9AD028578CD3ABBBE /* EditTrackView.swift */; };
 		3E248FD660D01CE13FD67284 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27ED92912FF018764F1314A9 /* RootView.swift */; };
+		085B75EC74719BB2964E3EF5 /* MessageBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651183D4997064A551B6DBE6 /* MessageBanner.swift */; };
 		4AA7165515150B2A1126E18B /* LevelMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2C8786E67341140FA8EFAF /* LevelMeterView.swift */; };
 		4BBDE2D22DA3A35DB8B0F008 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9253360D61A0BC5E0BE49D /* LibraryView.swift */; };
 		510D1882797CEC49A61789A1 /* EquipmentRemoteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A8A778A9F5863318C47A4A /* EquipmentRemoteModel.swift */; };
@@ -90,6 +91,7 @@
 		F2B4B2AAD3DA41B951841086 /* RemoteLayoutModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AECCBF928F2E75F86090E2 /* RemoteLayoutModel.swift */; };
 		F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C276B60479555871B884B5E /* NavigationState.swift */; };
 		F2A78B3106E95EC32135FC55 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF40924866D51EB60289432D /* Notifier.swift */; };
+		DEAC07F45712C976464E4BAC /* MessageCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D1268FB31ACFB2B9A69026E /* MessageCenter.swift */; };
 		F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5692B96AF11DD835C1F1819A /* RulesView.swift */; };
 		EA8E0EFCBCB96187CF1586E0 /* DeviceLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
@@ -113,6 +115,7 @@
 		26EFCF890EE02DEBAC662674 /* AmplifierStateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierStateModel.swift; sourceTree = "<group>"; };
 		27254E509C0A5183FE8A30CB /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		27ED92912FF018764F1314A9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		651183D4997064A551B6DBE6 /* MessageBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBanner.swift; sourceTree = "<group>"; };
 		29A0CECF61D4276DD41099F9 /* ChangeReleaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeReleaseSheet.swift; sourceTree = "<group>"; };
 		354361FA261048E456288AB8 /* StylusModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylusModels.swift; sourceTree = "<group>"; };
 		3634CDA0BB984B61C55ADD18 /* Barcode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Barcode.swift; sourceTree = "<group>"; };
@@ -131,6 +134,7 @@
 		599238D9601A338235548EB9 /* GrooveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrooveApp.swift; sourceTree = "<group>"; };
 		5C276B60479555871B884B5E /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
 		AF40924866D51EB60289432D /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
+		2D1268FB31ACFB2B9A69026E /* MessageCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageCenter.swift; sourceTree = "<group>"; };
 		65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllReleasesView.swift; sourceTree = "<group>"; };
 		66653264D1692CBEA90FB2AC /* EnricherSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnricherSettingsView.swift; sourceTree = "<group>"; };
 		66C5227820A40CD353C1E8E3 /* AmplifierRemoteTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifierRemoteTab.swift; sourceTree = "<group>"; };
@@ -250,6 +254,7 @@
 				B26F2A1EC6AA9160C8B6AB11 /* Formatters.swift */,
 				5C276B60479555871B884B5E /* NavigationState.swift */,
 				AF40924866D51EB60289432D /* Notifier.swift */,
+				2D1268FB31ACFB2B9A69026E /* MessageCenter.swift */,
 				80C08861DABACCD203B79E1B /* Poller.swift */,
 				D322FA7C4439A9656C8E14ED /* WifiSetupClient.swift */,
 			);
@@ -395,6 +400,7 @@
 			children = (
 				599238D9601A338235548EB9 /* GrooveApp.swift */,
 				27ED92912FF018764F1314A9 /* RootView.swift */,
+				651183D4997064A551B6DBE6 /* MessageBanner.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -554,6 +560,7 @@
 				AC56F500A15DAB4B209720C2 /* Models.swift in Sources */,
 				F41AAE7868120A68FFCC9339 /* NavigationState.swift in Sources */,
 				F2A78B3106E95EC32135FC55 /* Notifier.swift in Sources */,
+				DEAC07F45712C976464E4BAC /* MessageCenter.swift in Sources */,
 				C6EC0CB027A48AC81173518B /* NowPlayingMiniBar.swift in Sources */,
 				C3A1E032810FCB3E5B038EA3 /* NowPlayingModel.swift in Sources */,
 				6544598DD18F741DE4E930C4 /* NowPlayingView.swift in Sources */,
@@ -571,6 +578,7 @@
 				99D2880D1FB1BEC67D7D43A0 /* RigModels.swift in Sources */,
 				A5C8565C906430EC7A80EA7E /* RigView.swift in Sources */,
 				3E248FD660D01CE13FD67284 /* RootView.swift in Sources */,
+				085B75EC74719BB2964E3EF5 /* MessageBanner.swift in Sources */,
 				F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */,
 				EA8E0EFCBCB96187CF1586E0 /* DeviceLink.swift in Sources */,
 				0BA058B9DB3B8E645C1A48C3 /* SettingsView.swift in Sources */,

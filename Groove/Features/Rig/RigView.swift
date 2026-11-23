@@ -8,6 +8,7 @@ import SwiftUI
 struct RigView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(NavigationState.self) private var navigation
+    @Environment(MessageCenter.self) private var messages
 
     @State private var stylusStatusText: String?
     @State private var ampStatusText: String?
@@ -142,7 +143,7 @@ struct RigView: View {
             rigEnabled = true
         }
         guard rigEnabled == true else { return }
-        deviceLink.configure(settings)
+        deviceLink.configure(settings, messages: messages)
         async let amp: Void = loadAmpStatus()
         async let rules: Void = loadRulesStatus()
         async let devices: Void = deviceLink.load()
@@ -225,6 +226,7 @@ struct RigView: View {
 /// brand.
 struct IRBridgeView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = IRBridgeModel()
     @State private var manualHost = ""
 
@@ -284,17 +286,15 @@ struct IRBridgeView: View {
                 }
             } else if model.isLoading {
                 Section { ProgressView() }
-            }
-
-            if let error = model.error {
-                Section { Text(error).foregroundStyle(Brand.err) }
+            } else if let error = model.loadError {
+                Section { ErrorStateView(message: error) { Task { await model.load() } } }
             }
         }
         .scrollContentBackground(.hidden)
         .grooveScreenBackground()
         .navigationTitle("IR Bridge")
         .navigationBarTitleDisplayMode(.inline)
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
     }
 
     private func statusText(_ bridge: RigBackend) -> String {
@@ -341,9 +341,11 @@ final class IRBridgeModel {
     var searchNote: String?
     /// The host a pairing is running for.
     var pairingHost: String?
-    var error: String?
+    /// The bridge itself didn't load: the screen's primary fetch.
+    var loadError: String?
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
     /// How long pairing may take before the screen gives up waiting.
     /// Chosen: a pair session is one hello + auth exchange (~0.2 s on
@@ -353,9 +355,10 @@ final class IRBridgeModel {
     /// Between session polls — the same cadence as LearnSessionModel.
     private static let pollInterval: Duration = .milliseconds(500)
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -364,9 +367,9 @@ final class IRBridgeModel {
         guard let settings else { return }
         do {
             bridge = try await CatalogService(settings: settings).rigBackends().first
-            error = nil
+            loadError = nil
         } catch {
-            self.error = error.localizedForDisplay
+            if bridge == nil { loadError = error.localizedForDisplay }
         }
         isLoading = false
     }
@@ -378,12 +381,11 @@ final class IRBridgeModel {
         defer { isSearching = false }
         do {
             found = try await CatalogService(settings: settings).rigDiscoverBridges(backendId: bridge.id)
-            error = nil
             if found.isEmpty {
                 searchNote = "No IR bridge answered. Check that it is powered on and connected to the same Wi-Fi as Oceano, then search again."
             }
         } catch {
-            self.error = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.search() })
         }
     }
 
@@ -402,15 +404,14 @@ final class IRBridgeModel {
             }
             switch session.status {
             case "success":
-                error = nil
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             case "failed":
-                error = session.message?.nonEmpty ?? "Pairing failed."
+                messages?.error(session.message?.nonEmpty ?? "Pairing failed.")
             default:
-                error = "The bridge didn't answer. Check its address and that it's on the same Wi-Fi."
+                messages?.error("The bridge didn't answer. Check its address and that it's on the same Wi-Fi.")
             }
         } catch {
-            self.error = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.pair(host: host) })
         }
         await load()
     }

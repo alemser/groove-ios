@@ -6,12 +6,12 @@ import Observation
 final class AmplifierModel {
     var snapshot: RigSnapshot?
     var phase: Phase = .loading
-    var actionError: String?
     var isPerformingAction = false
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     /// Tail of the serial chain of volume steps — see volume(direction:).
     private var volumeChain: Task<Void, Never>?
 
@@ -38,9 +38,10 @@ final class AmplifierModel {
         return ampLearned || equipment.equipment.contains { $0.hasRemote }
     }
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -58,18 +59,16 @@ final class AmplifierModel {
         }
     }
 
-    private func perform(_ work: () async throws -> Void) async {
+    private func perform(_ work: @escaping () async throws -> Void) async {
         guard !isPerformingAction else { return }
         isPerformingAction = true
         defer { isPerformingAction = false }
         do {
             try await work()
-            actionError = nil
         } catch {
-            actionError = error.localizedForDisplay
-            // The tap was confirmed by a haptic before the request went out.
-            // If it then failed, say so the same way — the error text sits at
-            // the bottom of a scrolling screen and is easy to miss.
+            messages?.error(error, retry: { [weak self] in await self?.perform(work) })
+            // The tap was confirmed by a haptic before the request went out;
+            // a failure is felt the same way.
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
@@ -159,9 +158,9 @@ final class AmplifierModel {
             guard let self else { return }
             do {
                 self.snapshot = try await request(CatalogService(settings: settings))
-                self.actionError = nil
             } catch {
-                self.actionError = error.localizedForDisplay
+                // No retry: a burst of steps isn't worth replaying one of.
+                self.messages?.error(error)
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
         }

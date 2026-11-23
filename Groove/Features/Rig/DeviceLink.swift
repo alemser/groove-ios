@@ -14,15 +14,16 @@ final class DeviceLinkModel {
     var devices: [RigDeviceLinkDevice] = []
     var isScanning = false
     var busyName: String?
-    var actionError: String?
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
     /// Found and not added yet: what "Found on Your Network" offers.
     var found: [RigDeviceLinkDevice] { devices.filter { $0.added == nil } }
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         self.settings = settings
+        self.messages = messages
     }
 
     func load() async {
@@ -39,47 +40,34 @@ final class DeviceLinkModel {
     }
 
     func setEnabled(_ on: Bool) async {
-        guard let settings else { return }
+        guard let settings, let messages else { return }
         let previous = enabled
         enabled = on
-        do {
+        let done = await messages.attempt {
             let service = CatalogService(settings: settings)
             try await service.rigSetDeviceLink(enabled: on)
-            actionError = nil
-            devices = on ? ((try? await service.rigScanDeviceLink()) ?? []) : []
-        } catch {
-            enabled = previous
-            actionError = error.localizedForDisplay
+            self.devices = on ? ((try? await service.rigScanDeviceLink()) ?? []) : []
         }
+        if done == nil { enabled = previous }
     }
 
     func scan() async {
-        guard let settings, !isScanning else { return }
+        guard let settings, let messages, !isScanning else { return }
         isScanning = true
         defer { isScanning = false }
-        do {
-            devices = try await CatalogService(settings: settings).rigScanDeviceLink()
-            actionError = nil
-        } catch {
-            actionError = error.localizedForDisplay
-        }
+        devices = await messages.attempt { try await CatalogService(settings: settings).rigScanDeviceLink() } ?? devices
     }
 
     /// Adds `device` to the rig; true when it was.
     func add(_ device: RigDeviceLinkDevice) async -> Bool {
-        guard let settings else { return false }
+        guard let settings, let messages else { return false }
         busyName = device.name
         defer { busyName = nil }
-        do {
+        return await messages.attempt {
             try await CatalogService(settings: settings).rigAddDeviceLinkDevice(name: device.name)
-            actionError = nil
-            await load()
+            await self.load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 }
 
@@ -95,8 +83,8 @@ struct DeviceLinkSections: View {
                     set: { on in Task { await model.setEnabled(on) } }
                 ))
             } footer: {
-                Text(model.actionError ?? "For devices with a DeviceLink bridge. Leave off if you use an IR bridge only.")
-                    .foregroundStyle(model.actionError == nil ? Brand.muted : Brand.err)
+                Text("For devices with a DeviceLink bridge. Leave off if you use an IR bridge only.")
+                    .foregroundStyle(Brand.muted)
             }
             if enabled {
                 Section {
@@ -193,9 +181,6 @@ struct DeviceLinkDeviceView: View {
                     Text("Can't be added: \(device.previewError ?? "unknown reason")")
                         .foregroundStyle(Brand.err)
                 }
-            }
-            if let error = model.actionError {
-                Section { Text(error).foregroundStyle(Brand.err) }
             }
         }
         .scrollContentBackground(.hidden)

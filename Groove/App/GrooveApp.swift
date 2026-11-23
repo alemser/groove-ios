@@ -7,6 +7,7 @@ struct GrooveApp: App {
     @State private var settings = AppSettings()
     @State private var attention = AttentionCenter()
     @State private var nowPlaying = NowPlayingModel()
+    @State private var messages = MessageCenter()
 
     var body: some Scene {
         WindowGroup {
@@ -15,6 +16,7 @@ struct GrooveApp: App {
                 .environment(attention)
                 .environment(appDelegate.navigation)
                 .environment(nowPlaying)
+                .environment(messages)
                 .tint(Brand.accent)
                 .preferredColorScheme(.dark)
         }

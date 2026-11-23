@@ -5,6 +5,7 @@ import SwiftUI
 /// meter so recognition sees the level it was tuned for.
 struct AudioInputView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = AudioInputModel()
 
     var body: some View {
@@ -19,15 +20,7 @@ struct AudioInputView: View {
                     }
                 }
             case .error(let message):
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Couldn't reach the audio input.")
-                            .foregroundStyle(Brand.text)
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(Brand.muted)
-                    }
-                }
+                Section { ErrorStateView(message: message) { Task { await model.refresh() } } }
             case .loaded:
                 if let level = model.level {
                     connectionSection
@@ -41,16 +34,8 @@ struct AudioInputView: View {
         .grooveScreenBackground()
         .navigationTitle("Audio Input")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { model.start(settings) }
+        .onAppear { model.start(settings, messages: messages) }
         .onDisappear { model.stop() }
-        .alert("Couldn't apply", isPresented: Binding(
-            get: { model.actionError != nil },
-            set: { if !$0 { model.actionError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.actionError ?? "")
-        }
     }
 
     private var connectionSection: some View {

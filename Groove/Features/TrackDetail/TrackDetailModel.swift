@@ -6,20 +6,21 @@ import Observation
 final class TrackDetailModel {
     var profile: TrackProfile?
     var phase: Phase = .loading
-    var actionError: String?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     let trackId: Int64
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
     init(trackId: Int64) { self.trackId = trackId }
 
     var track: Track? { profile?.track }
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -36,15 +37,9 @@ final class TrackDetailModel {
     }
 
     func save(_ patch: TrackDisplayPatch) async -> Bool {
-        guard let settings else { return false }
-        do {
-            let updated = try await CatalogService(settings: settings).patchTrackDisplay(id: trackId, patch: patch)
-            if var profile { profile.track = updated; self.profile = profile }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
+        await attempt { service in
+            let updated = try await service.patchTrackDisplay(id: self.trackId, patch: patch)
+            if var profile = self.profile { profile.track = updated; self.profile = profile }
         }
     }
 
@@ -53,15 +48,7 @@ final class TrackDetailModel {
     }
 
     func delete() async -> Bool {
-        guard let settings else { return false }
-        do {
-            try await CatalogService(settings: settings).deleteTrack(id: trackId)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        await attempt { try await $0.deleteTrack(id: self.trackId) }
     }
 
     /// Rejects a wrongly-recognized play with no replacement — just removes
@@ -70,15 +57,18 @@ final class TrackDetailModel {
     /// play, in which case it now shows zero).
     @discardableResult
     func rejectPlay(epoch: UInt64) async -> Bool {
-        guard let settings else { return false }
-        do {
-            try await CatalogService(settings: settings).deletePlay(epoch: epoch)
-            await load()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
+        await attempt { service in
+            try await service.deletePlay(epoch: epoch)
+            await self.load()
         }
+    }
+
+    /// A write the person asked for, confirmed with a haptic; a failure goes to the message center.
+    private func attempt(_ action: @escaping (CatalogService) async throws -> Void) async -> Bool {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
+            try await action(CatalogService(settings: settings))
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } != nil
     }
 }

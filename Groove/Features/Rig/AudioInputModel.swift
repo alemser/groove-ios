@@ -14,7 +14,6 @@ import Observation
 final class AudioInputModel {
     var level: CaptureLevel?
     var phase: Phase = .loading
-    var actionError: String?
     /// The step the operator is heading to while a debounced apply is pending.
     private(set) var pendingStep: Int?
     private(set) var isApplying = false
@@ -27,6 +26,7 @@ final class AudioInputModel {
     static let pollInterval: Duration = .milliseconds(250)
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
     private var applyTask: Task<Void, Never>?
     @ObservationIgnored private lazy var poller = Poller(interval: Self.pollInterval) { [weak self] in
         await self?.refresh()
@@ -72,8 +72,9 @@ final class AudioInputModel {
         return Double(target - gain.step) * per
     }
 
-    func start(_ settings: AppSettings) {
+    func start(_ settings: AppSettings, messages: MessageCenter) {
         self.settings = settings
+        self.messages = messages
         poller.start()
     }
 
@@ -107,7 +108,7 @@ final class AudioInputModel {
             await refresh()
         } catch {
             if let previous { level?.inputLevel = previous }
-            actionError = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.setVariable(variable) })
         }
     }
 
@@ -157,7 +158,7 @@ final class AudioInputModel {
         } catch is CancellationError {
             // Superseded; the newer target applies on its own.
         } catch {
-            actionError = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in self?.schedule(step, after: .zero) })
         }
         // A newer tap may have re-targeted while this request was in flight.
         if pendingStep == step { pendingStep = nil }

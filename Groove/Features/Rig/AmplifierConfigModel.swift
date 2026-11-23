@@ -8,7 +8,6 @@ final class AmplifierConfigModel {
     var profiles: [RigStoredAmplifierProfile] = []
     var activeProfileId: String?
     var phase: Phase = .loading
-    var actionError: String?
     var isSaving = false
     /// Whether the amplifier's selected input may inform which medium is
     /// playing. Loaded and saved separately from `config` — see `RigFormatHint`.
@@ -23,12 +22,25 @@ final class AmplifierConfigModel {
     var hasAmplifier: Bool { activeProfileId != "" }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
+    }
+
+    /// A change to the amplifier setup, then a reload; true when it went through.
+    @discardableResult
+    private func mutate(_ action: @escaping (CatalogService) async throws -> Void) async -> Bool {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
+            try await action(CatalogService(settings: settings))
+            await self.load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } != nil
     }
 
     func load() async {
@@ -60,54 +72,34 @@ final class AmplifierConfigModel {
 
     @discardableResult
     func save(_ patch: RigAmplifierConfig, useAmplifierInputForFormat: Bool) async -> Bool {
-        guard let settings else { return false }
+        guard let settings, let messages else { return false }
         isSaving = true
         defer { isSaving = false }
-        do {
+        return await messages.attempt {
             let service = CatalogService(settings: settings)
-            config = try await service.rigPatchAmplifier(patch)
+            self.config = try await service.rigPatchAmplifier(patch)
             let hint = try await service.rigSetFormatHint(useAmplifierInput: useAmplifierInputForFormat)
             self.useAmplifierInputForFormat = hint.useAmplifierInput
-            actionError = nil
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 
     /// Switches amplifier. Never blocked: groove-rig saves edits into the
     /// active profile as they're made (a built-in's override, or the custom
     /// profile), so switching away and back restores them.
     func activate(profileId: String) async {
-        guard let settings else { return }
-        do {
-            try await CatalogService(settings: settings).rigActivateProfile(id: profileId)
-            await load()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            actionError = error.localizedForDisplay
-        }
+        await mutate { try await $0.rigActivateProfile(id: profileId) }
     }
 
     /// "No Amplifier": groove-rig keeps the amplifier's settings, wiring and
     /// learned codes in its profile, so choosing it again restores them.
     func removeAmplifier() async {
-        guard let settings else { return }
-        do {
-            try await CatalogService(settings: settings).rigRemoveAmplifier()
-            await load()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            actionError = error.localizedForDisplay
-        }
+        await mutate { try await $0.rigRemoveAmplifier() }
     }
 
     /// Copies `source` under a new name, with its learned IR codes and
     /// equipment wiring. Returns the new profile's id on success.
     func duplicateProfile(_ source: RigStoredAmplifierProfile, name: String) async -> String? {
-        guard let settings else { return nil }
         let base = Self.slug(name)
         var id = base
         var n = 2
@@ -115,28 +107,13 @@ final class AmplifierConfigModel {
             id = "\(base)_\(n)"
             n += 1
         }
-        do {
-            _ = try await CatalogService(settings: settings).rigDuplicateProfile(
-                RigProfileDuplicateRequest(id: id, name: name, config: source.config, copyCodesFrom: source.id)
-            )
-            await load()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return id
-        } catch {
-            actionError = error.localizedForDisplay
-            return nil
-        }
+        let request = RigProfileDuplicateRequest(id: id, name: name, config: source.config, copyCodesFrom: source.id)
+        let done = await mutate { _ = try await $0.rigDuplicateProfile(request) }
+        return done ? id : nil
     }
 
     func resetProfile(id: String) async {
-        guard let settings else { return }
-        do {
-            try await CatalogService(settings: settings).rigResetProfile(id: id)
-            await load()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            actionError = error.localizedForDisplay
-        }
+        await mutate { try await $0.rigResetProfile(id: id) }
     }
 
     /// Profile ids are internal (`^[a-z0-9][a-z0-9_-]*$` on the server).
@@ -155,36 +132,16 @@ final class AmplifierConfigModel {
     }
 
     func deleteProfile(id: String) async {
-        guard let settings else { return }
-        do {
-            try await CatalogService(settings: settings).rigDeleteProfile(id: id)
-            await load()
-        } catch {
-            actionError = error.localizedForDisplay
-        }
+        await mutate { try await $0.rigDeleteProfile(id: id) }
     }
 
     func exportProfile(id: String) async -> RigProfileExportDoc? {
-        guard let settings else { return nil }
-        do {
-            return try await CatalogService(settings: settings).rigExportProfile(id: id)
-        } catch {
-            actionError = error.localizedForDisplay
-            return nil
-        }
+        guard let settings, let messages else { return nil }
+        return await messages.attempt { try await CatalogService(settings: settings).rigExportProfile(id: id) }
     }
 
     @discardableResult
     func importProfile(_ doc: RigProfileExportDoc) async -> Bool {
-        guard let settings else { return false }
-        do {
-            _ = try await CatalogService(settings: settings).rigImportProfile(doc)
-            await load()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        await mutate { _ = try await $0.rigImportProfile(doc) }
     }
 }

@@ -30,6 +30,7 @@ struct AmplifierConfigView: View {
     let equipmentModel: EquipmentRemoteModel
 
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = AmplifierConfigModel()
 
     @State private var maker = ""
@@ -67,7 +68,7 @@ struct AmplifierConfigView: View {
             }
         }
         .grooveScreenBackground()
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
         .onChange(of: model.config) { _, new in seed(from: new) }
         .onChange(of: model.useAmplifierInputForFormat) { _, new in useInputForFormat = new }
         .toolbar {
@@ -223,9 +224,6 @@ struct AmplifierConfigView: View {
                 advancedSection
             }
 
-            if let error = model.actionError ?? equipmentModel.actionError {
-                Section { Text(error).foregroundStyle(Brand.err) }
-            }
         }
         .scrollContentBackground(.hidden)
     }
@@ -505,7 +503,7 @@ struct AmplifierConfigView: View {
             exportDocument = AmplifierProfileDocument(data: data)
             showExporter = true
         } catch {
-            model.actionError = "Couldn't prepare the export."
+            messages.error("Couldn't prepare the export.")
         }
     }
 
@@ -520,7 +518,7 @@ struct AmplifierConfigView: View {
             let doc = try decoder.decode(RigProfileExportDoc.self, from: data)
             await model.importProfile(doc)
         } catch {
-            model.actionError = "Couldn't read that profile file."
+            messages.error("Couldn't read that profile file.")
         }
     }
 }

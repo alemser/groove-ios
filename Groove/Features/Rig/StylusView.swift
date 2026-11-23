@@ -6,6 +6,7 @@ import SwiftUI
 /// cartridge definition itself.
 struct StylusView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = StylusModel()
 
     @State private var sourceMode: SourceMode = .catalog
@@ -50,7 +51,7 @@ struct StylusView: View {
         .navigationTitle("Stylus Tracking")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            model.configure(settings)
+            model.configure(settings, messages: messages)
             if stylusAlertEnabled { await Notifier.requestPermissionIfNeeded() }
         }
         .onChange(of: model.phase) { _, phase in
@@ -301,8 +302,6 @@ struct StylusView: View {
             if let p = model.state?.profile {
                 Text("Installed \(Format.absolute(p.installedAt)) · \(p.brand) \(p.model) (\(p.stylusProfile))")
                     .foregroundStyle(Brand.muted)
-            } else if let error = model.actionError {
-                Text(error).foregroundStyle(Brand.err)
             }
         }
     }

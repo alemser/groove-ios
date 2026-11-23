@@ -8,13 +8,13 @@ import SwiftUI
 /// it's made, like the Streaming screen's device choice.
 struct RulesView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
 
     @State private var rules: [RigRule] = []
     @State private var kinds: [RigRuleKind] = []
     @State private var inputs: [RigInputStatus] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var actionError: String?
     @State private var isSaving = false
     /// Options picked for a rule not created yet, used when it's turned on.
     @State private var newInputId = ""
@@ -50,23 +50,10 @@ struct RulesView: View {
                     Spacer()
                 }
             } else if let errorMessage {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Couldn't load the rules.")
-                        .foregroundStyle(Brand.text)
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(Brand.muted)
-                }
+                ErrorStateView(message: errorMessage) { Task { await load() } }
             } else {
                 ForEach(slots) { slot in
                     section(slot)
-                }
-                if let actionError {
-                    Section {
-                        Text(actionError)
-                            .font(.footnote)
-                            .foregroundStyle(Brand.err)
-                    }
                 }
             }
         }
@@ -224,15 +211,13 @@ struct RulesView: View {
         kinds = response.kinds
     }
 
-    private func save(_ work: (CatalogService) async throws -> Void) async {
+    private func save(_ work: @escaping (CatalogService) async throws -> Void) async {
         isSaving = true
         defer { isSaving = false }
-        do {
-            try await work(CatalogService(settings: settings))
-            actionError = nil
-            apply(try await CatalogService(settings: settings).rigRules())
-        } catch {
-            actionError = error.localizedForDisplay
+        let service = CatalogService(settings: settings)
+        await messages.attempt {
+            try await work(service)
+            apply(try await service.rigRules())
         }
     }
 

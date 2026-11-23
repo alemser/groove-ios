@@ -7,7 +7,6 @@ final class EquipmentRemoteModel {
     var equipment: [RigEquipmentItem] = []
     var snapshot: RigSnapshot?
     var phase: Phase = .loading
-    var actionError: String?
     var isPerformingAction = false
     /// Well-known buttons and equipment templates from groove-rig — the
     /// server owns "which buttons does this kind of device have", not the
@@ -84,7 +83,8 @@ final class EquipmentRemoteModel {
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
-            actionError = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.addShippedButtons(targetId: targetId, actions: actions) })
+            // Some may have been added before the failure.
             await load()
         }
     }
@@ -115,29 +115,26 @@ final class EquipmentRemoteModel {
     }
 
     func renameButton(targetId: String, action: String, label: String) async {
-        guard let settings else { return }
-        do {
+        guard let settings, let messages else { return }
+        await messages.attempt {
             try await CatalogService(settings: settings).rigRenameEquipmentAction(target: targetId, action: action, label: label)
-            await load()
-        } catch {
-            actionError = error.localizedForDisplay
+            await self.load()
         }
     }
 
     /// Removes the button and its learned code (power: every power key).
     func removeButton(targetId: String, actions: [String]) async {
-        guard let settings else { return }
-        do {
+        guard let settings, let messages else { return }
+        await messages.attempt {
             let service = CatalogService(settings: settings)
             for a in actions { try await service.rigRemoveEquipmentAction(target: targetId, action: a) }
-            await load()
+            await self.load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            actionError = error.localizedForDisplay
         }
     }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
     /// The active amplifier's inputs, every one, visible or not: what equipment can be plugged into.
     var amplifierInputs: [RigInputStatus] { snapshot?.amplifier?.inputs ?? [] }
@@ -150,9 +147,10 @@ final class EquipmentRemoteModel {
     /// surfaced from Amplifier → Configuration instead of the Equipment list.
     var amplifierEquipment: RigEquipmentItem? { equipment.first { $0.id == "amplifier" } }
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -208,9 +206,8 @@ final class EquipmentRemoteModel {
         defer { isPerformingAction = false }
         do {
             snapshot = try await CatalogService(settings: settings).rigAction(target: targetId, action: action)
-            actionError = nil
         } catch {
-            actionError = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.fire(targetId: targetId, action: action) })
             // The tap was confirmed by a haptic before the request went out; a
             // failure has to be felt too, or the operator is left believing the
             // command reached the equipment.
@@ -219,28 +216,22 @@ final class EquipmentRemoteModel {
     }
 
     func unlearn(targetId: String, action: String) async {
-        guard let settings else { return }
-        do {
+        guard let settings, let messages else { return }
+        await messages.attempt {
             try await CatalogService(settings: settings).rigUnlearn(target: targetId, action: action)
-            await load()
+            await self.load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            actionError = error.localizedForDisplay
         }
     }
 
     @discardableResult
     func addEquipment(_ req: RigEquipmentSaveRequest) async -> Bool {
-        guard let settings else { return false }
-        do {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
             _ = try await CatalogService(settings: settings).rigCreateEquipment(req)
-            await load()
+            await self.load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 
     /// The DeviceLink device `item` came from, as discovery lists it now
@@ -259,16 +250,11 @@ final class EquipmentRemoteModel {
     /// when it was.
     @discardableResult
     func removeDeviceLinkDevice(name: String) async -> Bool {
-        guard let settings else { return false }
-        do {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
             try await CatalogService(settings: settings).rigRemoveDeviceLinkDevice(name: name)
-            actionError = nil
-            await load()
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+            await self.load()
+        } != nil
     }
 
     /// Removes `item`: a DeviceLink device's with the device, any other
@@ -282,12 +268,10 @@ final class EquipmentRemoteModel {
     }
 
     func deleteEquipment(id: String) async {
-        guard let settings else { return }
-        do {
+        guard let settings, let messages else { return }
+        await messages.attempt {
             try await CatalogService(settings: settings).rigDeleteEquipment(id: id)
-            await load()
-        } catch {
-            actionError = error.localizedForDisplay
+            await self.load()
         }
     }
 
@@ -310,15 +294,11 @@ final class EquipmentRemoteModel {
 
     @discardableResult
     func updateEquipment(id: String, _ patch: RigEquipmentPatchRequest) async -> Bool {
-        guard let settings else { return false }
-        do {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
             _ = try await CatalogService(settings: settings).rigPatchEquipment(id: id, patch)
-            await load()
+            await self.load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 }

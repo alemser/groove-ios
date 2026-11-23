@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TrackDetailView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
     @State private var model: TrackDetailModel
     @State private var editing = false
@@ -41,7 +42,7 @@ struct TrackDetailView: View {
                     }
                 }
             }
-            .task { model.configure(settings) }
+            .task { model.configure(settings, messages: messages) }
             .sheet(isPresented: $editing) {
                 if let track = model.track {
                     EditTrackView(track: track) { patch in
@@ -151,9 +152,6 @@ struct TrackDetailView: View {
                         .padding(16).grooveCard()
                 }
 
-                if let err = model.actionError {
-                    Text(err).font(.caption).foregroundStyle(Brand.err).multilineTextAlignment(.center)
-                }
             }
             .padding()
             .frame(maxWidth: 560)

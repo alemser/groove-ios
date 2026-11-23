@@ -9,13 +9,14 @@ import Observation
 @Observable
 final class RemoteLayoutModel {
     var layout: RigRemoteLayout?
-    var actionError: String?
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
         }
     }
 
@@ -26,27 +27,24 @@ final class RemoteLayoutModel {
     }
 
     /// Applies `change` locally right away, then saves; reverts on failure.
-    func update(_ change: (inout RigRemoteLayout) -> Void) async {
+    func update(_ change: @escaping (inout RigRemoteLayout) -> Void) async {
         guard let settings, var next = layout else { return }
         let previous = layout
         change(&next)
         layout = next
         do {
             layout = try await CatalogService(settings: settings).rigSaveRemoteLayout(next)
-            actionError = nil
         } catch {
             layout = previous
-            actionError = error.localizedForDisplay
+            messages?.error(error, retry: { [weak self] in await self?.update(change) })
         }
     }
 
     func reset() async {
-        guard let settings else { return }
-        do {
+        guard let settings, let messages else { return }
+        await messages.attempt {
             try await CatalogService(settings: settings).rigResetRemoteLayout()
-            await load()
-        } catch {
-            actionError = error.localizedForDisplay
+            await self.load()
         }
     }
 }

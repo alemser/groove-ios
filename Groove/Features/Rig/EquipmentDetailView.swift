@@ -62,11 +62,6 @@ struct EquipmentDetailView: View {
                 }
             }
 
-            if let error = model.actionError {
-                Section {
-                    Text(error).foregroundStyle(Brand.err)
-                }
-            }
 
             if currentItem.id != "amplifier" {
                 Section {
@@ -233,9 +228,6 @@ struct EquipmentEditForm: View {
 
                 ConnectedToSection(inputs: wiringInputs, ticked: $ticked)
 
-                if let error = model.actionError {
-                    Section { Text(error).foregroundStyle(Brand.err) }
-                }
             }
             .scrollContentBackground(.hidden)
             .grooveScreenBackground()

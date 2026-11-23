@@ -41,9 +41,6 @@ struct ArrangeRemoteView: View {
                                 Text("Tap to put a button back on the remote.").foregroundStyle(Brand.muted)
                             }
                         }
-                        if let error = model.actionError {
-                            Section { Text(error).foregroundStyle(Brand.err) }
-                        }
                     }
                     .environment(\.editMode, .constant(.active))
                 } else {

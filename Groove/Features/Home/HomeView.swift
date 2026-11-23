@@ -5,6 +5,7 @@ import SwiftUI
 /// the spirit of `oceano-player-ios`'s Home.
 struct HomeView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(AttentionCenter.self) private var attention
     @Environment(NavigationState.self) private var navigation
     @Environment(NowPlayingModel.self) private var nowPlaying
@@ -55,8 +56,8 @@ struct HomeView: View {
                 }
             }
         }
-        .task { ampModel.configure(settings) }
-        .task { equipmentModel.configure(settings) }
+        .task { ampModel.configure(settings, messages: messages) }
+        .task { equipmentModel.configure(settings, messages: messages) }
         .task { await loadStylusState() }
         .task { await retryRemoteWhileMissing() }
         .onChange(of: scenePhase) { _, phase in

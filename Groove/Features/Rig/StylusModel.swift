@@ -7,15 +7,16 @@ final class StylusModel {
     var state: StylusState?
     var catalog: [StylusCatalogItem] = []
     var phase: Phase = .loading
-    var actionError: String?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -42,27 +43,19 @@ final class StylusModel {
 
     @discardableResult
     func save(_ req: StylusSaveRequest) async -> Bool {
-        guard let settings else { return false }
-        do {
-            state = try await CatalogService(settings: settings).putStylusProfile(req)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        await store { try await $0.putStylusProfile(req) }
     }
 
     @discardableResult
     func replace(_ req: StylusSaveRequest) async -> Bool {
-        guard let settings else { return false }
-        do {
-            state = try await CatalogService(settings: settings).replaceStylusProfile(req)
+        await store { try await $0.replaceStylusProfile(req) }
+    }
+
+    private func store(_ request: @escaping (CatalogService) async throws -> StylusState) async -> Bool {
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
+            self.state = try await request(CatalogService(settings: settings))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 }

@@ -10,6 +10,7 @@ struct AmplifierRemoteTab: View {
     let model: AmplifierModel
     let equipmentModel: EquipmentRemoteModel
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var layoutModel = RemoteLayoutModel()
     @State private var stateModel = AmplifierStateModel()
     @State private var showResyncDialog = false
@@ -30,12 +31,6 @@ struct AmplifierRemoteTab: View {
                     ForEach(remoteEquipment) { item in
                         equipmentCard(item)
                     }
-                }
-                if let error = model.actionError {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(Brand.err)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(16)
@@ -67,7 +62,7 @@ struct AmplifierRemoteTab: View {
             }
         }
         .task {
-            layoutModel.configure(settings)
+            layoutModel.configure(settings, messages: messages)
             await layoutModel.load()
         }
         // A button learned or removed elsewhere changes what the layout

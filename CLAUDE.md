@@ -76,6 +76,12 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   the *primary* fetch only — a secondary fetch failing should degrade to the previous value
   (`(try? await x) ?? previousValue`), not blank the whole screen. This exact bug shipped in
   `ReleasesModel` and 3 other models before being caught and fixed as a batch.
+- `Core/MessageCenter.swift` is the one channel for an action that failed (save, delete, a rig
+  button) and for a short acknowledgement: `messages.attempt { … }` runs a write and offers Retry
+  when it fails. It shows as a banner in a window of its own above every sheet
+  (`App/MessageBanner.swift`); Android shows the same messages as a snackbar. A failed primary
+  fetch keeps `ErrorStateView`, a wrong form value stays under its field. No screen draws its own
+  red line.
 - `Core/WifiSetupClient.swift` / `Features/Onboarding/` — the board's Wi-Fi setup routes
   (groove-provision's `PROTOCOL.md`); the setup network's prefix and address must match
   it exactly. iOS joins a network from an app only with the Hotspot Configuration capability, which

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
 
     var body: some View {
         Group {
@@ -12,6 +13,7 @@ struct RootView: View {
             }
         }
         .animation(.default, value: settings.isConfigured)
+        .task { MessageBannerWindow.install(messages) }
     }
 }
 
