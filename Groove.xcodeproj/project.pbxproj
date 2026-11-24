@@ -81,6 +81,7 @@
 		D3BF1220E59898E2D65811D6 /* EnricherCredentialsForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54307373692AB53DC1F59A33 /* EnricherCredentialsForm.swift */; };
 		D7037250A5B12675B7A3C555 /* ProviderCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6909C50BD75141522C630B /* ProviderCredentialsView.swift */; };
 		E947901EE0ADF3D0BDEC0487 /* MediaFormatIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876155CF9A90291A8BC5DE46 /* MediaFormatIcon.swift */; };
+		EA8E0EFCBCB96187CF1586E0 /* DeviceLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */; };
 		EBDB97AA8FD8BD7CE797D9A9 /* AmplifierConfigModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164F9B46FAA2A75FDEB3E77A /* AmplifierConfigModel.swift */; };
 		EDE41E102940AA4FEAF74F7F /* AmplifierCommandsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CBAF08163F31479F9161C5C /* AmplifierCommandsView.swift */; };
 		EFCEAE28AA013B4C50B3A62D /* RemoteQuickAccessSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */; };
@@ -93,7 +94,6 @@
 		F2A78B3106E95EC32135FC55 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF40924866D51EB60289432D /* Notifier.swift */; };
 		DEAC07F45712C976464E4BAC /* MessageCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D1268FB31ACFB2B9A69026E /* MessageCenter.swift */; };
 		F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5692B96AF11DD835C1F1819A /* RulesView.swift */; };
-		EA8E0EFCBCB96187CF1586E0 /* DeviceLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
 /* End PBXBuildFile section */
@@ -129,7 +129,6 @@
 		535882879A217CB2085F866E /* ReleasesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasesView.swift; sourceTree = "<group>"; };
 		54307373692AB53DC1F59A33 /* EnricherCredentialsForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnricherCredentialsForm.swift; sourceTree = "<group>"; };
 		5692B96AF11DD835C1F1819A /* RulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesView.swift; sourceTree = "<group>"; };
-		DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLink.swift; sourceTree = "<group>"; };
 		569411080918D04DCBAC649F /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
 		599238D9601A338235548EB9 /* GrooveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrooveApp.swift; sourceTree = "<group>"; };
 		5C276B60479555871B884B5E /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
@@ -178,6 +177,7 @@
 		D251609A9AA8214E30F2AD3B /* RemoteQuickAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteQuickAccessSheet.swift; sourceTree = "<group>"; };
 		D322FA7C4439A9656C8E14ED /* WifiSetupClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WifiSetupClient.swift; sourceTree = "<group>"; };
 		D5EB40C22B18DFB61CAA5600 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		DB523F1C4D8FC6C628EAD903 /* DeviceLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLink.swift; sourceTree = "<group>"; };
 		DB9253360D61A0BC5E0BE49D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		E1413AC3F7F93EB3B0926AD2 /* AssociationReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssociationReviewSheet.swift; sourceTree = "<group>"; };
 		E359E243C5567C525755CBD8 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
