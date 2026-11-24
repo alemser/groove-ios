@@ -116,6 +116,29 @@ struct SectionLabel: View {
     }
 }
 
+// MARK: - Icon row
+
+/// An icon with a title and a caption under it: the label of a list row that opens something.
+struct IconRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    var tint: Color = Brand.accent
+    var subtitleColor: Color = Brand.muted
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(Brand.text)
+                Text(subtitle).font(.caption).foregroundStyle(subtitleColor)
+            }
+        }
+    }
+}
+
 // MARK: - Key/value row
 
 struct InfoRow: View {

@@ -4,6 +4,18 @@ import SwiftUI
 /// configuration and streaming, which is part of Oceano itself rather than
 /// the rig around it. Rig stays focused on physical hardware; this is
 /// everything else about how Oceano is wired up.
+/// How a settings screen is named and drawn wherever it's offered: Settings and Home's setup card.
+struct ScreenEntry {
+    let title: String
+    let icon: String
+    let tint: Color
+
+    static let recognitionProviders = ScreenEntry(
+        title: "Recognition Providers", icon: "waveform.badge.magnifyingglass", tint: Brand.gold
+    )
+    static let metadataEnrichers = ScreenEntry(title: "Metadata Enrichers", icon: "text.badge.checkmark", tint: Brand.teal)
+}
+
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(MessageCenter.self) private var messages
@@ -22,11 +34,11 @@ struct SettingsView: View {
                     NavigationLink {
                         RecognitionProvidersScreen()
                     } label: {
-                        row(
-                            title: "Recognition Providers",
+                        IconRow(
+                            title: ScreenEntry.recognitionProviders.title,
                             subtitle: "ACRCloud, AudD, custom providers, local fingerprints",
-                            icon: "waveform.badge.magnifyingglass",
-                            tint: Brand.gold
+                            icon: ScreenEntry.recognitionProviders.icon,
+                            tint: ScreenEntry.recognitionProviders.tint
                         )
                     }
                 } footer: {
@@ -38,11 +50,11 @@ struct SettingsView: View {
                     NavigationLink {
                         EnricherSettingsView()
                     } label: {
-                        row(
-                            title: "Metadata Enrichers",
+                        IconRow(
+                            title: ScreenEntry.metadataEnrichers.title,
                             subtitle: "MusicBrainz, Discogs, iTunes",
-                            icon: "text.badge.checkmark",
-                            tint: Brand.teal
+                            icon: ScreenEntry.metadataEnrichers.icon,
+                            tint: ScreenEntry.metadataEnrichers.tint
                         )
                     }
                 } footer: {
@@ -54,7 +66,7 @@ struct SettingsView: View {
                     NavigationLink {
                         StreamingView()
                     } label: {
-                        row(
+                        IconRow(
                             title: "Streaming",
                             subtitle: streamingStatusText ?? "Loading…",
                             icon: "airplayaudio",
@@ -187,18 +199,6 @@ struct SettingsView: View {
             }
         } != nil
         if sent { powerStatus = action.sentStatus }
-    }
-
-    private func row(title: String, subtitle: String, icon: String, tint: Color) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).foregroundStyle(Brand.text)
-                Text(subtitle).font(.caption).foregroundStyle(Brand.muted)
-            }
-        }
     }
 
     private var appVersion: String {

@@ -116,17 +116,13 @@ private struct DeviceLinkRow: View {
     let device: RigDeviceLinkDevice
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: device.preview?.profileId != nil ? "hifispeaker" : "opticaldisc")
-                .foregroundStyle(Brand.teal)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(device.displayName).foregroundStyle(Brand.text)
-                Text("\(device.kindLabel) · \(device.statusLabel)")
-                    .font(.caption)
-                    .foregroundStyle(device.online ? Brand.muted : Brand.err)
-            }
-        }
+        IconRow(
+            title: device.displayName,
+            subtitle: "\(device.kindLabel) · \(device.statusLabel)",
+            icon: device.preview?.profileId != nil ? "hifispeaker" : "opticaldisc",
+            tint: Brand.teal,
+            subtitleColor: device.online ? Brand.muted : Brand.err
+        )
     }
 }
 

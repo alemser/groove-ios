@@ -29,6 +29,12 @@ Scenarios, for checking a screen against what a board does:
   WARM_UP=30      the amplifier reads warming_up, with warming_up_until this
       many seconds after start, as groove-rig does after a power_on it sent:
       the remote's warm-up countdown. Past it, /rig/status reads on.
+  SETUP=new       a board just set up: no enricher is on (/status has no
+      enricher_chain) and no recognition provider has credentials, as
+      groove-catalog and groove-identity answer before anything is configured.
+      Home's "Finish Setting Up" card asks for both.
+  SETUP=enriched  the enrichers are done, the recognition provider is not: the
+      card offers only the optional step, with Not Now.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
 
@@ -40,6 +46,7 @@ from urllib.parse import urlparse, parse_qs
 EDITION_QUESTION_OPEN = os.environ.get("MOCK_EDITION_QUESTION") == "1"
 RIG_URL = os.environ.get("RIG_URL", "").rstrip("/")
 WARM_UP = float(os.environ.get("WARM_UP", "0"))
+SETUP = os.environ.get("SETUP", "")
 
 def png(r,g,b):
     w=h=160
@@ -114,6 +121,12 @@ def stylus_state():
         "remaining_hours":487.6,"wear_percent":39.05,"state":"healthy"}}
 
 def recognition_providers():
+    if SETUP:
+        # groove-identity before anything is configured: the built-ins listed, off.
+        return {"chain_mode":"first_success","min_confidence":0.6,"offline":False,"suspended":False,
+            "custom_providers":[],"builtins":{},
+            "chain":[{"id":"acrcloud","display_name":"ACRCloud","enabled":False,"configured":False},
+                {"id":"audd","display_name":"AudD","enabled":False,"configured":False}]}
     return {"chain_mode":"first_success","min_confidence":0.6,"offline":False,"suspended":False,
         "custom_providers":[],
         "chain":[{"id":"acrcloud","display_name":"ACRCloud","enabled":True,"configured":True},
@@ -328,6 +341,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 "artwork_url":"/catalog/artwork/tracks/100","media_format":"vinyl"},
                 "catalog_schema_version":7,"catalog_db_path":"/var/lib/groove-catalog/catalog.db",
                 "enricher_chain":["musicbrainz","discogs","itunes"]}
+            if SETUP=="new":
+                del status["enricher_chain"]  # groove-catalog omits it when empty
             if EDITION_QUESTION_OPEN:
                 status["edition_question"] = edition_question()
             return self._json(status)
@@ -375,6 +390,11 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._json({"items":[{"listener_epoch":6000+i,"started_at":"2026-07-12T17:0%d:00Z"%i,
                 "failure_reason":"no_match","suggested_track_id":100+i,"suggested_artist":ARTISTS[i%len(ARTISTS)][0],
                 "suggested_title":ARTISTS[i%len(ARTISTS)][2],"suggested_album":ARTISTS[i%len(ARTISTS)][1]} for i in range(n)],"total":n})
+        if path=="/enrich/providers" and SETUP=="new":
+            return self._json({"order":["musicbrainz","discogs","itunes"],"chain":[
+                {"id":"musicbrainz","display_name":"MusicBrainz","enabled":False,"configured":False},
+                {"id":"discogs","display_name":"Discogs","enabled":False,"configured":False},
+                {"id":"itunes","display_name":"iTunes Search","enabled":False,"configured":True}]})
         if path=="/enrich/providers":
             return self._json({"order":["musicbrainz","discogs","itunes"],"chain":[
                 {"id":"musicbrainz","display_name":"MusicBrainz","enabled":True,"configured":True},

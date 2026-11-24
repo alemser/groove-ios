@@ -34,7 +34,7 @@ struct RecognitionProvidersScreen: View {
                 content
             }
         }
-        .navigationTitle("Recognition Providers")
+        .navigationTitle(ScreenEntry.recognitionProviders.title)
         .navigationBarTitleDisplayMode(.inline)
         .grooveScreenBackground()
         .task { model.configure(settings, messages: messages) }

@@ -10,6 +10,7 @@ final class AppSettings {
     private static let portKey = "catalog.port"
     private static let schemeKey = "catalog.scheme"
     private static let deviceNameKey = "catalog.deviceName"
+    private static let recognitionSetupPutOffKey = "recognitionSetupPutOff"
 
     var host: String {
         didSet { defaults.set(host, forKey: Self.hostKey) }
@@ -27,12 +28,18 @@ final class AppSettings {
         didSet { defaults.set(deviceName, forKey: Self.deviceNameKey) }
     }
 
+    /// "Not Now" on Home's setup card: stop asking for a recognition provider.
+    var recognitionSetupPutOff: Bool {
+        didSet { defaults.set(recognitionSetupPutOff, forKey: Self.recognitionSetupPutOffKey) }
+    }
+
     init() {
         host = defaults.string(forKey: Self.hostKey) ?? ""
         let storedPort = defaults.integer(forKey: Self.portKey)
         port = storedPort == 0 ? 7073 : storedPort
         scheme = defaults.string(forKey: Self.schemeKey) ?? "http"
         deviceName = defaults.string(forKey: Self.deviceNameKey) ?? ""
+        recognitionSetupPutOff = defaults.bool(forKey: Self.recognitionSetupPutOffKey)
     }
 
     /// True once a host has been entered — gates the app onto the setup screen.

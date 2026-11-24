@@ -81,15 +81,7 @@ struct AmplifierEquipmentTab: View {
     }
 
     private func row(_ item: RigEquipmentItem) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon(for: item))
-                .foregroundStyle(Brand.teal)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.label).foregroundStyle(Brand.text)
-                Text(subtitle(item)).font(.caption).foregroundStyle(Brand.muted)
-            }
-        }
+        IconRow(title: item.label, subtitle: subtitle(item), icon: icon(for: item), tint: Brand.teal)
     }
 
     private func icon(for item: RigEquipmentItem) -> String {

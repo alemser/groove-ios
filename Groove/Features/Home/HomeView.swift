@@ -25,6 +25,9 @@ struct HomeView: View {
                 if let error = nowPlaying.errorMessage {
                     connectionIssueSection(error)
                 }
+                if let checklist = setupChecklist {
+                    setupSection(checklist)
+                }
                 nowPlayingSection
                 if attention.offline {
                     sessionSection
@@ -60,6 +63,8 @@ struct HomeView: View {
         .task { equipmentModel.configure(settings, messages: messages) }
         .task { await loadStylusState() }
         .task { await retryRemoteWhileMissing() }
+        // Back from Recognition Providers, the setup card reads the new choice at once.
+        .onAppear { Task { await attention.refresh() } }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await reloadRemote() }
@@ -108,6 +113,59 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Finish setting up
+
+    /// What's left to set up after connecting; nil once it's done or the optional rest is put off.
+    private var setupChecklist: SetupChecklist? {
+        guard let checklist = SetupChecklist.of(status: nowPlaying.status, recognitionChosen: attention.recognitionChosen),
+              checklist.isShown(recognitionPutOff: settings.recognitionSetupPutOff) else { return nil }
+        return checklist
+    }
+
+    private func setupSection(_ checklist: SetupChecklist) -> some View {
+        Section {
+            NavigationLink {
+                EnricherSettingsView()
+            } label: {
+                setupStep(
+                    .metadataEnrichers,
+                    toDo: "Required: finds each record's album, artwork and tracklist",
+                    done: checklist.enrichersReady
+                )
+            }
+            NavigationLink {
+                RecognitionProvidersScreen()
+            } label: {
+                setupStep(
+                    .recognitionProviders,
+                    toDo: "Optional: names records Oceano hasn't learned yet",
+                    done: checklist.recognitionChosen
+                )
+            }
+        } header: {
+            Text("Finish Setting Up")
+        } footer: {
+            if checklist.canPutOff {
+                HStack {
+                    Spacer()
+                    Button("Not Now") { settings.recognitionSetupPutOff = true }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Brand.muted)
+                }
+            }
+        }
+    }
+
+    /// One setup step: what it's for while it's to do, a check once done. Either way it opens its screen.
+    private func setupStep(_ entry: ScreenEntry, toDo: String, done: Bool) -> some View {
+        IconRow(
+            title: entry.title,
+            subtitle: done ? "Done" : toDo,
+            icon: done ? "checkmark.circle.fill" : entry.icon,
+            tint: done ? Brand.ok : entry.tint
+        )
     }
 
     // MARK: - Recognition pause
@@ -177,16 +235,12 @@ struct HomeView: View {
             NavigationLink {
                 CatalogSessionView()
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "waveform.circle")
-                        .foregroundStyle(Brand.teal)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Catalog Session").foregroundStyle(Brand.text)
-                        Text("Live view of this listening sitting").font(.caption).foregroundStyle(Brand.muted)
-                    }
-                    Spacer()
-                }
+                IconRow(
+                    title: "Catalog Session",
+                    subtitle: "Live view of this listening sitting",
+                    icon: "waveform.circle",
+                    tint: Brand.teal
+                )
             }
             .accessibilityHint("Opens the live catalog session dashboard")
         }
@@ -200,13 +254,7 @@ struct HomeView: View {
                 showRemoteSheet = true
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "appletvremote.gen4")
-                        .foregroundStyle(Brand.accent)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Remote Control").foregroundStyle(Brand.text)
-                        Text("Power, input, volume, and IR devices").font(.caption).foregroundStyle(Brand.muted)
-                    }
+                    IconRow(title: "Remote Control", subtitle: "Power, input, volume, and IR devices", icon: "appletvremote.gen4")
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
@@ -225,19 +273,14 @@ struct HomeView: View {
             NavigationLink {
                 StylusView()
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "gauge.with.dots.needle.33percent")
-                        .foregroundStyle(Brand.gold)
-                        .frame(width: 24)
-                    if let profile = stylusState?.profile {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(profile.brand) \(profile.model)").foregroundStyle(Brand.text)
-                            Text("\(Int((stylusState?.metrics.wearPercent ?? 0).rounded()))% worn")
-                                .font(.caption)
-                                .foregroundStyle(attention.rigAttentionCount > 0 ? Brand.warn : Brand.muted)
-                        }
-                    }
-                    Spacer()
+                if let profile = stylusState?.profile {
+                    IconRow(
+                        title: "\(profile.brand) \(profile.model)",
+                        subtitle: "\(Int((stylusState?.metrics.wearPercent ?? 0).rounded()))% worn",
+                        icon: "gauge.with.dots.needle.33percent",
+                        tint: Brand.gold,
+                        subtitleColor: attention.rigAttentionCount > 0 ? Brand.warn : Brand.muted
+                    )
                 }
             }
             .accessibilityHint("Opens stylus tracking")
@@ -286,13 +329,7 @@ struct HomeView: View {
     private func quickLink(title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .foregroundStyle(Brand.accent)
-                    .frame(width: 24)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).foregroundStyle(Brand.text)
-                    Text(subtitle).font(.caption).foregroundStyle(Brand.muted)
-                }
+                IconRow(title: title, subtitle: subtitle, icon: icon)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))

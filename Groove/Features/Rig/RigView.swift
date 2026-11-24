@@ -27,7 +27,7 @@ struct RigView: View {
                     NavigationLink {
                         StylusView()
                     } label: {
-                        hardwareRow(
+                        IconRow(
                             title: "Stylus Tracking",
                             subtitle: stylusStatusText ?? "Loading…",
                             icon: "gauge.with.dots.needle.33percent",
@@ -37,7 +37,7 @@ struct RigView: View {
                     NavigationLink {
                         AudioInputView()
                     } label: {
-                        hardwareRow(
+                        IconRow(
                             title: "Audio Input",
                             subtitle: audioInputStatusText ?? "Loading…",
                             icon: "waveform",
@@ -56,7 +56,7 @@ struct RigView: View {
                         NavigationLink {
                             AmplifierView()
                         } label: {
-                            hardwareRow(
+                            IconRow(
                                 title: "Amplifier",
                                 subtitle: ampStatusText ?? "Loading…",
                                 icon: "hifispeaker.and.homepod",
@@ -66,7 +66,7 @@ struct RigView: View {
                         NavigationLink {
                             IRBridgeView()
                         } label: {
-                            hardwareRow(
+                            IconRow(
                                 title: "IR Bridge",
                                 subtitle: bridgeStatusText ?? "Loading…",
                                 icon: "dot.radiowaves.left.and.right",
@@ -85,7 +85,7 @@ struct RigView: View {
                         NavigationLink {
                             RulesView()
                         } label: {
-                            hardwareRow(
+                            IconRow(
                                 title: "Rules",
                                 subtitle: rulesStatusText ?? "Loading…",
                                 icon: "wand.and.stars",
@@ -104,18 +104,6 @@ struct RigView: View {
         .task { await loadStylusStatus() }
         .task { await loadRig() }
         .task { await loadAudioInputStatus() }
-    }
-
-    private func hardwareRow(title: String, subtitle: String, icon: String, tint: Color) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).foregroundStyle(Brand.text)
-                Text(subtitle).font(.caption).foregroundStyle(Brand.muted)
-            }
-        }
     }
 
     private func loadStylusStatus() async {

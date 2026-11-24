@@ -80,7 +80,7 @@ struct EnricherSettingsView: View {
                 content
             }
         }
-        .navigationTitle("Metadata Enrichers")
+        .navigationTitle(ScreenEntry.metadataEnrichers.title)
         .navigationBarTitleDisplayMode(.inline)
         .grooveScreenBackground()
         .task { model.configure(settings, messages: messages) }

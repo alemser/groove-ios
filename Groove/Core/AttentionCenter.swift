@@ -21,6 +21,8 @@ final class AttentionCenter {
     /// Mirrors `RecognitionProvidersState.suspended` — backs the quick-access
     /// "pause recognition" toggle on Home, same reasoning as `offline`.
     private(set) var suspended = false
+    /// Mirrors `RecognitionProvidersState.recognitionChosen` for Home's setup card; nil until it loads.
+    private(set) var recognitionChosen: Bool?
 
     private var poller: Poller?
     private var settings: AppSettings?
@@ -46,7 +48,7 @@ final class AttentionCenter {
 
     func refresh() async {
         guard let settings, settings.isConfigured else {
-            count = 0; rigAttentionCount = 0; offline = false; suspended = false
+            count = 0; rigAttentionCount = 0; offline = false; suspended = false; recognitionChosen = nil
             return
         }
         let service = CatalogService(settings: settings)
@@ -67,6 +69,7 @@ final class AttentionCenter {
         if let recognition = try? await service.recognitionProviders() {
             offline = recognition.offline
             suspended = recognition.suspended
+            recognitionChosen = recognition.recognitionChosen
         }
         await refreshRigAttention(service)
     }

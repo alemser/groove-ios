@@ -57,6 +57,9 @@ struct RecognitionProvidersState: Decodable {
         builtins = try c.decode([String: BuiltinProviderView].self, forKey: .builtins)
         customProviders = try c.decode([CustomProviderConfig].self, forKey: .customProviders)
     }
+
+    /// Offline Mode, or a provider that is on and has its credentials: Home's setup card stops asking.
+    var recognitionChosen: Bool { offline || chain.contains { $0.enabled && $0.configured } }
 }
 
 struct ProviderEnabledRequest: Encodable {

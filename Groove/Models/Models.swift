@@ -685,6 +685,32 @@ struct EnricherSlot: Decodable, Identifiable, Hashable {
     var params: [String: String]?
 }
 
+// MARK: - Home's "Finish Setting Up" card
+
+/// What Home still asks for after connecting. An enricher is required: without one, nothing Oceano
+/// identifies gets its album, artwork or tracklist. A recognition provider is optional, and turning
+/// Offline Mode on is as much a choice as setting one up.
+struct SetupChecklist: Equatable {
+    var enrichersReady: Bool
+    var recognitionChosen: Bool
+
+    /// Only the optional step can be put off, and only once the required one is done.
+    var canPutOff: Bool { enrichersReady && !recognitionChosen }
+
+    func isShown(recognitionPutOff: Bool) -> Bool { !enrichersReady || (canPutOff && !recognitionPutOff) }
+
+    /// Nil until `/status` answers, so a card never flashes on a guess. `enricher_chain` is the
+    /// catalog's own list of enrichers that are on and have what they need; it's absent when empty.
+    /// An unknown `recognitionChosen` (that fetch failed) asks for nothing.
+    static func of(status: CatalogStatus?, recognitionChosen: Bool?) -> SetupChecklist? {
+        guard let status else { return nil }
+        return SetupChecklist(
+            enrichersReady: !(status.enricherChain ?? []).isEmpty,
+            recognitionChosen: recognitionChosen ?? true
+        )
+    }
+}
+
 // MARK: - Small helpers
 
 extension String {
