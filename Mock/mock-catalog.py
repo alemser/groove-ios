@@ -17,8 +17,20 @@ dismissing closes it.
 RIG_URL=http://127.0.0.1:7099 sends /rig/* (but /rig/capture/*) to a groove-rig
 running there instead of the canned rig answers, as groove-catalog does: a
 local groove-rig with a fake DeviceLink bridge shows the DeviceLink screens.
+
+Scenarios, for checking a screen against what a board does:
+  FAIL_PREFIX=/rig/,/enrich/providers/   every write (POST/PUT/PATCH/DELETE) whose
+      path starts with one of these answers 502 {"error": "..."}: the apps'
+      failed-action messages, with their Retry.
+  IDLE=1          nothing is playing and no album waits to be added: the
+      Library grid starts with a release card.
+  ASSOC_AFTER=20  the pending associations appear only this many seconds after
+      start: a banner that arrives after the grid loaded.
+  MOCK_LOG=1      prints each request, with the seconds since start.
 """
 
+import time
+START = time.time()
 import json, os, struct, zlib, http.server, socketserver, re
 from urllib.parse import urlparse, parse_qs
 
@@ -98,7 +110,8 @@ def stylus_state():
         "remaining_hours":487.6,"wear_percent":39.05,"state":"healthy"}}
 
 def recognition_providers():
-    return {"chain_mode":"sequential",
+    return {"chain_mode":"first_success","min_confidence":0.6,"offline":False,"suspended":False,
+        "custom_providers":[],
         "chain":[{"id":"acrcloud","display_name":"ACRCloud","enabled":True,"configured":True},
             {"id":"audd","display_name":"AudD","enabled":True,"configured":False},
             {"id":"local_index","display_name":"Local Index","enabled":True,"configured":True}],
@@ -218,6 +231,41 @@ def suggestion_view(sg,alts=5):
 def pending_suggestions(alts=5):
     return [suggestion_view(sg,alts) for sg in SUGGESTIONS.values() if sg["status"]=="pending"]
 
+if os.environ.get("IDLE") == "1":
+    SUGGESTIONS.clear()
+
+ASSOC_AFTER = float(os.environ.get("ASSOC_AFTER", "0"))
+FAIL_PREFIXES = [p for p in os.environ.get("FAIL_PREFIX", "").split(",") if p]
+
+
+def identify_search():
+    """Two editions of each album, as a release search finds them. Like groove-catalog,
+    only the first hit carries a tracklist: the others are looked up through prefill."""
+    hits = []
+    for i, (artist, album, title, _) in enumerate(ARTISTS):
+        for k, (fmt, country) in enumerate((("vinyl", "GB"), ("cd", "DE"))):
+            hit = {"source": ["musicbrainz", "discogs"][k], "artist": artist, "title": title, "album": album,
+                "recording_id": "rec-%d" % i, "release_id": "rel-%d-%s" % (i, fmt), "release_format": fmt,
+                "release_date": "19%d-01-01" % (80 + i), "country": country, "label": "Mock Records",
+                "artwork_url": "/catalog/artwork/tracks/%d" % (100 + i)}
+            if not hits:
+                hit["tracklist"] = [{"ordinal": t + 1, "position": "A%d" % (t + 1), "title": "Track %d" % (t + 1),
+                    "duration_ms": 200000 + t * 9000} for t in range(8)]
+            hits.append(hit)
+    return {"items": hits}
+
+
+def prefill(hit):
+    """The edition a hit names, with its tracklist. Alternate releases have a track with no
+    time, as many providers' editions do; the second it takes is a provider's lookup."""
+    time.sleep(1)
+    timed = sum(map(ord, hit.get("release_id") or "")) % 2 == 0
+    tracklist = [{"ordinal": t + 1, "position": "A%d" % (t + 1), "title": "Track %d" % (t + 1),
+        "duration_ms": 200000 if timed or t < 3 else None} for t in range(6)]
+    return {"release": {"id": 0, "job_id": 0, "status": "", "artist": hit.get("artist"), "album": hit.get("album"),
+        "release_format": hit.get("release_format"), "country": hit.get("country"), "tracklist": tracklist}}
+
+
 class H(http.server.BaseHTTPRequestHandler):
     def _rig_proxied(self):
         """Forwards a /rig/* request to RIG_URL when set; True when it did."""
@@ -240,7 +288,15 @@ class H(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
         return True
 
-    def log_message(self,*a): pass
+    def log_message(self,fmt,*a):
+        if os.environ.get("MOCK_LOG") == "1": print("%.1f" % (time.time() - START), fmt % a, flush=True)
+
+    def _failing(self):
+        """FAIL_PREFIX: a write the scenario makes fail, as a board that didn't answer."""
+        if any(self.path.startswith(p) for p in FAIL_PREFIXES):
+            self._json({"error": "the board did not answer in time"}, 502)
+            return True
+        return False
     def _json(self,obj,code=200):
         b=json.dumps(obj).encode(); self.send_response(code)
         self.send_header("Content-Type","application/json"); self.send_header("Content-Length",str(len(b)))
@@ -254,7 +310,7 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","image/png"); self.send_header("Content-Length",str(len(b)))
             self.end_headers(); self.wfile.write(b); return
         if path=="/status":
-            status = {"playback":{"active":True,"epoch":5001,"track_id":100,
+            status = {"playback":{"active":os.environ.get("IDLE") != "1","epoch":5001,"track_id":100,
                 "artist":"Midnight Oil","title":"The Dead Heart","album":"Diesel and Dust",
                 "source":"acrcloud","position_ms":74000,"duration_ms":275000,"confidence":0.95,
                 "artwork_url":"/catalog/artwork/tracks/100","media_format":"vinyl"},
@@ -298,10 +354,15 @@ class H(http.server.BaseHTTPRequestHandler):
                 "tracklist":[{"position":"A%d"%(t+1),"ordinal":t+1,"title":"Track %d"%(t+1),"duration_ms":200000+t*9000} for t in range(8)]} for k in range(2)]
             return self._json({"job":{"id":700+i,"listener_epoch":5000+i,"artist":ARTISTS[i%len(ARTISTS)][0],
                 "title":ARTISTS[i%len(ARTISTS)][2],"album":ARTISTS[i%len(ARTISTS)][1],"status":"complete","isrc":"GBAAA0000010"},"releases":rels})
+        if path=="/catalog/identify/search":
+            return self._json(identify_search())
+        if path=="/catalog/tracks/pending-release":
+            return self._json({"items":[]})
         if path=="/catalog/plays/pending-association":
+            n = 3 if time.time() - START >= ASSOC_AFTER else 0
             return self._json({"items":[{"listener_epoch":6000+i,"started_at":"2026-07-12T17:0%d:00Z"%i,
                 "failure_reason":"no_match","suggested_track_id":100+i,"suggested_artist":ARTISTS[i%len(ARTISTS)][0],
-                "suggested_title":ARTISTS[i%len(ARTISTS)][2],"suggested_album":ARTISTS[i%len(ARTISTS)][1]} for i in range(3)],"total":3})
+                "suggested_title":ARTISTS[i%len(ARTISTS)][2],"suggested_album":ARTISTS[i%len(ARTISTS)][1]} for i in range(n)],"total":n})
         if path=="/enrich/providers":
             return self._json({"order":["musicbrainz","discogs","itunes"],"chain":[
                 {"id":"musicbrainz","display_name":"MusicBrainz","enabled":True,"configured":True},
@@ -325,9 +386,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 "backend":"broadlink","target_id":"cd_player","action":"stop"})
         self._json({"error":"not found"},404)
     def do_POST(self):
+        if self._failing(): return
         if self._rig_proxied(): return
         global EDITION_QUESTION_OPEN
         if self.path=="/catalog/stylus/replace": return self._json(stylus_state())
+        if self.path=="/catalog/user-releases/prefill-from-search": return self._json(prefill(self._body()))
         if self.path in ("/identity/album-programme/choose-edition", "/identity/album-programme/dismiss-edition-question"):
             EDITION_QUESTION_OPEN = False
             self.send_response(204); self.end_headers(); return
@@ -370,6 +433,7 @@ class H(http.server.BaseHTTPRequestHandler):
         n=int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}")
     def do_PUT(self):
+        if self._failing(): return
         if self._rig_proxied(): return
         if self.path=="/catalog/stylus": return self._json(stylus_state())
         if self.path=="/rig/capture/input-level":
@@ -392,11 +456,13 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._json(recognition_providers())
         self._json({"ok":True})
     def do_PATCH(self):
+        if self._failing(): return
         if self._rig_proxied(): return
         if self.path.startswith("/identity/recognition/providers/"):
             return self._json(recognition_providers())
         self._json(track(0))
     def do_DELETE(self):
+        if self._failing(): return
         if self._rig_proxied(): return
         self._json({"ok":True})
 
