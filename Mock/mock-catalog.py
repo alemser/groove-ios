@@ -26,6 +26,9 @@ Scenarios, for checking a screen against what a board does:
       Library grid starts with a release card.
   ASSOC_AFTER=20  the pending associations appear only this many seconds after
       start: a banner that arrives after the grid loaded.
+  WARM_UP=30      the amplifier reads warming_up, with warming_up_until this
+      many seconds after start, as groove-rig does after a power_on it sent:
+      the remote's warm-up countdown. Past it, /rig/status reads on.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
 
@@ -36,6 +39,7 @@ from urllib.parse import urlparse, parse_qs
 
 EDITION_QUESTION_OPEN = os.environ.get("MOCK_EDITION_QUESTION") == "1"
 RIG_URL = os.environ.get("RIG_URL", "").rstrip("/")
+WARM_UP = float(os.environ.get("WARM_UP", "0"))
 
 def png(r,g,b):
     w=h=160
@@ -142,7 +146,15 @@ def rig_status():
             "inputs":[{"id":"phono","label":"Phono","visible":True},
                 {"id":"cd","label":"CD","visible":True},
                 {"id":"airplay","label":"AirPlay","visible":True}],
-            "power":{"state":"on","confidence":"high","method":"vu_probe"}}}
+            "power":rig_power()}}
+
+def rig_power():
+    """The amplifier's power: warming up until WARM_UP seconds after start, then on."""
+    warm_until = START + WARM_UP
+    if time.time() < warm_until:
+        until = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(warm_until))
+        return {"state":"warming_up","confidence":"high","method":"command_inference","warming_up_until":until}
+    return {"state":"on","confidence":"high","method":"vu_probe"}
 
 def stylus_catalog():
     return {"items":[

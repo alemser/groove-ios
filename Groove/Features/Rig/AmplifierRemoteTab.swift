@@ -113,28 +113,28 @@ struct AmplifierRemoteTab: View {
                     .foregroundStyle(Brand.muted)
                     .tracking(0.5)
             }
-            HStack(spacing: 5) {
-                Circle().fill(powerColor).frame(width: 6, height: 6)
-                Text(powerLabel).font(.caption2).foregroundStyle(Brand.muted)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let power = shownPower(at: context.date)
+                HStack(spacing: 5) {
+                    Circle().fill(powerColor(power.state)).frame(width: 6, height: 6)
+                    Text(power.label).font(.caption2).foregroundStyle(Brand.muted)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The amp's own reading when it has a state provider; otherwise the
-    /// rig's inference from REC OUT level and its own IR history.
-    private var powerState: String {
-        stateModel.powerState ?? model.amplifier?.power?.state ?? RigPowerState.unknown
-    }
-    /// "Warming Up · 19 s" while the amp counts its warm-up down.
-    private var powerLabel: String {
-        guard powerState == RigPowerState.warmingUp, let left = stateModel.warmupS else { return powerState.idWords }
-        return "\(powerState.idWords) · \(Int(left.rounded(.up))) s"
+    /// The power shown; see `ShownPower.of`. Callers tick it each second so a
+    /// warm-up counts down.
+    private func shownPower(at now: Date) -> ShownPower {
+        ShownPower.of(status: model.amplifier?.power, reading: stateModel.reading, now: now)
     }
 
-    private var powerColor: Color {
-        switch powerState {
-        case RigPowerState.on, RigPowerState.warmingUp: return Brand.ok
+    /// Warming up is gold, not the green of on: the amp isn't ready to play yet.
+    private func powerColor(_ state: String) -> Color {
+        switch state {
+        case RigPowerState.on: return Brand.ok
+        case RigPowerState.warmingUp: return Brand.gold
         case RigPowerState.standby: return Brand.warn
         default: return Brand.muted
         }
@@ -154,14 +154,21 @@ struct AmplifierRemoteTab: View {
     private var powerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Power")
-            stateButton("Power", systemImage: "power", isActive: isOn, iconOnly: true) { Task { await model.togglePower() } }
-                .accessibilityLabel("Power")
+            powerButton
         }
         .padding(14)
         .grooveCard()
     }
 
-    private var isOn: Bool { RigPowerState.isOn(powerState) }
+    private var powerButton: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let state = shownPower(at: context.date).state
+            stateButton("Power", systemImage: "power", isActive: RigPowerState.isOn(state), tint: powerColor(state)) {
+                Task { await model.togglePower() }
+            }
+                .accessibilityLabel("Power")
+        }
+    }
 
     // MARK: - Input
 
@@ -327,8 +334,7 @@ struct AmplifierRemoteTab: View {
         switch c.widget {
         case "power":
             if c.target == "amplifier" {
-                stateButton("Power", systemImage: "power", isActive: isOn, iconOnly: true) { Task { await model.togglePower() } }
-                    .accessibilityLabel("Power")
+                powerButton
             } else {
                 remoteButton(c.label, icon: "power") {
                     if let action = resolvedPower(c.target) {
@@ -485,33 +491,26 @@ struct AmplifierRemoteTab: View {
 
     // MARK: - Buttons
 
+    /// Lit in the power colour while the amp is on or warming up.
     private func stateButton(
         _ title: String,
         systemImage: String,
         isActive: Bool,
-        iconOnly: Bool = false,
+        tint: Color,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Group {
-                if iconOnly {
-                    Label(title, systemImage: systemImage)
-                        .labelStyle(.iconOnly)
-                        .font(.title3.weight(.semibold))
-                } else {
-                    Label(title, systemImage: systemImage)
-                        .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 46)
-                .background(isActive ? Brand.ok.opacity(0.15) : Brand.cardElevated)
-                .foregroundStyle(isActive ? Brand.ok : Brand.text)
+            Label(title, systemImage: systemImage)
+                .labelStyle(.iconOnly)
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(isActive ? tint.opacity(0.15) : Brand.cardElevated)
+                .foregroundStyle(isActive ? tint : Brand.text)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(isActive ? Brand.ok.opacity(0.35) : .clear, lineWidth: 1)
+                        .strokeBorder(isActive ? tint.opacity(0.35) : .clear, lineWidth: 1)
                 )
         }
         .buttonStyle(ScaleButtonStyle())

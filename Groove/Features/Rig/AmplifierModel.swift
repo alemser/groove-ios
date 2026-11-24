@@ -1,6 +1,48 @@
 import SwiftUI
 import Observation
 
+/// Whole seconds from `now` to `until`, rounded up, so a countdown reads 1
+/// until it ends; 0 or less once past.
+private func secondsUntil(_ until: Date, from now: Date) -> Int {
+    Int(until.timeIntervalSince(now).rounded(.up))
+}
+
+/// The amplifier's power as the remote shows it; `secondsLeft` is the
+/// warm-up still to go, when known.
+struct ShownPower: Equatable {
+    var state: String
+    var secondsLeft: Int?
+
+    /// "Warming Up · 0:12" while the countdown is known, else the state alone.
+    var label: String {
+        guard let secondsLeft else { return state.idWords }
+        return "\(state.idWords) · \(Format.duration(Int64(secondsLeft) * 1000))"
+    }
+
+    /// The amp's own reading wins for on vs. standby. A warm-up wins over its
+    /// "on": the provider's own countdown (`warmup_s`) when it reports one,
+    /// else the rig's `warming_up` while `warming_up_until` is ahead. The rig
+    /// leaves `warming_up_until` empty when the provider reports the warm-up
+    /// itself, so then a reading that isn't warming up reads as on. Once
+    /// `warming_up_until` has passed the snapshot is stale: the amp is warm.
+    static func of(status: RigPowerStatus?, reading: RigAmplifierReading?, now: Date) -> ShownPower {
+        let own = reading?.powerState
+        if own == RigPowerState.warmingUp {
+            return ShownPower(state: RigPowerState.warmingUp, secondsLeft: reading?.warmupS.map { Int($0.rounded(.up)) })
+        }
+        if own != RigPowerState.standby, status?.state == RigPowerState.warmingUp {
+            let until = Format.date(status?.warmingUpUntil)
+            if until == nil, own == nil { return ShownPower(state: RigPowerState.warmingUp) }
+            if let until {
+                let left = secondsUntil(until, from: now)
+                if left > 0 { return ShownPower(state: RigPowerState.warmingUp, secondsLeft: left) }
+            }
+        }
+        let rig = status.map { $0.state == RigPowerState.warmingUp ? RigPowerState.on : $0.state }
+        return ShownPower(state: own ?? rig ?? RigPowerState.unknown)
+    }
+}
+
 @MainActor
 @Observable
 final class AmplifierModel {
@@ -170,17 +212,10 @@ final class AmplifierModel {
     /// Bass/treble mode currently active on the amp, and seconds left —
     /// while it lasts, Volume ± is held by groove-rig.
     func activeTone(at now: Date) -> (control: String, seconds: Int)? {
-        guard let t = amplifier?.tone, let control = t.active, let until = t.activeUntil,
-              let date = Self.rfc3339.date(from: until) ?? ISO8601DateFormatter().date(from: until) else { return nil }
-        let left = date.timeIntervalSince(now)
-        return left > 0 ? (control, Int(left.rounded(.up))) : nil
+        guard let t = amplifier?.tone, let control = t.active, let date = Format.date(t.activeUntil) else { return nil }
+        let left = secondsUntil(date, from: now)
+        return left > 0 ? (control, left) : nil
     }
-
-    private static let rfc3339: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
 
     func nextInput() async {
         guard let settings else { return }

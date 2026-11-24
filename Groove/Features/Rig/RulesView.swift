@@ -176,9 +176,7 @@ struct RulesView: View {
 
     /// Time only for today, date and time otherwise.
     private static func formatTime(_ iso: String) -> String {
-        let parser = ISO8601DateFormatter()
-        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else { return iso }
+        guard let date = Format.date(iso) else { return iso }
         return Calendar.current.isDateInToday(date)
             ? date.formatted(date: .omitted, time: .shortened)
             : date.formatted(date: .abbreviated, time: .shortened)
