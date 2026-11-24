@@ -7,6 +7,7 @@ import SwiftUI
 /// trusted, never a numeric card index across a reboot.
 struct StreamingView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = StreamingModel()
 
     var body: some View {
@@ -41,7 +42,7 @@ struct StreamingView: View {
         .navigationTitle("Streaming")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            model.configure(settings)
+            model.configure(settings, messages: messages)
             await model.load()
         }
         .refreshable { await model.load() }
@@ -81,7 +82,8 @@ struct StreamingView: View {
                 }
             }
             .disabled(!model.available || model.isChanging)
-            if let error = model.changeErrors[extra.name] ?? extra.error {
+            // The board's own word on this extra, such as an install that failed: it stays with its row.
+            if let error = extra.error {
                 Text(error).font(.caption).foregroundStyle(Brand.err)
             }
         }
@@ -152,12 +154,12 @@ final class StreamingModel {
     var selectedOutput: String?
     var isLoading = true
     var loadError: String?
-    /// A switch change the board refused to start, per extra.
-    var changeErrors: [StreamingExtraName: String] = [:]
+    /// The output list didn't load: that section's own fetch.
     var outputError: String?
     var selectingID: String?
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
     /// Between reads while a change runs on the board. Chosen: an AirPlay
     /// switch takes a second or two and a first Bluetooth install a minute
@@ -168,8 +170,11 @@ final class StreamingModel {
     /// The board runs one change at a time.
     var isChanging: Bool { extras.contains { $0.pending != nil } }
 
-    func configure(_ settings: AppSettings) {
-        if self.settings == nil { self.settings = settings }
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
+        if self.settings == nil {
+            self.settings = settings
+            self.messages = messages
+        }
     }
 
     func load() async {
@@ -189,28 +194,21 @@ final class StreamingModel {
     }
 
     func set(_ name: StreamingExtraName, enabled: Bool) async {
-        guard let settings else { return }
-        changeErrors[name] = nil
-        do {
-            apply(try await CatalogService(settings: settings).setStreamingExtra(name, enabled: enabled))
-        } catch {
-            changeErrors[name] = error.localizedForDisplay
-            return
-        }
-        await followChange()
+        guard let settings, let messages else { return }
+        let started = await messages.attempt {
+            self.apply(try await CatalogService(settings: settings).setStreamingExtra(name, enabled: enabled))
+        } != nil
+        if started { await followChange() }
     }
 
     func select(_ output: RigAudioOutput) async {
-        guard let settings else { return }
+        guard let settings, let messages else { return }
         selectingID = output.id
         defer { selectingID = nil }
-        do {
+        await messages.attempt {
             let response = try await CatalogService(settings: settings).rigSelectAudioOutput(device: output.id)
-            outputs = response.outputs
-            selectedOutput = response.selected.nonEmpty
-            outputError = nil
-        } catch {
-            outputError = error.localizedForDisplay
+            self.outputs = response.outputs
+            self.selectedOutput = response.selected.nonEmpty
         }
     }
 

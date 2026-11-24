@@ -17,7 +17,6 @@ struct RigView: View {
     @State private var rulesStatusText: String?
     /// The "Rig" switch; nil until loaded.
     @State private var rigEnabled: Bool?
-    @State private var rigSwitchError: String?
     @State private var deviceLink = DeviceLinkModel()
 
     var body: some View {
@@ -76,8 +75,8 @@ struct RigView: View {
                         }
                     }
                 } footer: {
-                    Text(rigSwitchError ?? "Your amplifier, the equipment around it, and the IR bridge that lets Oceano control them. Off, Oceano still recognises what plays, shows it and streams.")
-                        .foregroundStyle(rigSwitchError == nil ? Brand.muted : Brand.err)
+                    Text("Your amplifier, the equipment around it, and the IR bridge that lets Oceano control them. Off, Oceano still recognises what plays, shows it and streams.")
+                        .foregroundStyle(Brand.muted)
                 }
 
                 if rigEnabled == true {
@@ -153,14 +152,12 @@ struct RigView: View {
     private func setRig(_ on: Bool) async {
         let previous = rigEnabled
         rigEnabled = on
-        do {
-            try await CatalogService(settings: settings).rigSetControl(enabled: on)
-            rigSwitchError = nil
-            await loadRig()
-        } catch {
+        let service = CatalogService(settings: settings)
+        guard await messages.attempt({ try await service.rigSetControl(enabled: on) }) != nil else {
             rigEnabled = previous
-            rigSwitchError = error.localizedForDisplay
+            return
         }
+        await loadRig()
     }
 
     private func loadAmpStatus() async {

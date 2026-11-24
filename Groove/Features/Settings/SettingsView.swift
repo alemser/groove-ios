@@ -6,6 +6,7 @@ import SwiftUI
 /// everything else about how Oceano is wired up.
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
 
     @State private var streamingStatusText: String?
     @State private var showSwitchServer = false
@@ -13,7 +14,6 @@ struct SettingsView: View {
     @State private var pendingPower: PowerAction?
     @State private var isSendingPower = false
     @State private var powerStatus: String?
-    @State private var powerError: String?
 
     var body: some View {
         NavigationStack {
@@ -108,9 +108,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Device")
                 } footer: {
-                    if let powerError {
-                        Text(powerError).foregroundStyle(Brand.err)
-                    } else if let powerStatus {
+                    if let powerStatus {
                         Text(powerStatus).foregroundStyle(Brand.muted)
                     } else {
                         Text("After a shut down, Oceano stays off until its power is unplugged and plugged back in.")
@@ -180,18 +178,15 @@ struct SettingsView: View {
     private func sendPower(_ action: PowerAction) async {
         isSendingPower = true
         defer { isSendingPower = false }
-        powerError = nil
         powerStatus = nil
         let service = CatalogService(settings: settings)
-        do {
+        let sent = await messages.attempt {
             switch action {
             case .restart: try await service.rebootDevice()
             case .shutDown: try await service.powerOffDevice()
             }
-            powerStatus = action.sentStatus
-        } catch {
-            powerError = error.localizedForDisplay
-        }
+        } != nil
+        if sent { powerStatus = action.sentStatus }
     }
 
     private func row(title: String, subtitle: String, icon: String, tint: Color) -> some View {

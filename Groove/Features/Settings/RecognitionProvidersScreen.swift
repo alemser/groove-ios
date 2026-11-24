@@ -7,6 +7,7 @@ import SwiftUI
 /// fills in a confirmed track's metadata.
 struct RecognitionProvidersScreen: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = RecognitionProvidersModel()
     @State private var credentialsTarget: CredentialsTarget?
     @State private var customProviderTarget: CustomProviderTarget?
@@ -36,7 +37,7 @@ struct RecognitionProvidersScreen: View {
         .navigationTitle("Recognition Providers")
         .navigationBarTitleDisplayMode(.inline)
         .grooveScreenBackground()
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -152,11 +153,6 @@ struct RecognitionProvidersScreen: View {
                 usageSection(usage)
             }
 
-            if let error = model.actionError {
-                Section {
-                    Text(error).foregroundStyle(Brand.err)
-                }
-            }
         }
         .scrollContentBackground(.hidden)
     }

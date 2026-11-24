@@ -6,15 +6,16 @@ import Observation
 final class EnricherSettingsModel {
     var chain: [EnricherSlot] = []
     var phase: Phase = .loading
-    var actionError: String?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
 
     private var settings: AppSettings?
+    private var messages: MessageCenter?
 
-    func configure(_ settings: AppSettings) {
+    func configure(_ settings: AppSettings, messages: MessageCenter) {
         if self.settings == nil {
             self.settings = settings
+            self.messages = messages
             Task { await load() }
         }
     }
@@ -33,39 +34,26 @@ final class EnricherSettingsModel {
     }
 
     func setEnabled(id: String, enabled: Bool) async {
-        guard let settings else { return }
-        do {
-            try await CatalogService(settings: settings).setEnricherEnabled(id: id, enabled: enabled)
-            await load()
-        } catch {
-            actionError = error.localizedForDisplay
-            await load()
-        }
+        guard let settings, let messages else { return }
+        await messages.attempt { try await CatalogService(settings: settings).setEnricherEnabled(id: id, enabled: enabled) }
+        await load()
     }
 
     func reorder(_ order: [String]) async {
-        guard let settings else { return }
-        do {
-            chain = try await CatalogService(settings: settings).reorderEnrichers(order: order).chain
-            actionError = nil
-        } catch {
-            actionError = error.localizedForDisplay
-            await load()
-        }
+        guard let settings, let messages else { return }
+        let reordered = await messages.attempt {
+            self.chain = try await CatalogService(settings: settings).reorderEnrichers(order: order).chain
+        } != nil
+        if !reordered { await load() }
     }
 
     @discardableResult
     func saveCredentials(id: String, apiKey: String?, params: [String: String]?) async -> Bool {
-        guard let settings else { return false }
-        do {
-            chain = try await CatalogService(settings: settings).setEnricherCredentials(id: id, apiKey: apiKey, params: params).chain
+        guard let settings, let messages else { return false }
+        return await messages.attempt {
+            self.chain = try await CatalogService(settings: settings).setEnricherCredentials(id: id, apiKey: apiKey, params: params).chain
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            actionError = nil
-            return true
-        } catch {
-            actionError = error.localizedForDisplay
-            return false
-        }
+        } != nil
     }
 }
 
@@ -75,6 +63,7 @@ final class EnricherSettingsModel {
 /// already identified.
 struct EnricherSettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @State private var model = EnricherSettingsModel()
     @State private var credentialsTarget: CredentialsTarget?
 
@@ -94,7 +83,7 @@ struct EnricherSettingsView: View {
         .navigationTitle("Metadata Enrichers")
         .navigationBarTitleDisplayMode(.inline)
         .grooveScreenBackground()
-        .task { model.configure(settings) }
+        .task { model.configure(settings, messages: messages) }
         .toolbar { EditButton() }
         .sheet(item: $credentialsTarget) { target in
             EnricherCredentialsForm(providerID: target.id, model: model)
@@ -119,11 +108,6 @@ struct EnricherSettingsView: View {
                     .foregroundStyle(Brand.muted)
             }
 
-            if let error = model.actionError {
-                Section {
-                    Text(error).foregroundStyle(Brand.err)
-                }
-            }
         }
         .scrollContentBackground(.hidden)
     }

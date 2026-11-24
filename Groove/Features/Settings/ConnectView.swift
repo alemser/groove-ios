@@ -10,6 +10,7 @@ import SwiftUI
 /// first run with a single Oceano on the network connects on its own.
 struct ConnectView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MessageCenter.self) private var messages
     @Environment(\.dismiss) private var dismiss
 
     @State private var host = ""
@@ -46,12 +47,6 @@ struct ConnectView: View {
                     discoveredHosts
                 }
 
-                if case let .failed(message) = probe {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(Brand.err)
-                        .multilineTextAlignment(.center)
-                }
 
                 if showManualEntry || !discovery.hosts.isEmpty {
                     manualEntryToggle
@@ -286,7 +281,8 @@ struct ConnectView: View {
             dismiss()
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-            probe = .failed(error.localizedForDisplay)
+            probe = .idle
+            messages.error(error, retry: { await connect() })
         }
     }
 }
@@ -361,6 +357,6 @@ struct ConnectionFields: View {
 }
 
 enum ProbeState {
-    case idle, probing, failed(String)
+    case idle, probing
     var isProbing: Bool { if case .probing = self { return true }; return false }
 }

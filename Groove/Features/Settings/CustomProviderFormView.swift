@@ -41,7 +41,6 @@ struct CustomProviderFormView: View {
     @State private var analyzeMessage: String?
 
     @State private var isSaving = false
-    @State private var error: String?
     @State private var showDeleteConfirm = false
 
     private var isEditing: Bool { existing != nil }
@@ -61,9 +60,6 @@ struct CustomProviderFormView: View {
                 responseSection
                 sampleSection
 
-                if let error {
-                    Section { Text(error).foregroundStyle(Brand.err) }
-                }
 
                 if isEditing {
                     Section {
@@ -315,23 +311,23 @@ struct CustomProviderFormView: View {
 
     private func save() async {
         isSaving = true
-        error = nil
+        let saved: Bool
         let slug = id.trimmingCharacters(in: .whitespaces).lowercased()
         if isEditing {
             let cp = CustomProviderConfig(
                 id: slug, displayName: displayName.nonEmpty ?? slug, endpointUrl: endpointUrl,
                 auth: buildAuth(), request: buildRequest(), response: buildResponse()
             )
-            error = await model.updateCustomProvider(slug: slug, cp)
+            saved = await model.updateCustomProvider(slug: slug, cp)
         } else {
             let req = CustomProviderCreateRequest(
                 id: slug, displayName: displayName.nonEmpty ?? slug, endpointUrl: endpointUrl,
                 auth: buildAuth(), request: buildRequest(), response: buildResponse(), enabled: true
             )
-            error = await model.createCustomProvider(req)
+            saved = await model.createCustomProvider(req)
         }
         isSaving = false
-        if error == nil { dismiss() }
+        if saved { dismiss() }
     }
 
     private func analyze() async {
