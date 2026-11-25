@@ -35,6 +35,13 @@ Scenarios, for checking a screen against what a board does:
       Home's "Finish Setting Up" card asks for both.
   SETUP=enriched  the enrichers are done, the recognition provider is not: the
       card offers only the optional step, with Not Now.
+  UPDATES=unset   board updates (/system/updates, groove-updater's status as
+      groove-catalog forwards it): nobody answered "automatic or ask first"
+      yet, so the apps ask. Other values: available (ask first, a release with
+      a security fix waits for approval), installed (automatic, a release just
+      installed), rolled_back (the last install was rolled back), none (an
+      older catalog: 404), off (the updater is off: 503). Unset: ask first and
+      up to date. The preference, approval and check change the mock's state.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
 
@@ -262,6 +269,52 @@ if os.environ.get("IDLE") == "1":
 ASSOC_AFTER = float(os.environ.get("ASSOC_AFTER", "0"))
 FAIL_PREFIXES = [p for p in os.environ.get("FAIL_PREFIX", "").split(",") if p]
 
+UPDATES = os.environ.get("UPDATES", "")
+
+def update_status_initial():
+    s = {"preference": "ask_first", "phase": "idle",
+         "installed": {"release": "2026.12.1", "components": [{"name": "groove-catalog", "version": "a1b2c3d"}]},
+         "available": None, "approved_release": "",
+         "last_check": {"at": "2026-12-14T11:02:00Z", "error": ""}, "last_result": None}
+    if UPDATES == "unset":
+        s.update(preference="unset", last_check=None)
+    if UPDATES == "available":
+        s["available"] = {"release": "2026.12.2", "published_at": "2026-12-14T10:00:00Z",
+            "notes": "Fixes the screen staying dim after Bluetooth pauses.", "security": True,
+            "components": ["groove-display"]}
+    if UPDATES == "installed":
+        s["preference"] = "automatic"
+        s["last_result"] = {"release": "2026.12.1", "outcome": "installed", "at": "2026-12-15T02:14:00Z",
+            "notes": "Fixes the screen staying dim after Bluetooth pauses.", "error": ""}
+    if UPDATES == "rolled_back":
+        s["last_result"] = {"release": "2026.12.2", "outcome": "rolled_back", "at": "2026-12-15T02:14:00Z",
+            "notes": "", "error": "groove-display did not come up"}
+    return s
+
+UPDATE_STATUS = update_status_initial()
+
+def update_route(method, path, body):
+    """(status code, answer) for a /system/updates* request."""
+    if UPDATES == "none": return 404, {"error": "not found"}
+    if UPDATES == "off": return 503, {"error": "groove-updater is not running"}
+    s = UPDATE_STATUS
+    if method == "GET" and path == "/system/updates": return 200, s
+    if method == "PUT" and path == "/system/updates/preference":
+        if body.get("preference") not in ("automatic", "ask_first"):
+            return 400, {"error": "preference must be automatic or ask_first"}
+        s["preference"] = body["preference"]; return 200, s
+    if s["preference"] == "unset": return 409, {"error": "no update preference set yet"}
+    if method == "POST" and path == "/system/updates/check":
+        s["last_check"] = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "error": ""}
+        return 202, s
+    if method == "POST" and path == "/system/updates/approval":
+        if not s["available"] or body.get("release") != s["available"]["release"]:
+            return 409, {"error": "that release is not the available one"}
+        s.update(approved_release=body["release"], phase="waiting_for_idle"); return 200, s
+    if method == "DELETE" and path == "/system/updates/approval":
+        s.update(approved_release="", phase="idle"); return 200, s
+    return 404, {"error": "not found"}
+
 
 def identify_search():
     """Two editions of each album, as a release search finds them. Like groove-catalog,
@@ -326,8 +379,16 @@ class H(http.server.BaseHTTPRequestHandler):
         b=json.dumps(obj).encode(); self.send_response(code)
         self.send_header("Content-Type","application/json"); self.send_header("Content-Length",str(len(b)))
         self.end_headers(); self.wfile.write(b)
+    def _updates(self):
+        """Answers a /system/updates* request; False for any other path."""
+        path = urlparse(self.path).path
+        if not path.startswith("/system/updates"): return False
+        body = self._body() if self.command in ("POST", "PUT") else {}
+        code, answer = update_route(self.command, path, body)
+        self._json(answer, code); return True
     def do_GET(self):
         if self._rig_proxied(): return
+        if self._updates(): return
         p=urlparse(self.path); path=p.path
         m=re.match(r"/catalog/artwork/tracks/(\d+)",path)
         if m:
@@ -420,6 +481,7 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         if self._failing(): return
         if self._rig_proxied(): return
+        if self._updates(): return
         global EDITION_QUESTION_OPEN
         if self.path=="/catalog/stylus/replace": return self._json(stylus_state())
         if self.path=="/catalog/user-releases/prefill-from-search": return self._json(prefill(self._body()))
@@ -467,6 +529,7 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_PUT(self):
         if self._failing(): return
         if self._rig_proxied(): return
+        if self._updates(): return
         if self.path=="/catalog/stylus": return self._json(stylus_state())
         if self.path=="/rig/capture/input-level":
             to=self._body().get("input_level","fixed"); frm=CAPTURE["input_level"]
@@ -496,6 +559,7 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_DELETE(self):
         if self._failing(): return
         if self._rig_proxied(): return
+        if self._updates(): return
         self._json({"ok":True})
 
 # Threaded: the app fires several requests at once (and URLSession may hold

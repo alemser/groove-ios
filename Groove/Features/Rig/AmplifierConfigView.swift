@@ -513,9 +513,8 @@ struct AmplifierConfigView: View {
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
             let data = try Data(contentsOf: url)
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            let doc = try decoder.decode(RigProfileExportDoc.self, from: data)
+            // A profile file is the catalog's own export, so it decodes as the catalog's answers do.
+            let doc = try APIClient.decoder.decode(RigProfileExportDoc.self, from: data)
             await model.importProfile(doc)
         } catch {
             messages.error("Couldn't read that profile file.")

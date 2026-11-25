@@ -22,6 +22,8 @@ struct MainTabView: View {
     @Environment(AttentionCenter.self) private var attention
     @Environment(NavigationState.self) private var navigation
     @Environment(NowPlayingModel.self) private var nowPlaying
+    @Environment(MessageCenter.self) private var messages
+    @Environment(UpdateCenter.self) private var updates
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -66,14 +68,30 @@ struct MainTabView: View {
         .sheet(isPresented: $navigation.isNowPlayingSheetPresented) {
             NowPlayingView()
         }
+        // The first-use update question, or a notice about an update, when the app reaches a board.
+        .sheet(item: Binding(
+            get: { navigation.isNowPlayingSheetPresented ? nil : updates.notice },
+            set: { if $0 == nil, let shown = updates.notice { updates.dismiss(shown) } }
+        )) { notice in
+            UpdateNoticeSheet(notice: notice)
+        }
         .task { attention.start(settings) }
         .task { nowPlaying.start(settings) }
+        .task {
+            updates.configure(settings, messages: messages)
+            await updates.connected()
+        }
+        .onChange(of: settings.host) { _, _ in
+            Task { await updates.connected(boardChanged: true) }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await attention.refresh() }
                 nowPlaying.start(settings)
+                Task { await updates.connected() }
             } else {
                 nowPlaying.stop()
+                updates.stop()
             }
         }
     }

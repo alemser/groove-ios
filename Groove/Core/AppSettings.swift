@@ -11,6 +11,8 @@ final class AppSettings {
     private static let schemeKey = "catalog.scheme"
     private static let deviceNameKey = "catalog.deviceName"
     private static let recognitionSetupPutOffKey = "recognitionSetupPutOff"
+    private static let dismissedUpdateReleaseKey = "updates.dismissedRelease"
+    private static let acknowledgedUpdateResultKey = "updates.acknowledgedResult"
 
     var host: String {
         didSet { defaults.set(host, forKey: Self.hostKey) }
@@ -33,6 +35,34 @@ final class AppSettings {
         didSet { defaults.set(recognitionSetupPutOff, forKey: Self.recognitionSetupPutOffKey) }
     }
 
+    /// Per board (`updateBoardKey`): the release whose "Update available" notice was
+    /// answered "Later", so it doesn't come back for that release.
+    private var dismissedUpdateRelease: [String: String] {
+        didSet { defaults.set(dismissedUpdateRelease, forKey: Self.dismissedUpdateReleaseKey) }
+    }
+    /// Per board: the last install whose outcome was shown (`UpdateResult.key`).
+    private var acknowledgedUpdateResult: [String: String] {
+        didSet { defaults.set(acknowledgedUpdateResult, forKey: Self.acknowledgedUpdateResultKey) }
+    }
+
+    /// The board the update memory belongs to: the stored host is its Bonjour name
+    /// (or the address entered by hand), which stays the same across DHCP leases.
+    private var updateBoardKey: String { host.trimmingCharacters(in: .whitespaces) }
+
+    /// What this phone remembers about the connected board's update notices.
+    var updateNoticeMemory: UpdateNoticeMemory {
+        get {
+            UpdateNoticeMemory(
+                dismissedRelease: dismissedUpdateRelease[updateBoardKey],
+                acknowledgedResult: acknowledgedUpdateResult[updateBoardKey]
+            )
+        }
+        set {
+            dismissedUpdateRelease[updateBoardKey] = newValue.dismissedRelease
+            acknowledgedUpdateResult[updateBoardKey] = newValue.acknowledgedResult
+        }
+    }
+
     init() {
         host = defaults.string(forKey: Self.hostKey) ?? ""
         let storedPort = defaults.integer(forKey: Self.portKey)
@@ -40,6 +70,8 @@ final class AppSettings {
         scheme = defaults.string(forKey: Self.schemeKey) ?? "http"
         deviceName = defaults.string(forKey: Self.deviceNameKey) ?? ""
         recognitionSetupPutOff = defaults.bool(forKey: Self.recognitionSetupPutOffKey)
+        dismissedUpdateRelease = defaults.dictionary(forKey: Self.dismissedUpdateReleaseKey) as? [String: String] ?? [:]
+        acknowledgedUpdateResult = defaults.dictionary(forKey: Self.acknowledgedUpdateResultKey) as? [String: String] ?? [:]
     }
 
     /// True once a host has been entered — gates the app onto the setup screen.

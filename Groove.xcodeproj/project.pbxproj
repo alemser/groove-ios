@@ -96,7 +96,23 @@
 		F8CD3EDB406FC9C04E9036F6 /* RulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5692B96AF11DD835C1F1819A /* RulesView.swift */; };
 		F914EF6073A255080D4A8342 /* AllReleasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C5AEEF4BAC77BA04EF99A7 /* AllReleasesView.swift */; };
 		FAE51B01AF44F5A62D98967D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF1193157A2AE8C0D67BA94 /* APIClient.swift */; };
+		2EEE31052555DC08CBEB4F8A /* UpdateCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 235F1249AD5A6A37D243B4C7 /* UpdateCenter.swift */; };
+		737711E1BA8471CACA708BC2 /* UpdateModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD62B85359831CFAA93CECC1 /* UpdateModels.swift */; };
+		8B3CFC714A2B948445BF32B7 /* UpdateNoticeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC985794925B3C6BF7A350E /* UpdateNoticeSheet.swift */; };
+		60004A1AC31D3425D7083F78 /* UpdatePreferenceOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483C65FAF11FCF022BD8AEEF /* UpdatePreferenceOptions.swift */; };
+		74AB12AA633B7B7498F9387A /* UpdatesSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B6EB41F624AAC3B29E331F /* UpdatesSection.swift */; };
+		3B1AEAB1829FCF0D11FDA345 /* UpdateModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B5B91E535DFA291426629E /* UpdateModelsTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F24C6C6AD76FF2B86D2C824C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9B5177CFDFE068501CDD734A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 183CFA358C610AC48FAF527E;
+			remoteInfo = Groove;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		02A8A778A9F5863318C47A4A /* EquipmentRemoteModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentRemoteModel.swift; sourceTree = "<group>"; };
@@ -190,6 +206,13 @@
 		FC4B0E8F6B3D1B7A2F69D9A4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FF1FA5A5337318111F9EAD42 /* WifiSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WifiSetupView.swift; sourceTree = "<group>"; };
 		FF369C4E1D963FAC0B2FAC34 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		235F1249AD5A6A37D243B4C7 /* UpdateCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCenter.swift; sourceTree = "<group>"; };
+		CD62B85359831CFAA93CECC1 /* UpdateModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateModels.swift; sourceTree = "<group>"; };
+		6FC985794925B3C6BF7A350E /* UpdateNoticeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateNoticeSheet.swift; sourceTree = "<group>"; };
+		483C65FAF11FCF022BD8AEEF /* UpdatePreferenceOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatePreferenceOptions.swift; sourceTree = "<group>"; };
+		75B6EB41F624AAC3B29E331F /* UpdatesSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatesSection.swift; sourceTree = "<group>"; };
+		C1B5B91E535DFA291426629E /* UpdateModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateModelsTests.swift; sourceTree = "<group>"; };
+		FAD53214EA3CE15AEA1B0C27 /* GrooveTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GrooveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -225,6 +248,7 @@
 		379ED978476CD91E7D74839B /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				CD62B85359831CFAA93CECC1 /* UpdateModels.swift */,
 				3A9BAD5549550DECAB6614F5 /* Models.swift */,
 				9CBA85AF898CC46578F41CD6 /* RecognitionModels.swift */,
 				70A2E76DD3C03EACA8571DDA /* RigModels.swift */,
@@ -245,6 +269,7 @@
 		48A4970F1EABD1A850B4397C /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				235F1249AD5A6A37D243B4C7 /* UpdateCenter.swift */,
 				CFF1193157A2AE8C0D67BA94 /* APIClient.swift */,
 				B328C114E82F254E4675A5AA /* AppSettings.swift */,
 				27254E509C0A5183FE8A30CB /* AttentionCenter.swift */,
@@ -265,6 +290,7 @@
 			isa = PBXGroup;
 			children = (
 				65975D3668890DA3865F22CA /* Groove */,
+				2AF03572F0806939FD9F430D /* GrooveTests */,
 				B76CEC5E83BCDAE0439A18BC /* Products */,
 			);
 			sourceTree = "<group>";
@@ -363,6 +389,7 @@
 		B76CEC5E83BCDAE0439A18BC /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				FAD53214EA3CE15AEA1B0C27 /* GrooveTests.xctest */,
 				415BD591D32B91EC7E5C0C0A /* Groove.app */,
 			);
 			name = Products;
@@ -408,6 +435,7 @@
 		E5630D7A318C840DC0FFB6D1 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				51E6C3DF16019F8D362AF534 /* Updates */,
 				A5D9533E5153D2CB518A77C5 /* Health */,
 				C54E931E24F903A85AE22D0B /* Home */,
 				BF333BC6F654A1A30AB948A1 /* Library */,
@@ -434,6 +462,24 @@
 			path = NowPlaying;
 			sourceTree = "<group>";
 		};
+		2AF03572F0806939FD9F430D /* GrooveTests */ = {
+			isa = PBXGroup;
+			children = (
+				C1B5B91E535DFA291426629E /* UpdateModelsTests.swift */,
+			);
+			path = GrooveTests;
+			sourceTree = "<group>";
+		};
+		51E6C3DF16019F8D362AF534 /* Updates */ = {
+			isa = PBXGroup;
+			children = (
+				6FC985794925B3C6BF7A350E /* UpdateNoticeSheet.swift */,
+				483C65FAF11FCF022BD8AEEF /* UpdatePreferenceOptions.swift */,
+				75B6EB41F624AAC3B29E331F /* UpdatesSection.swift */,
+			);
+			path = Updates;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -454,6 +500,24 @@
 			productName = Groove;
 			productReference = 415BD591D32B91EC7E5C0C0A /* Groove.app */;
 			productType = "com.apple.product-type.application";
+		};
+		7D8F538A4640D371E7996B06 /* GrooveTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DB14307C579778659C295FC1 /* Build configuration list for PBXNativeTarget "GrooveTests" */;
+			buildPhases = (
+				A618B93CFDF5C37086F9AC83 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B1B53A44200A41D71EEA8C30 /* PBXTargetDependency */,
+			);
+			name = GrooveTests;
+			packageProductDependencies = (
+			);
+			productName = GrooveTests;
+			productReference = FAD53214EA3CE15AEA1B0C27 /* GrooveTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -484,6 +548,7 @@
 			projectRoot = "";
 			targets = (
 				183CFA358C610AC48FAF527E /* Groove */,
+				7D8F538A4640D371E7996B06 /* GrooveTests */,
 			);
 		};
 /* End PBXProject section */
@@ -592,10 +657,31 @@
 				31F9F202A9C440A1B50C4CBC /* WifiSetupClient.swift in Sources */,
 				A5447335A4A5A90E15676591 /* WifiSetupModel.swift in Sources */,
 				7CDAA975C0426BEBB81D4EC7 /* WifiSetupView.swift in Sources */,
+				2EEE31052555DC08CBEB4F8A /* UpdateCenter.swift in Sources */,
+				737711E1BA8471CACA708BC2 /* UpdateModels.swift in Sources */,
+				8B3CFC714A2B948445BF32B7 /* UpdateNoticeSheet.swift in Sources */,
+				60004A1AC31D3425D7083F78 /* UpdatePreferenceOptions.swift in Sources */,
+				74AB12AA633B7B7498F9387A /* UpdatesSection.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A618B93CFDF5C37086F9AC83 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3B1AEAB1829FCF0D11FDA345 /* UpdateModelsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B1B53A44200A41D71EEA8C30 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 183CFA358C610AC48FAF527E /* Groove */;
+			targetProxy = F24C6C6AD76FF2B86D2C824C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5A78C56D72C2784C186BE04B /* Debug */ = {
@@ -763,6 +849,40 @@
 			};
 			name = Release;
 		};
+		79F88DC56664900A6ABF470A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.alemser.groove.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Groove.app/Groove";
+			};
+			name = Debug;
+		};
+		3BC5C6BA4EE5BCAD7328C1A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.alemser.groove.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Groove.app/Groove";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -780,6 +900,15 @@
 			buildConfigurations = (
 				5A78C56D72C2784C186BE04B /* Debug */,
 				7F93AF947C931AD8C010B157 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DB14307C579778659C295FC1 /* Build configuration list for PBXNativeTarget "GrooveTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79F88DC56664900A6ABF470A /* Debug */,
+				3BC5C6BA4EE5BCAD7328C1A6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -41,6 +41,14 @@ extension Error {
         return (self as? APIError)?.localizedDescription ?? localizedDescription
     }
 
+    /// The board has no update service to reach: an older groove-catalog without the
+    /// `/system/updates` routes answers 404, and one whose groove-updater is off or
+    /// unreachable answers 502 or 503. The app then shows nothing about updates.
+    var meansNoUpdater: Bool {
+        guard case let .http(status, _)? = self as? APIError else { return false }
+        return noUpdaterStatuses.contains(status)
+    }
+
     /// The release check's refusal this error is, or nil for any other error. A
     /// refusal whose body didn't decode still counts: it says only that the check failed.
     var refusal: ConfirmPreflightError? {
@@ -52,11 +60,12 @@ extension Error {
 /// The status groove-catalog answers when its release check refuses a tracklist.
 private let httpUnprocessable = 422
 
+/// Not found, bad gateway, service unavailable: see `meansNoUpdater`.
+private let noUpdaterStatuses: Set<Int> = [404, 502, 503]
+
 /// The refusal body of a failed confirm or save, when the server sent one.
 func decodeRefusal(_ body: String) -> ConfirmPreflightError? {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    return try? decoder.decode(ConfirmPreflightError.self, from: Data(body.utf8))
+    try? APIClient.decoder.decode(ConfirmPreflightError.self, from: Data(body.utf8))
 }
 
 extension ConfirmPreflightError {
@@ -100,7 +109,8 @@ struct APIClient {
         return url
     }
 
-    private static let decoder: JSONDecoder = {
+    /// How every catalog answer is decoded, error bodies and test fixtures included.
+    static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
         return d
@@ -145,6 +155,11 @@ struct APIClient {
 
     func delete(_ path: String, query: [URLQueryItem] = []) async throws {
         _ = try await sendRaw(path, method: "DELETE", query: query, body: Optional<Empty>.none)
+    }
+
+    /// DELETE to an endpoint that answers with a body the caller reads.
+    func delete<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
+        try await send(path, method: "DELETE", body: Optional<Empty>.none)
     }
 
     /// Posts a pre-built raw JSON body, bypassing the `Encodable` encoder — for the one

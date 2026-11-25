@@ -713,6 +713,19 @@ struct SetupChecklist: Equatable {
 
 // MARK: - Small helpers
 
+/// A closed vocabulary from the wire that a newer board may extend: a value this
+/// app doesn't know decodes as `unknown` instead of failing the whole answer.
+protocol UnknownTolerantDecodable: RawRepresentable, Decodable where RawValue == String {
+    static var unknown: Self { get }
+}
+
+extension UnknownTolerantDecodable {
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unknown
+    }
+}
+
 extension String {
     var nonEmpty: String? {
         let t = trimmingCharacters(in: .whitespacesAndNewlines)

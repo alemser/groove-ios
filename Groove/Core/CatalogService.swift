@@ -38,6 +38,34 @@ struct CatalogService {
         try await api.postNoContent("/system/poweroff")
     }
 
+    // MARK: Board updates
+    //
+    // groove-catalog forwards these to groove-updater and its answer unchanged
+    // (groove-updater `docs/contracts.md`); every one answers the status.
+
+    func updateStatus() async throws -> UpdateStatus {
+        try await api.get("/system/updates")
+    }
+
+    func setUpdatePreference(_ preference: UpdatePreference) async throws -> UpdateStatus {
+        struct Body: Encodable { let preference: UpdatePreference }
+        return try await api.put("/system/updates/preference", body: Body(preference: preference))
+    }
+
+    /// Answers 202 with the status as the check starts; its result comes later.
+    func checkForUpdates() async throws -> UpdateStatus {
+        try await api.post("/system/updates/check", body: Empty())
+    }
+
+    func approveUpdate(release: String) async throws -> UpdateStatus {
+        struct Body: Encodable { let release: String }
+        return try await api.post("/system/updates/approval", body: Body(release: release))
+    }
+
+    func withdrawUpdateApproval() async throws -> UpdateStatus {
+        try await api.delete("/system/updates/approval", as: UpdateStatus.self)
+    }
+
     // MARK: Tracks
 
     func track(id: Int64) async throws -> Track {

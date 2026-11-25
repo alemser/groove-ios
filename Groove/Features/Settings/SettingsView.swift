@@ -19,6 +19,7 @@ struct ScreenEntry {
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(MessageCenter.self) private var messages
+    @Environment(UpdateCenter.self) private var updates
 
     @State private var streamingStatusText: String?
     @State private var showSwitchServer = false
@@ -85,6 +86,8 @@ struct SettingsView: View {
                         Label("Stack Health", systemImage: "heart.text.square")
                     }
                 }
+
+                UpdatesSection()
 
                 Section {
                     Button {
@@ -175,6 +178,7 @@ struct SettingsView: View {
             WifiSetupView(homeHost: settings.host)
         }
         .task { await loadStreamingStatus() }
+        .onAppear { Task { await updates.refresh() } }
     }
 
     private func loadStreamingStatus() async {

@@ -725,18 +725,13 @@ enum CaptureInputLevel: String, Codable {
 
 /// The detector's verdict on the recent programme level. Decided server-side
 /// so every client agrees; an unrecognised value decodes as `.unknown`.
-enum CaptureLevelBand: String, Decodable {
+enum CaptureLevelBand: String, UnknownTolerantDecodable {
     case unknown
     case tooLow = "too_low"
     case low
     case good
     case high
     case clipping
-
-    init(from decoder: Decoder) throws {
-        let raw = try decoder.singleValueContainer().decode(String.self)
-        self = CaptureLevelBand(rawValue: raw) ?? .unknown
-    }
 }
 
 struct CaptureLevel: Decodable {

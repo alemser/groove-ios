@@ -49,3 +49,28 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
           NSAllowsLocalNetworking: true
+  GrooveTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: GrooveTests
+    dependencies:
+      - target: Groove
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alemser.groove.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Groove.app/Groove"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  Groove:
+    build:
+      targets:
+        Groove: all
+        GrooveTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - GrooveTests

@@ -82,6 +82,12 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   (`App/MessageBanner.swift`); Android shows the same messages as a snackbar. A failed primary
   fetch keeps `ErrorStateView`, a wrong form value stays under its field. No screen draws its own
   red line.
+- `Core/UpdateCenter.swift` — the connected board's update status (groove-updater, through
+  groove-catalog's `/system/updates`), app-wide: `MainTabView` presents its `notice` (the first-use
+  question, an available release, an install's outcome) and Settings → Updates reads it. What to
+  show for a status is decided in `Models/UpdateModels.swift` (pure, tested in `GrooveTests`). What
+  the phone already showed is kept per board in `AppSettings`. A 404/502/503 means the board has no
+  update service: nothing about updates shows.
 - `Core/WifiSetupClient.swift` / `Features/Onboarding/` — the board's Wi-Fi setup routes
   (groove-provision's `PROTOCOL.md`); the setup network's prefix and address must match
   it exactly. iOS joins a network from an app only with the Hotspot Configuration capability, which

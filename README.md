@@ -20,6 +20,7 @@ the enrichment review queue — all against your `groove-catalog` server on the 
 | **Settings** | Connect to a server (with live test), set up a new device's Wi-Fi or change it, toggle metadata enrichers, view stack health. | `GET /status`, `GET /enrich/providers`, `PATCH /enrich/providers/{id}`; on the device, port 80: `GET/PUT /wifi`, `GET /wifi/networks`, `POST /wifi/setup` |
 | **Settings → Recognition Providers** | What identifies a spinning record: offline (local-only) mode, chain mode/order/min-confidence, ACRCloud/AudD credentials, up to 3 custom HTTP providers (auth, request, response field mapping, paste-a-sample auto-fill), local-index/provider usage KPIs. | `GET/PATCH /identity/recognition/{providers,settings}`, `PUT …/providers/{id}/credentials`, `PUT …/providers/order`, `POST/PUT/DELETE …/custom-providers(/{slug})`, `GET /identity/observability/providers` |
 | **Settings → Streaming** | Turn the AirPlay and Bluetooth receivers on or off (third-party open-source projects; Bluetooth downloads on first use), then pick which ALSA device both play through, out to the amplifier — one wire, one setting. | `GET /rig/streaming/extras`, `POST /rig/streaming/extras/{name}`, `GET/POST /rig/streaming/audio-outputs(/select)` |
+| **Settings → Updates** | The board's version, how it installs updates (automatically when nothing is playing, or after asking), Check now, Update now and Cancel. The first connection to a board that has no answer yet asks the same question; an available release (ask first) and the outcome of an install show once as a notice. Hidden on a board without the update service. | `GET /system/updates`, `PUT …/preference`, `POST …/check`, `POST/DELETE …/approval` |
 | **Rig → Amplifier** | Model, inputs and profiles, plus whether the selected input may tell vinyl from digital. | `GET/PATCH /rig/amplifier`, `GET/PATCH /rig/amplifier/format-hint` |
 
 ### Which pressing is playing
@@ -106,6 +107,10 @@ populated with sample tracks and generated cover art.
 > ```bash
 > xcodebuild -scheme Groove -sdk iphonesimulator \
 >   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+> ```
+> Unit tests (`GrooveTests`):
+> ```bash
+> xcodebuild test -scheme Groove -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 > ```
 > On a **physical iPhone**, use your Mac's LAN IP instead of `127.0.0.1` and keep
 > the phone on the same Wi-Fi.
