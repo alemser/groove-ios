@@ -27,6 +27,8 @@ struct SettingsView: View {
     @State private var pendingPower: PowerAction?
     @State private var isSendingPower = false
     @State private var powerStatus: String?
+    @State private var isSharingLogs = false
+    @State private var sharedLog: SharedFile?
 
     var body: some View {
         NavigationStack {
@@ -85,6 +87,20 @@ struct SettingsView: View {
                     } label: {
                         Label("Stack Health", systemImage: "heart.text.square")
                     }
+                }
+
+                Section {
+                    Button {
+                        Task { await shareLogs() }
+                    } label: {
+                        Label(isSharingLogs ? "Preparing Logs…" : "Share Logs", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(!settings.isConfigured || isSharingLogs)
+                } header: {
+                    Text("Support")
+                } footer: {
+                    Text("The last two days of Oceano's logs, for support. Nothing is sent until you choose where.")
+                        .foregroundStyle(Brand.muted)
                 }
 
                 UpdatesSection()
@@ -177,6 +193,9 @@ struct SettingsView: View {
             // which lets it take a new one.
             WifiSetupView(homeHost: settings.host)
         }
+        .sheet(item: $sharedLog) { file in
+            ShareSheet(file: file)
+        }
         .task { await loadStreamingStatus() }
         .onAppear { Task { await updates.refresh() } }
     }
@@ -203,6 +222,15 @@ struct SettingsView: View {
             }
         } != nil
         if sent { powerStatus = action.sentStatus }
+    }
+
+    private func shareLogs() async {
+        isSharingLogs = true
+        defer { isSharingLogs = false }
+        let service = CatalogService(settings: settings)
+        if let url = await messages.attempt({ try await downloadSupportLog(service) }) {
+            sharedLog = SharedFile(url: url)
+        }
     }
 
     private var appVersion: String {

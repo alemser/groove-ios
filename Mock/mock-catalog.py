@@ -42,6 +42,7 @@ Scenarios, for checking a screen against what a board does:
       installed), rolled_back (the last install was rolled back), none (an
       older catalog: 404), off (the updater is off: 503). Unset: ask first and
       up to date. The preference, approval and check change the mock's state.
+                  GET /system/logs answers a small gzip support log, 404 or 503 as above.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
 
@@ -386,9 +387,21 @@ class H(http.server.BaseHTTPRequestHandler):
         body = self._body() if self.command in ("POST", "PUT") else {}
         code, answer = update_route(self.command, path, body)
         self._json(answer, code); return True
+    def _logs(self):
+        """GET /system/logs: groove-updater's support log, a gzip file; the updater's
+        absence answers as on /system/updates (UPDATES=none 404, off 503)."""
+        if urlparse(self.path).path != "/system/logs": return False
+        if UPDATES == "none": self._json({"error": "not found"}, 404); return True
+        if UPDATES == "off": self._json({"error": "groove-updater is not running"}, 503); return True
+        import gzip
+        b = gzip.compress(b"==== groove-updater status ====\n{\"phase\": \"idle\"}\n\n==== journalctl ====\nmock journal line\n")
+        self.send_response(200); self.send_header("Content-Type", "application/gzip")
+        self.send_header("Content-Disposition", "attachment; filename=oceano-mock-%s.log.gz" % time.strftime("%Y%m%d-%H%M%S", time.gmtime()))
+        self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return True
     def do_GET(self):
         if self._rig_proxied(): return
         if self._updates(): return
+        if self._logs(): return
         p=urlparse(self.path); path=p.path
         m=re.match(r"/catalog/artwork/tracks/(\d+)",path)
         if m:

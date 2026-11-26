@@ -215,6 +215,19 @@ struct APIClient {
         }
     }
 
+    /// GETs a file: its bytes and the name the server gives it.
+    func download(_ path: String) async throws -> DownloadedFile {
+        var req = URLRequest(url: try makeURL(path))
+        req.httpMethod = "GET"
+        req.timeoutInterval = Self.downloadTimeout
+        let (data, response) = try await executeResponse(req)
+        return DownloadedFile(name: attachmentName(response.value(forHTTPHeaderField: "Content-Disposition")), data: data)
+    }
+
+    /// Chosen: the support log is the slowest answer, bounded by groove-catalog's
+    /// 30 s write timeout; 10 s more for the LAN.
+    private static let downloadTimeout: TimeInterval = 40
+
     // MARK: - Core
 
     private func send<Body: Encodable, T: Decodable>(
@@ -269,6 +282,11 @@ struct APIClient {
     /// real answer from the server, not a transient failure, and is never
     /// retried either way.
     private func execute(_ req: URLRequest) async throws -> Data {
+        try await executeResponse(req).data
+    }
+
+    /// `execute`, keeping the response for its headers.
+    private func executeResponse(_ req: URLRequest) async throws -> (data: Data, response: HTTPURLResponse) {
         let maxAttempts = req.httpMethod == "GET" ? 3 : 1
         var lastTransportError = APIError.transport("Unknown transport error.")
         for attempt in 1...maxAttempts {
@@ -281,7 +299,7 @@ struct APIClient {
                     let text = String(data: data, encoding: .utf8) ?? ""
                     throw APIError.http(status: http.statusCode, body: text.trimmingCharacters(in: .whitespacesAndNewlines))
                 }
-                return data
+                return (data, http)
             } catch let error as APIError {
                 throw error
             } catch {
@@ -298,6 +316,28 @@ struct APIClient {
         throw lastTransportError
     }
 }
+
+/// A file the server sent: its bytes and the name it gave it, nil when none or not a plain one.
+struct DownloadedFile {
+    let name: String?
+    let data: Data
+}
+
+/// The file name of a `Content-Disposition: attachment; filename=...` header, quoted or not.
+/// Only a plain name (a letter or digit, then letters, digits, `.`, `_`, `-`) is kept: it
+/// names a file the app writes.
+func attachmentName(_ header: String?) -> String? {
+    guard let header, let range = header.range(of: "filename=") else { return nil }
+    let raw = header[range.upperBound...]
+        .prefix { $0 != ";" }
+        .trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
+    guard let first = raw.unicodeScalars.first, plainFileNameStart.contains(first),
+          raw.unicodeScalars.allSatisfy(plainFileNameCharacters.contains) else { return nil }
+    return raw
+}
+
+private let plainFileNameStart = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+private let plainFileNameCharacters = plainFileNameStart.union(CharacterSet(charactersIn: "._-"))
 
 /// Empty request body sentinel.
 struct Empty: Encodable {}

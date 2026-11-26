@@ -66,6 +66,11 @@ struct CatalogService {
         try await api.delete("/system/updates/approval", as: UpdateStatus.self)
     }
 
+    /// The board's support log (groove-updater, forwarded): a gzip file for the user to send on.
+    func supportLog() async throws -> DownloadedFile {
+        try await api.download("/system/logs")
+    }
+
     // MARK: Tracks
 
     func track(id: Int64) async throws -> Track {
