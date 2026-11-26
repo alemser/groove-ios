@@ -2,8 +2,9 @@ import SwiftUI
 
 /// The update question or notice the app puts in front of the person when it
 /// reaches a board (`UpdateCenter.notice`). Swiping it away is the same as
-/// "Later" / "OK"; for the question it leaves the choice unanswered, and the app
-/// asks again on the next connection.
+/// "Remind me tomorrow" for an available release and "OK" for an install's outcome;
+/// for the question it leaves the choice unanswered, and the app asks again on the
+/// next connection.
 struct UpdateNoticeSheet: View {
     let notice: UpdateNotice
 
@@ -38,6 +39,8 @@ struct UpdateNoticeSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) { actions.padding(20) }
         }
+        // A swipe while an answer travels would send a second one.
+        .interactiveDismissDisabled(sending)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
@@ -52,26 +55,28 @@ struct UpdateNoticeSheet: View {
     private var actions: some View {
         switch notice {
         case .question:
-            primaryButton("Continue") { _ = await updates.setPreference(choice) }
-        case .available:
-            HStack(spacing: 12) {
-                Button {
-                    updates.dismiss(notice)
-                } label: {
-                    Text("Later").frame(maxWidth: .infinity)
+            answerButton("Continue") { _ = await updates.setPreference(choice) }
+        case let .available(_, _, security):
+            VStack(spacing: 10) {
+                answerButton("Update") { await updates.approve() }
+                ForEach(UpdateReminder.choices(security: security), id: \.self) { reminder in
+                    answerButton(reminder.title, prominent: false) { await updates.remind(reminder) }
                 }
-                .buttonStyle(.bordered)
-                primaryButton("Update") { await updates.approve() }
             }
         case .installed, .failed:
-            primaryButton("OK") { updates.dismiss(notice) }
+            answerButton("OK") { updates.dismiss(notice) }
         }
     }
 
     /// The answer closes the sheet on its own: the status it brings back no longer
     /// calls for this notice.
-    private func primaryButton(_ title: String, _ action: @escaping @MainActor () async -> Void) -> some View {
-        Button {
+    @ViewBuilder
+    private func answerButton(
+        _ title: String,
+        prominent: Bool = true,
+        _ action: @escaping @MainActor () async -> Void
+    ) -> some View {
+        let button = Button {
             sending = true
             Task {
                 await action()
@@ -80,7 +85,11 @@ struct UpdateNoticeSheet: View {
         } label: {
             Text(title).frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
         .disabled(sending)
+        if prominent {
+            button.buttonStyle(.borderedProminent)
+        } else {
+            button.buttonStyle(.bordered)
+        }
     }
 }

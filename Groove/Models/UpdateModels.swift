@@ -79,9 +79,10 @@ struct UpdateStatus: Decodable, Equatable {
     var installed: InstalledRelease
     var available: AvailableRelease?
     var approvedRelease: String
-    /// The board waits for the person to approve `available` ("Ask me first",
-    /// nothing approved). The board decides it; false on a board from before the field.
-    var awaitingApproval: Bool
+    /// The board asks the person about `available` now: it awaits approval and nobody
+    /// put it off ("Remind me tomorrow" less than 24 h ago, "Don't ask again", a
+    /// withdrawn approval). The board decides it; false on a board from before the field.
+    var askUser: Bool
     var lastCheck: UpdateCheck?
     var lastResult: UpdateResult?
 
@@ -115,7 +116,7 @@ struct UpdateStatus: Decodable, Equatable {
 
 extension UpdateStatus {
     private enum CodingKeys: String, CodingKey {
-        case preference, phase, installed, available, approvedRelease, awaitingApproval, lastCheck, lastResult
+        case preference, phase, installed, available, approvedRelease, askUser, lastCheck, lastResult
     }
 
     init(from decoder: Decoder) throws {
@@ -125,7 +126,7 @@ extension UpdateStatus {
         installed = try c.decode(InstalledRelease.self, forKey: .installed)
         available = try c.decodeIfPresent(AvailableRelease.self, forKey: .available)
         approvedRelease = try c.decode(String.self, forKey: .approvedRelease)
-        awaitingApproval = try c.decodeIfPresent(Bool.self, forKey: .awaitingApproval) ?? false
+        askUser = try c.decodeIfPresent(Bool.self, forKey: .askUser) ?? false
         lastCheck = try c.decodeIfPresent(UpdateCheck.self, forKey: .lastCheck)
         lastResult = try c.decodeIfPresent(UpdateResult.self, forKey: .lastResult)
     }
@@ -167,10 +168,31 @@ extension UpdateStatus {
     }
 }
 
+/// An answer to the "Update available" notice that puts the release off
+/// (`POST /system/updates/reminder`). The board keeps it, so every phone reads it
+/// through `ask_user`.
+enum UpdateReminder: String, Encodable {
+    /// Ask again about this release in 24 h.
+    case tomorrow
+    /// Never ask about this release again (a newer one asks). The board refuses it
+    /// for a security release.
+    case never
+
+    /// The answers the notice offers: a security fix can't be put off for good.
+    static func choices(security: Bool) -> [UpdateReminder] {
+        security ? [.tomorrow] : [.tomorrow, .never]
+    }
+
+    var title: String {
+        switch self {
+        case .tomorrow: "Remind me tomorrow"
+        case .never: "Don't ask again"
+        }
+    }
+}
+
 /// What this phone remembers about one board's updates, so a notice shows once.
 struct UpdateNoticeMemory: Equatable {
-    /// The release whose "Update available" notice was answered "Later".
-    var dismissedRelease: String?
     /// `UpdateResult.key` of the last install whose outcome was shown.
     var acknowledgedResult: String?
 }
@@ -213,9 +235,16 @@ enum UpdateNotice: Equatable, Identifiable {
 
     /// The question first: until it has an answer the board does nothing else.
     /// Then how the last install ended, once per install, then a release the board
-    /// says awaits approval, unless this phone answered "Later" for it.
+    /// asks about (`ask_user`).
     /// `questionDeferred`: the question was put away during this connection.
-    static func next(for status: UpdateStatus, seen: UpdateNoticeMemory, questionDeferred: Bool) -> UpdateNotice? {
+    /// `remindingRelease`: a reminder for that release is on its way to the board
+    /// (the notice was swiped away), so its notice stays closed until the board answers.
+    static func next(
+        for status: UpdateStatus,
+        seen: UpdateNoticeMemory,
+        questionDeferred: Bool,
+        remindingRelease: String? = nil
+    ) -> UpdateNotice? {
         if status.preference == .unset {
             return questionDeferred ? nil : .question
         }
@@ -226,7 +255,7 @@ enum UpdateNotice: Equatable, Identifiable {
             case .unknown: break
             }
         }
-        if status.awaitingApproval, let available = status.available, available.release != seen.dismissedRelease {
+        if status.askUser, let available = status.available, available.release != remindingRelease {
             return .available(release: available.release, notes: available.notes, security: available.security)
         }
         return nil

@@ -3,8 +3,9 @@ import Observation
 
 /// The connected board's update status, app-wide: the first-use question and the
 /// update notices are presented from it, and Settings → Updates reads and changes
-/// it. The preference and the approval live on the board (groove-updater owns
-/// them); this keeps only the last answer read and what the phone already showed.
+/// it. The preference, the approval and the reminders live on the board
+/// (groove-updater owns them); this keeps only the last answer read and which
+/// install outcome the phone already showed.
 @MainActor
 @Observable
 final class UpdateCenter {
@@ -15,6 +16,10 @@ final class UpdateCenter {
     /// The question was put away without an answer during this connection. It
     /// comes back on the next one (launch, return to the foreground, another board).
     private var questionDeferred = false
+
+    /// The available release whose swiped-away notice is on its way to the board as
+    /// "Remind me tomorrow" (`dismiss`); nil otherwise.
+    private var remindingRelease: String?
 
     private var settings: AppSettings?
     private var messages: MessageCenter?
@@ -30,7 +35,12 @@ final class UpdateCenter {
     /// What to put in front of the person now, or nil.
     var notice: UpdateNotice? {
         guard let status, let settings else { return nil }
-        return UpdateNotice.next(for: status, seen: settings.updateNoticeMemory, questionDeferred: questionDeferred)
+        return UpdateNotice.next(
+            for: status,
+            seen: settings.updateNoticeMemory,
+            questionDeferred: questionDeferred,
+            remindingRelease: remindingRelease
+        )
     }
 
     func configure(_ settings: AppSettings, messages: MessageCenter) {
@@ -88,25 +98,33 @@ final class UpdateCenter {
         await write { try await $0.approveUpdate(release: release) }
     }
 
-    /// Withdrawing is a "not now" for that release: its notice doesn't come back
-    /// at once; Settings still offers it.
-    /// Remembered before the answer arrives, so the notice never flashes up in between.
+    /// Withdrawing is a "not now" for that release: the board puts it off for 24 h,
+    /// so its notice doesn't come back at once; Settings still offers it.
     func withdrawApproval() async {
-        if let release = status?.approvedRelease.nonEmpty {
-            settings?.updateNoticeMemory.dismissedRelease = release
-        }
         await write { try await $0.withdrawUpdateApproval() }
     }
 
-    /// The notice was closed without acting on it: "Later" for an available
-    /// release, "OK" for an install's outcome, or swiped away.
+    /// "Remind me tomorrow" or "Don't ask again" for the available release.
+    func remind(_ remind: UpdateReminder) async {
+        guard let release = status?.available?.release else { return }
+        await write { try await $0.remindAboutUpdate(release: release, remind) }
+    }
+
+    /// The notice was closed without an answer to the board: "OK" for an install's
+    /// outcome, or swiped away. Swiping an available release away is "Remind me
+    /// tomorrow", so it doesn't come back on every connection.
     func dismiss(_ notice: UpdateNotice) {
         guard let settings else { return }
         switch notice {
         case .question:
             questionDeferred = true
         case let .available(release, _, _):
-            settings.updateNoticeMemory.dismissedRelease = release
+            // Held closed while the answer travels, so the sheet doesn't present again in between.
+            remindingRelease = release
+            Task {
+                await remind(.tomorrow)
+                remindingRelease = nil
+            }
         case .installed, .failed:
             settings.updateNoticeMemory.acknowledgedResult = status?.lastResult?.key
         }

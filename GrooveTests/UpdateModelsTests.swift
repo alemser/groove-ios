@@ -22,6 +22,7 @@ final class UpdateModelsTests: XCTestCase {
       },
       "approved_release": "2026.12.2",
       "awaiting_approval": false,
+      "ask_user": false,
       "last_check": {"at": "2026-12-14T11:02:00Z", "error": ""},
       "last_result": {
         "release": "2026.12.1",
@@ -61,7 +62,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertEqual(s.available?.notes, "Fixes the screen staying dim after Bluetooth pauses.")
         XCTAssertEqual(s.available?.security, false)
         XCTAssertEqual(s.approvedRelease, "2026.12.2")
-        XCTAssertFalse(s.awaitingApproval)
+        XCTAssertFalse(s.askUser)
         XCTAssertEqual(s.lastCheck?.at, "2026-12-14T11:02:00Z")
         XCTAssertEqual(s.lastResult?.outcome, .installed)
     }
@@ -76,7 +77,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertNil(s.lastCheck)
         XCTAssertNil(s.lastResult)
         XCTAssertEqual(s.installedLabel, "Not a release")
-        XCTAssertFalse(s.awaitingApproval, "a board from before the field awaits nothing")
+        XCTAssertFalse(s.askUser, "a board from before the field asks nothing")
     }
 
     /// A newer board may add fields and values: the answer still decodes.
@@ -182,33 +183,49 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertNil(UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: true))
     }
 
-    func testOffersAReleaseAwaitingApprovalUntilLater() throws {
-        let s = try status { s in
+    /// A release offered and not approved; `askUser` is what the board says about it.
+    private func offered(askUser: Bool) throws -> UpdateStatus {
+        try status { s in
             s.phase = .idle; s.approvedRelease = ""; s.available = self.available; s.lastResult = nil
-            s.awaitingApproval = true
+            s.askUser = askUser
         }
-        XCTAssertEqual(
-            UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: false),
-            .available(release: "2026.12.2", notes: "Fixes the dim screen.", security: true)
-        )
-        XCTAssertNil(UpdateNotice.next(for: s, seen: UpdateNoticeMemory(dismissedRelease: "2026.12.2"), questionDeferred: false))
+    }
 
-        var newer = s
-        newer.available?.release = "2026.12.3"
+    func testOffersAReleaseWhileTheBoardAsksAboutIt() throws {
         XCTAssertEqual(
-            UpdateNotice.next(for: newer, seen: UpdateNoticeMemory(dismissedRelease: "2026.12.2"), questionDeferred: false)?.id,
-            "available-2026.12.3",
-            "Later holds for one release only"
+            UpdateNotice.next(for: try offered(askUser: true), seen: nothingSeen, questionDeferred: false),
+            .available(release: "2026.12.2", notes: "Fixes the dim screen.", security: true)
         )
     }
 
-    /// The board says when a release awaits approval (`awaiting_approval`); the app doesn't work it out.
-    func testOnlyTheBoardsAwaitingApprovalOffersARelease() throws {
-        let notAwaiting = try status { s in
-            s.phase = .idle; s.approvedRelease = ""; s.available = self.available; s.lastResult = nil
-            s.awaitingApproval = false
-        }
-        XCTAssertNil(UpdateNotice.next(for: notAwaiting, seen: nothingSeen, questionDeferred: false))
+    /// The board says when to ask (`ask_user`): a release put off ("Remind me tomorrow",
+    /// "Don't ask again", a withdrawn approval) stays available, and the phone asks nothing.
+    func testOnlyTheBoardsAskUserOffersARelease() throws {
+        let putOff = try offered(askUser: false)
+        XCTAssertNil(UpdateNotice.next(for: putOff, seen: nothingSeen, questionDeferred: false))
+        XCTAssertTrue(putOff.canApprove, "Settings still offers Update now")
+    }
+
+    /// Swiped away: the notice stays closed while "Remind me tomorrow" travels, and
+    /// for that release only.
+    func testAReminderOnItsWayHoldsThatReleasesNoticeClosed() throws {
+        let s = try offered(askUser: true)
+        XCTAssertNil(UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: false, remindingRelease: "2026.12.2"))
+        XCTAssertEqual(
+            UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: false, remindingRelease: "2026.12.1")?.id,
+            "available-2026.12.2"
+        )
+    }
+
+    func testDontAskAgainIsNotOfferedForASecurityFix() throws {
+        XCTAssertEqual(UpdateReminder.choices(security: true), [.tomorrow])
+        XCTAssertEqual(UpdateReminder.choices(security: false), [.tomorrow, .never])
+    }
+
+    func testReminderEncodesTheRoutesBody() throws {
+        let data = try JSONEncoder().encode(["remind": UpdateReminder.tomorrow, "other": .never])
+        let decoded = try JSONDecoder().decode([String: String].self, from: data)
+        XCTAssertEqual(decoded, ["remind": "tomorrow", "other": "never"])
     }
 
     func testNoAvailableNoticeOnceApprovedOrInAutomaticMode() throws {
@@ -247,7 +264,7 @@ final class UpdateModelsTests: XCTestCase {
     func testTheOutcomeComesBeforeTheNextAvailableRelease() throws {
         let s = try status { s in
             s.phase = .idle; s.approvedRelease = ""; s.available = self.available; s.lastResult = self.result(.installed, release: "2026.12.1")
-            s.awaitingApproval = true
+            s.askUser = true
         }
         XCTAssertEqual(UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: false)?.id, "installed-2026.12.1")
         let acknowledged = UpdateNoticeMemory(acknowledgedResult: s.lastResult?.key)

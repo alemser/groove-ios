@@ -11,7 +11,6 @@ final class AppSettings {
     private static let schemeKey = "catalog.scheme"
     private static let deviceNameKey = "catalog.deviceName"
     private static let recognitionSetupPutOffKey = "recognitionSetupPutOff"
-    private static let dismissedUpdateReleaseKey = "updates.dismissedRelease"
     private static let acknowledgedUpdateResultKey = "updates.acknowledgedResult"
 
     var host: String {
@@ -35,12 +34,7 @@ final class AppSettings {
         didSet { defaults.set(recognitionSetupPutOff, forKey: Self.recognitionSetupPutOffKey) }
     }
 
-    /// Per board (`updateBoardKey`): the release whose "Update available" notice was
-    /// answered "Later", so it doesn't come back for that release.
-    private var dismissedUpdateRelease: [String: String] {
-        didSet { defaults.set(dismissedUpdateRelease, forKey: Self.dismissedUpdateReleaseKey) }
-    }
-    /// Per board: the last install whose outcome was shown (`UpdateResult.key`).
+    /// Per board (`updateBoardKey`): the last install whose outcome was shown (`UpdateResult.key`).
     private var acknowledgedUpdateResult: [String: String] {
         didSet { defaults.set(acknowledgedUpdateResult, forKey: Self.acknowledgedUpdateResultKey) }
     }
@@ -52,13 +46,9 @@ final class AppSettings {
     /// What this phone remembers about the connected board's update notices.
     var updateNoticeMemory: UpdateNoticeMemory {
         get {
-            UpdateNoticeMemory(
-                dismissedRelease: dismissedUpdateRelease[updateBoardKey],
-                acknowledgedResult: acknowledgedUpdateResult[updateBoardKey]
-            )
+            UpdateNoticeMemory(acknowledgedResult: acknowledgedUpdateResult[updateBoardKey])
         }
         set {
-            dismissedUpdateRelease[updateBoardKey] = newValue.dismissedRelease
             acknowledgedUpdateResult[updateBoardKey] = newValue.acknowledgedResult
         }
     }
@@ -70,7 +60,6 @@ final class AppSettings {
         scheme = defaults.string(forKey: Self.schemeKey) ?? "http"
         deviceName = defaults.string(forKey: Self.deviceNameKey) ?? ""
         recognitionSetupPutOff = defaults.bool(forKey: Self.recognitionSetupPutOffKey)
-        dismissedUpdateRelease = defaults.dictionary(forKey: Self.dismissedUpdateReleaseKey) as? [String: String] ?? [:]
         acknowledgedUpdateResult = defaults.dictionary(forKey: Self.acknowledgedUpdateResultKey) as? [String: String] ?? [:]
     }
 

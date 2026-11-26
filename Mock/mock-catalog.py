@@ -41,7 +41,8 @@ Scenarios, for checking a screen against what a board does:
       a security fix waits for approval), installed (automatic, a release just
       installed), rolled_back (the last install was rolled back), none (an
       older catalog: 404), off (the updater is off: 503). Unset: ask first and
-      up to date. The preference, approval and check change the mock's state.
+      up to date. The preference, approval, reminder and check change the
+      mock's state; ask_user turns false once the release is put off.
                   GET /system/logs answers a small gzip support log, 404 or 503 as above.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
@@ -293,9 +294,28 @@ def update_status_initial():
     return s
 
 UPDATE_STATUS = update_status_initial()
+# Release -> (remind, epoch seconds) of the last "put off" answer, as groove-updater keeps it.
+UPDATE_PUT_OFF = {}
+
+def update_awaiting(s):
+    return s["preference"] == "ask_first" and bool(s["available"]) and not s["approved_release"]
+
+def update_put_off(release, remind):
+    UPDATE_PUT_OFF[release] = (remind, time.time())
+
+def update_answer(s):
+    """The status with the fields groove-updater derives on every answer."""
+    awaiting = update_awaiting(s)
+    put_off = s["available"] and UPDATE_PUT_OFF.get(s["available"]["release"])
+    asked = not put_off or (put_off[0] == "tomorrow" and time.time() - put_off[1] >= 24 * 3600)
+    return dict(s, awaiting_approval=awaiting, ask_user=awaiting and asked)
 
 def update_route(method, path, body):
     """(status code, answer) for a /system/updates* request."""
+    code, answer = update_route_raw(method, path, body)
+    return code, update_answer(answer) if answer is UPDATE_STATUS else answer
+
+def update_route_raw(method, path, body):
     if UPDATES == "none": return 404, {"error": "not found"}
     if UPDATES == "off": return 503, {"error": "groove-updater is not running"}
     s = UPDATE_STATUS
@@ -313,7 +333,16 @@ def update_route(method, path, body):
             return 409, {"error": "that release is not the available one"}
         s.update(approved_release=body["release"], phase="waiting_for_idle"); return 200, s
     if method == "DELETE" and path == "/system/updates/approval":
+        if s["approved_release"]: update_put_off(s["approved_release"], "tomorrow")
         s.update(approved_release="", phase="idle"); return 200, s
+    if method == "POST" and path == "/system/updates/reminder":
+        remind = body.get("remind")
+        if remind not in ("tomorrow", "never"): return 400, {"error": "remind must be tomorrow or never"}
+        if not update_awaiting(s) or body.get("release") != s["available"]["release"]:
+            return 409, {"error": "that release is not awaiting approval"}
+        if remind == "never" and s["available"]["security"]:
+            return 409, {"error": "a security release can't be put off for good"}
+        update_put_off(body["release"], remind); return 200, s
     return 404, {"error": "not found"}
 
 

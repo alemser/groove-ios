@@ -62,8 +62,15 @@ struct CatalogService {
         return try await api.post("/system/updates/approval", body: Body(release: release))
     }
 
+    /// The board also puts the release off for 24 h, as `remindAboutUpdate(.tomorrow)` does.
     func withdrawUpdateApproval() async throws -> UpdateStatus {
         try await api.delete("/system/updates/approval", as: UpdateStatus.self)
+    }
+
+    /// Puts `release` off; it stays available, and Settings still offers it.
+    func remindAboutUpdate(release: String, _ remind: UpdateReminder) async throws -> UpdateStatus {
+        struct Body: Encodable { let release: String; let remind: UpdateReminder }
+        return try await api.post("/system/updates/reminder", body: Body(release: release, remind: remind))
     }
 
     /// The board's support log (groove-updater, forwarded): a gzip file for the user to
