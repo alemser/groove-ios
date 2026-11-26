@@ -91,6 +91,8 @@ struct SettingsView: View {
 
                 Section {
                     Button {
+                        // Busy from the tap, before the task runs: a second tap can't send twice.
+                        isSharingLogs = true
                         Task { await shareLogs() }
                     } label: {
                         Label(isSharingLogs ? "Preparing Logs…" : "Share Logs", systemImage: "square.and.arrow.up")
@@ -215,21 +217,24 @@ struct SettingsView: View {
         defer { isSendingPower = false }
         powerStatus = nil
         let service = CatalogService(settings: settings)
-        let sent = await messages.attempt {
+        // The status is set inside the attempt, so a Retry that goes through shows it too.
+        await messages.attempt {
             switch action {
             case .restart: try await service.rebootDevice()
             case .shutDown: try await service.powerOffDevice()
             }
-        } != nil
-        if sent { powerStatus = action.sentStatus }
+            powerStatus = action.sentStatus
+        }
     }
 
+    /// "Preparing Logs…" and the share sheet come from inside the attempt, so the
+    /// message's Retry shows both as the first try does.
     private func shareLogs() async {
-        isSharingLogs = true
-        defer { isSharingLogs = false }
         let service = CatalogService(settings: settings)
-        if let url = await messages.attempt({ try await downloadSupportLog(service) }) {
-            sharedLog = SharedFile(url: url)
+        await messages.attempt {
+            isSharingLogs = true
+            defer { isSharingLogs = false }
+            sharedLog = SharedFile(url: try await downloadSupportLog(service))
         }
     }
 

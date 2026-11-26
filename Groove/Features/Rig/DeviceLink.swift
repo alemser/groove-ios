@@ -46,6 +46,7 @@ final class DeviceLinkModel {
         let done = await messages.attempt {
             let service = CatalogService(settings: settings)
             try await service.rigSetDeviceLink(enabled: on)
+            self.enabled = on
             self.devices = on ? ((try? await service.rigScanDeviceLink()) ?? []) : []
         } != nil
         if !done { enabled = previous }
@@ -55,7 +56,7 @@ final class DeviceLinkModel {
         guard let settings, let messages, !isScanning else { return }
         isScanning = true
         defer { isScanning = false }
-        devices = await messages.attempt { try await CatalogService(settings: settings).rigScanDeviceLink() } ?? devices
+        await messages.attempt { self.devices = try await CatalogService(settings: settings).rigScanDeviceLink() }
     }
 
     /// Adds `device` to the rig; true when it was.

@@ -42,8 +42,8 @@ extension Error {
     }
 
     /// The board has no update service to reach: an older groove-catalog without the
-    /// `/system/updates` routes answers 404, and one whose groove-updater is off or
-    /// unreachable answers 502 or 503. The app then shows nothing about updates.
+    /// `/system/updates` routes answers 404 or 405, and one whose groove-updater is off
+    /// or unreachable answers 503 or 502. The app then shows nothing about updates.
     var meansNoUpdater: Bool {
         guard case let .http(status, _)? = self as? APIError else { return false }
         return noUpdaterStatuses.contains(status)
@@ -60,8 +60,8 @@ extension Error {
 /// The status groove-catalog answers when its release check refuses a tracklist.
 private let httpUnprocessable = 422
 
-/// Not found, bad gateway, service unavailable: see `meansNoUpdater`.
-private let noUpdaterStatuses: Set<Int> = [404, 502, 503]
+/// Not found, method not allowed, bad gateway, service unavailable: see `meansNoUpdater`.
+private let noUpdaterStatuses: Set<Int> = [404, 405, 502, 503]
 
 /// The refusal body of a failed confirm or save, when the server sent one.
 func decodeRefusal(_ body: String) -> ConfirmPreflightError? {
@@ -215,12 +215,14 @@ struct APIClient {
         }
     }
 
-    /// GETs a file: its bytes and the name the server gives it.
+    /// GETs a file: its bytes and the name the server gives it. Asked for once: the
+    /// one file is the support log, which the board builds again for each request,
+    /// and Share Logs has a Retry.
     func download(_ path: String) async throws -> DownloadedFile {
         var req = URLRequest(url: try makeURL(path))
         req.httpMethod = "GET"
         req.timeoutInterval = Self.downloadTimeout
-        let (data, response) = try await executeResponse(req)
+        let (data, response) = try await executeResponse(req, maxAttempts: 1)
         return DownloadedFile(name: attachmentName(response.value(forHTTPHeaderField: "Content-Disposition")), data: data)
     }
 
@@ -286,8 +288,11 @@ struct APIClient {
     }
 
     /// `execute`, keeping the response for its headers.
-    private func executeResponse(_ req: URLRequest) async throws -> (data: Data, response: HTTPURLResponse) {
-        let maxAttempts = req.httpMethod == "GET" ? 3 : 1
+    private func executeResponse(
+        _ req: URLRequest,
+        maxAttempts: Int? = nil
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
+        let maxAttempts = maxAttempts ?? (req.httpMethod == "GET" ? 3 : 1)
         var lastTransportError = APIError.transport("Unknown transport error.")
         for attempt in 1...maxAttempts {
             do {

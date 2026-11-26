@@ -74,10 +74,15 @@ final class ManualIdentifyModel {
         } != nil
     }
 
-    func submitManual(epoch: UInt64, artist: String, title: String, album: String?) async -> Bool {
+    /// `done` runs once it went through, inside the attempt: a Retry that goes through runs it too.
+    func submitManual(
+        epoch: UInt64, artist: String, title: String, album: String?,
+        then done: @escaping @MainActor () -> Void
+    ) async -> Bool {
         guard let settings, let messages else { return false }
         return await messages.attempt {
             _ = try await CatalogService(settings: settings).manualIdentify(epoch: epoch, artist: artist, title: title, album: album)
+            done()
         } != nil
     }
 }
@@ -236,13 +241,11 @@ struct ManualIdentifySheet: View {
 
     /// True when it went through; a failure is the message center's to tell.
     private func submitManual(artist: String, title: String, album: String?) async -> Bool {
-        let ok = await model.submitManual(epoch: epoch, artist: artist, title: title, album: album)
-        if ok {
+        await model.submitManual(epoch: epoch, artist: artist, title: title, album: album) {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onResolved()
             dismiss()
         }
-        return ok
     }
 }
 
@@ -451,11 +454,8 @@ struct ReleaseTracklistPickerSheet: View {
         guard let source = hit.source, let releaseId = hit.releaseId else { return }
         submittingOrdinal = ordinal
         let service = CatalogService(settings: settings)
-        let associated = await messages.attempt {
+        await messages.attempt {
             try await service.associatePlayToReleaseRow(epoch: epoch, source: source, releaseId: releaseId, ordinal: ordinal)
-        } != nil
-        submittingOrdinal = nil
-        if associated {
             // A multi-track release is worth asking about — turning the session
             // user-confirmed here lets offline mode assign the rest of the
             // tracklist automatically for the rest of this sitting, with no more
@@ -466,6 +466,7 @@ struct ReleaseTracklistPickerSheet: View {
                 onResolved()
             }
         }
+        submittingOrdinal = nil
     }
 
     private func confirmSession(wholeAlbum: Bool) async {

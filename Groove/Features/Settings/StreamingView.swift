@@ -195,10 +195,10 @@ final class StreamingModel {
 
     func set(_ name: StreamingExtraName, enabled: Bool) async {
         guard let settings, let messages else { return }
-        let started = await messages.attempt {
+        await messages.attempt {
             self.apply(try await CatalogService(settings: settings).setStreamingExtra(name, enabled: enabled))
-        } != nil
-        if started { await followChange() }
+            await self.followChange()
+        }
     }
 
     func select(_ output: RigAudioOutput) async {

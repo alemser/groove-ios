@@ -21,6 +21,7 @@ final class UpdateModelsTests: XCTestCase {
         "components": ["groove-display"]
       },
       "approved_release": "2026.12.2",
+      "awaiting_approval": false,
       "last_check": {"at": "2026-12-14T11:02:00Z", "error": ""},
       "last_result": {
         "release": "2026.12.1",
@@ -60,6 +61,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertEqual(s.available?.notes, "Fixes the screen staying dim after Bluetooth pauses.")
         XCTAssertEqual(s.available?.security, false)
         XCTAssertEqual(s.approvedRelease, "2026.12.2")
+        XCTAssertFalse(s.awaitingApproval)
         XCTAssertEqual(s.lastCheck?.at, "2026-12-14T11:02:00Z")
         XCTAssertEqual(s.lastResult?.outcome, .installed)
     }
@@ -74,6 +76,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertNil(s.lastCheck)
         XCTAssertNil(s.lastResult)
         XCTAssertEqual(s.installedLabel, "Not a release")
+        XCTAssertFalse(s.awaitingApproval, "a board from before the field awaits nothing")
     }
 
     /// A newer board may add fields and values: the answer still decodes.
@@ -144,9 +147,17 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertFalse(approved.canApprove)
         XCTAssertTrue(approved.isWaitingToInstall)
 
-        let installing = try status { $0.phase = .installing }
-        XCTAssertFalse(installing.canApprove)
-        XCTAssertFalse(installing.isWaitingToInstall, "the approval can't be withdrawn once the install started")
+        // groove-updater refuses `DELETE /approval` only once the install started (`InstallStarted`).
+        let downloading = try status { $0.phase = .downloading }
+        XCTAssertFalse(downloading.canApprove)
+        XCTAssertTrue(downloading.isWaitingToInstall, "the approval can be withdrawn while the release downloads")
+        XCTAssertEqual(downloading.statusLine, "Updating…")
+
+        for phase in [UpdatePhase.installing, .verifying, .rollingBack] {
+            let started = try status { $0.phase = phase }
+            XCTAssertFalse(started.canApprove)
+            XCTAssertFalse(started.isWaitingToInstall, "the approval can't be withdrawn once the install started")
+        }
 
         let unanswered = try status { $0.preference = .unset; $0.phase = .idle; $0.approvedRelease = "" }
         XCTAssertFalse(unanswered.canApprove)
@@ -171,9 +182,10 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertNil(UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: true))
     }
 
-    func testOffersAnAvailableReleaseInAskFirstModeUntilLater() throws {
+    func testOffersAReleaseAwaitingApprovalUntilLater() throws {
         let s = try status { s in
             s.phase = .idle; s.approvedRelease = ""; s.available = self.available; s.lastResult = nil
+            s.awaitingApproval = true
         }
         XCTAssertEqual(
             UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: false),
@@ -188,6 +200,15 @@ final class UpdateModelsTests: XCTestCase {
             "available-2026.12.3",
             "Later holds for one release only"
         )
+    }
+
+    /// The board says when a release awaits approval (`awaiting_approval`); the app doesn't work it out.
+    func testOnlyTheBoardsAwaitingApprovalOffersARelease() throws {
+        let notAwaiting = try status { s in
+            s.phase = .idle; s.approvedRelease = ""; s.available = self.available; s.lastResult = nil
+            s.awaitingApproval = false
+        }
+        XCTAssertNil(UpdateNotice.next(for: notAwaiting, seen: nothingSeen, questionDeferred: false))
     }
 
     func testNoAvailableNoticeOnceApprovedOrInAutomaticMode() throws {
@@ -208,6 +229,7 @@ final class UpdateModelsTests: XCTestCase {
             UpdateNotice.next(for: installed, seen: nothingSeen, questionDeferred: false),
             .installed(release: "2026.12.2", notes: "Notes.")
         )
+        XCTAssertEqual(UpdateNotice.installed(release: "2026.12.2", notes: "").title, "Updated to 2026.12.2")
         XCTAssertNil(UpdateNotice.next(
             for: installed, seen: UpdateNoticeMemory(acknowledgedResult: installed.lastResult?.key), questionDeferred: false
         ))
@@ -225,16 +247,29 @@ final class UpdateModelsTests: XCTestCase {
     func testTheOutcomeComesBeforeTheNextAvailableRelease() throws {
         let s = try status { s in
             s.phase = .idle; s.approvedRelease = ""; s.available = self.available; s.lastResult = self.result(.installed, release: "2026.12.1")
+            s.awaitingApproval = true
         }
         XCTAssertEqual(UpdateNotice.next(for: s, seen: nothingSeen, questionDeferred: false)?.id, "installed-2026.12.1")
         let acknowledged = UpdateNoticeMemory(acknowledgedResult: s.lastResult?.key)
         XCTAssertEqual(UpdateNotice.next(for: s, seen: acknowledged, questionDeferred: false)?.id, "available-2026.12.2")
     }
 
+    // MARK: Settings footer
+
+    /// The updater's own error text is a Go error: it goes out in the support log, not on screen.
+    func testAFailedCheckReadsInPlainWords() {
+        let error = #"Get "https://updates.getoceano.com/": dial tcp: lookup updates.getoceano.com: no such host"#
+        let line = UpdatesSection.lastCheckLine(UpdateStatus.UpdateCheck(at: "2026-12-14T11:02:00Z", error: error))
+        XCTAssertTrue(line.hasPrefix("Last checked: "), line)
+        XCTAssertTrue(line.hasSuffix(". Couldn't check for updates."), line)
+        XCTAssertFalse(line.contains("dial tcp"), line)
+        XCTAssertEqual(UpdatesSection.lastCheckLine(nil), "Last checked: never")
+    }
+
     // MARK: A board without the update service
 
     func testOnlyMissingRoutesAndAnUnreachableUpdaterHideUpdates() {
-        for code in [404, 502, 503] {
+        for code in [404, 405, 502, 503] {
             XCTAssertTrue(APIError.http(status: code, body: "").meansNoUpdater, "\(code)")
         }
         XCTAssertFalse(APIError.http(status: 409, body: #"{"error": "release is not the available one"}"#).meansNoUpdater)

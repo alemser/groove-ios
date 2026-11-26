@@ -45,15 +45,18 @@ struct UpdatesSection: View {
         } header: {
             Text("Updates")
         } footer: {
-            Text(lastCheckLine(status.lastCheck)).foregroundStyle(Brand.muted)
+            Text(Self.lastCheckLine(status.lastCheck)).foregroundStyle(Brand.muted)
         }
     }
 
-    private func lastCheckLine(_ check: UpdateStatus.UpdateCheck?) -> String {
+    /// The footer under Updates. The updater's own error text is for support: it goes
+    /// out in the support log (Settings → Support → Share Logs), never on screen.
+    /// Android says the same.
+    static func lastCheckLine(_ check: UpdateStatus.UpdateCheck?) -> String {
         guard let check else { return "Last checked: never" }
         let when = "Last checked: \(Format.absolute(check.at))"
-        guard let error = check.error.nonEmpty else { return when }
-        return "\(when). The check failed: \(error)"
+        guard check.error.nonEmpty != nil else { return when }
+        return "\(when). Couldn't check for updates."
     }
 
     private func action(

@@ -47,13 +47,18 @@ enum UpdatePhase: String, UnknownTolerantDecodable {
     case rollingBack = "rolling_back"
     case unknown
 
-    /// The release is being fetched, switched in or rolled back: the app reads "Updating…".
-    var isInstalling: Bool {
+    /// The install has touched the board: an approval can no longer be withdrawn.
+    /// groove-updater's `Phase.InstallStarted` decides the same, and refuses
+    /// `DELETE /approval` from here on.
+    var installStarted: Bool {
         switch self {
-        case .downloading, .installing, .verifying, .rollingBack: true
-        case .idle, .checking, .waitingForIdle, .unknown: false
+        case .installing, .verifying, .rollingBack: true
+        case .idle, .checking, .downloading, .waitingForIdle, .unknown: false
         }
     }
+
+    /// The release is being fetched, switched in or rolled back: the app reads "Updating…".
+    var isInstalling: Bool { self == .downloading || installStarted }
 }
 
 /// How the last install ended.
@@ -74,6 +79,9 @@ struct UpdateStatus: Decodable, Equatable {
     var installed: InstalledRelease
     var available: AvailableRelease?
     var approvedRelease: String
+    /// The board waits for the person to approve `available` ("Ask me first",
+    /// nothing approved). The board decides it; false on a board from before the field.
+    var awaitingApproval: Bool
     var lastCheck: UpdateCheck?
     var lastResult: UpdateResult?
 
@@ -106,9 +114,27 @@ struct UpdateStatus: Decodable, Equatable {
 }
 
 extension UpdateStatus {
-    /// Approved and not started yet: the updater waits for the board to be idle.
-    /// The approval can still be withdrawn.
-    var isWaitingToInstall: Bool { approvedRelease.nonEmpty != nil && !phase.isInstalling }
+    private enum CodingKeys: String, CodingKey {
+        case preference, phase, installed, available, approvedRelease, awaitingApproval, lastCheck, lastResult
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        preference = try c.decode(UpdatePreference.self, forKey: .preference)
+        phase = try c.decode(UpdatePhase.self, forKey: .phase)
+        installed = try c.decode(InstalledRelease.self, forKey: .installed)
+        available = try c.decodeIfPresent(AvailableRelease.self, forKey: .available)
+        approvedRelease = try c.decode(String.self, forKey: .approvedRelease)
+        awaitingApproval = try c.decodeIfPresent(Bool.self, forKey: .awaitingApproval) ?? false
+        lastCheck = try c.decodeIfPresent(UpdateCheck.self, forKey: .lastCheck)
+        lastResult = try c.decodeIfPresent(UpdateResult.self, forKey: .lastResult)
+    }
+}
+
+extension UpdateStatus {
+    /// Approved and the install not started: the release downloads, or the updater
+    /// waits for the board to be idle. The approval can still be withdrawn ("Cancel").
+    var isWaitingToInstall: Bool { approvedRelease.nonEmpty != nil && !phase.installStarted }
 
     /// While this holds the status changes on its own within seconds, so the app
     /// keeps reading it: an install, an approval waiting for idle, a check running.
@@ -134,7 +160,7 @@ extension UpdateStatus {
             return "Update to \(lastResult.release) failed; the previous version is running"
         }
         if let lastResult, lastResult.outcome == .installed, lastResult.release == installed.release {
-            return "Updated to \(lastResult.release)"
+            return updatedTo(lastResult.release)
         }
         if lastCheck == nil { return "Not checked yet" }
         return "Up to date"
@@ -171,7 +197,7 @@ enum UpdateNotice: Equatable, Identifiable {
         switch self {
         case .question: "Oceano updates"
         case .available: "Update available"
-        case let .installed(release, _): "Updated to \(release)"
+        case let .installed(release, _): updatedTo(release)
         case .failed: "Update didn't work"
         }
     }
@@ -186,8 +212,8 @@ enum UpdateNotice: Equatable, Identifiable {
     }
 
     /// The question first: until it has an answer the board does nothing else.
-    /// Then how the last install ended, once per install, then a release waiting
-    /// for approval in "Ask me first" mode, unless this phone answered "Later" for it.
+    /// Then how the last install ended, once per install, then a release the board
+    /// says awaits approval, unless this phone answered "Later" for it.
     /// `questionDeferred`: the question was put away during this connection.
     static func next(for status: UpdateStatus, seen: UpdateNoticeMemory, questionDeferred: Bool) -> UpdateNotice? {
         if status.preference == .unset {
@@ -200,10 +226,12 @@ enum UpdateNotice: Equatable, Identifiable {
             case .unknown: break
             }
         }
-        if status.preference == .askFirst, let available = status.available,
-           status.approvedRelease.nonEmpty == nil, available.release != seen.dismissedRelease {
+        if status.awaitingApproval, let available = status.available, available.release != seen.dismissedRelease {
             return .available(release: available.release, notes: available.notes, security: available.security)
         }
         return nil
     }
 }
+
+/// "Updated to <release>": Settings' status line and the one-time notice say the same.
+private func updatedTo(_ release: String) -> String { "Updated to \(release)" }

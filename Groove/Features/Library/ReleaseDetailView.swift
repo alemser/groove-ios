@@ -277,13 +277,11 @@ struct ReleaseDetailView: View {
     private func delete() async {
         deleting = true
         let service = CatalogService(settings: settings)
-        let removed = await messages.attempt {
+        await messages.attempt {
             try await service.deleteLibraryRelease(source: release.source, releaseId: release.releaseId)
-        } != nil
-        deleting = false
-        if removed {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         }
+        deleting = false
     }
 }

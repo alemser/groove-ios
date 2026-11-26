@@ -62,7 +62,8 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
 
 - `Core/APIClient.swift` — thin HTTP client; `Error.localizedForDisplay` is the one place error
   text is decided, don't reimplement `(error as? APIError)?.localizedDescription ?? ...` inline.
-  GET requests retry once with backoff (mDNS resolution on cold launch is flaky) — see the file's
+  GET requests are tried up to three times with backoff (mDNS resolution on cold launch is flaky),
+  except the support log download, which the board builds again for each request — see the file's
   `execute(_:)` doc comment before changing retry behavior.
 - `Core/Poller.swift` — shared polling-loop primitive; every screen that polls the catalog for
   live state (`NowPlayingModel`, `CatalogSessionModel`, `AttentionCenter`) uses this instead of
@@ -78,7 +79,8 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   `ReleasesModel` and 3 other models before being caught and fixed as a batch.
 - `Core/MessageCenter.swift` is the one channel for an action that failed (save, delete, a rig
   button) and for a short acknowledgement: `messages.attempt { … }` runs a write and offers Retry
-  when it fails. It shows as a banner in a window of its own above every sheet
+  when it fails. Retry runs the closure again and nothing else, so what must follow a success
+  (taking the answer, reading again, closing the sheet) goes inside the closure. It shows as a banner in a window of its own above every sheet
   (`App/MessageBanner.swift`); Android shows the same messages as a snackbar. A failed primary
   fetch keeps `ErrorStateView`, a wrong form value stays under its field. No screen draws its own
   red line.
@@ -86,7 +88,7 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   groove-catalog's `/system/updates`), app-wide: `MainTabView` presents its `notice` (the first-use
   question, an available release, an install's outcome) and Settings → Updates reads it. What to
   show for a status is decided in `Models/UpdateModels.swift` (pure, tested in `GrooveTests`). What
-  the phone already showed is kept per board in `AppSettings`. A 404/502/503 means the board has no
+  the phone already showed is kept per board in `AppSettings`. A 404/405/502/503 means the board has no
   update service: nothing about updates shows.
 - `Core/WifiSetupClient.swift` / `Features/Onboarding/` — the board's Wi-Fi setup routes
   (groove-provision's `PROTOCOL.md`); the setup network's prefix and address must match

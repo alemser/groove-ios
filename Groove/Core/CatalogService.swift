@@ -66,9 +66,14 @@ struct CatalogService {
         try await api.delete("/system/updates/approval", as: UpdateStatus.self)
     }
 
-    /// The board's support log (groove-updater, forwarded): a gzip file for the user to send on.
+    /// The board's support log (groove-updater, forwarded): a gzip file for the user to
+    /// send on. A board without the updater can't make one, and says so in plain words.
     func supportLog() async throws -> DownloadedFile {
-        try await api.download("/system/logs")
+        do {
+            return try await api.download("/system/logs")
+        } catch where error.meansNoUpdater {
+            throw SupportLogError.unavailable
+        }
     }
 
     // MARK: Tracks

@@ -141,11 +141,12 @@ struct RigView: View {
         let previous = rigEnabled
         rigEnabled = on
         let service = CatalogService(settings: settings)
-        guard await messages.attempt({ try await service.rigSetControl(enabled: on) }) != nil else {
-            rigEnabled = previous
-            return
-        }
-        await loadRig()
+        let done = await messages.attempt {
+            try await service.rigSetControl(enabled: on)
+            rigEnabled = on
+            await loadRig()
+        } != nil
+        if !done { rigEnabled = previous }
     }
 
     private func loadAmpStatus() async {

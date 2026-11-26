@@ -33,10 +33,14 @@ final class EnricherSettingsModel {
         }
     }
 
+    /// Reads the chain again either way: refused, the switch goes back to what the board holds.
     func setEnabled(id: String, enabled: Bool) async {
         guard let settings, let messages else { return }
-        await messages.attempt { try await CatalogService(settings: settings).setEnricherEnabled(id: id, enabled: enabled) }
-        await load()
+        let done = await messages.attempt {
+            try await CatalogService(settings: settings).setEnricherEnabled(id: id, enabled: enabled)
+            await self.load()
+        } != nil
+        if !done { await load() }
     }
 
     func reorder(_ order: [String]) async {
