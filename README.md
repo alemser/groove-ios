@@ -74,7 +74,8 @@ the wire contract lives in one place. Views depend on small `@MainActor`
 ## Build & run
 
 The Xcode project is generated from `project.yml` with
-[XcodeGen](https://github.com/yonaskolb/XcodeGen) (committed for convenience):
+[XcodeGen](https://github.com/yonaskolb/XcodeGen); `Groove.xcodeproj` is not committed, so
+generate it after a clone and after any change to `project.yml`:
 
 ```bash
 brew install xcodegen        # if you don't have it

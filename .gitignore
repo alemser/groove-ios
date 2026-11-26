@@ -11,9 +11,8 @@ xcuserdata/
 *.dSYM
 
 # The Xcode project is generated from project.yml via `xcodegen generate`.
-# It is committed for convenience but regenerated on demand; ignore user cruft.
-Groove.xcodeproj/xcuserdata/
-Groove.xcodeproj/project.xcworkspace/xcuserdata/
+# It is not committed: project.yml is the source.
+Groove.xcodeproj/
 
 # macOS
 .DS_Store
