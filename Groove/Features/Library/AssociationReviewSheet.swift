@@ -257,19 +257,7 @@ struct AssociationRowView: View {
 
     private var hasSuggestion: Bool { (item.suggestedTrackId ?? 0) > 0 }
 
-    /// Mirrors the web pending panel's `pendingContextLabel`: was this
-    /// captured mid a known, correctly-identified play (and after which
-    /// track), or is there no session context to anchor it at all?
-    private var contextLabel: String {
-        switch item.suggestion?.reason {
-        case "last_known_track_no_next":
-            return "During known play: after \"\(item.suggestion?.title ?? "a known track")\""
-        case "expected_next_track":
-            return "During known play: expected next track in album"
-        default:
-            return (item.playTrackId ?? 0) > 0 ? "During known play" : "No active session context"
-        }
-    }
+    private var contextLabel: String { item.contextLabel }
 
     private var capturedDurationLabel: String? {
         guard let ms = item.capturedMs, ms > 0 else { return nil }
@@ -311,7 +299,7 @@ struct AssociationRowView: View {
                 // reasons in full sentences — only show the raw humanized
                 // reason for anything else, to avoid saying the same thing twice.
                 if let reason = item.suggestion?.reason,
-                   reason != "last_known_track_no_next", reason != "expected_next_track",
+                   !PendingAssociation.contextReasons.contains(reason),
                    let humanized = reason.humanizedReason {
                     Text(humanized)
                         .font(.caption)

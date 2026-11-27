@@ -404,6 +404,29 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
     var capturedMs: Int64?
 
     var id: UInt64 { listenerEpoch }
+
+    /// Suggestion reasons `contextLabel` spells out in full, so the review
+    /// row does not repeat them as a humanized reason.
+    static let contextReasons: Set<String> = ["last_known_track_no_next", "expected_next_track", "different_record"]
+
+    /// Mirrors the web pending panel's `pendingContextLabel`: was this
+    /// captured mid a known, correctly-identified play (and after which
+    /// track), after the record seems to have changed, or with no session
+    /// context to anchor it at all?
+    var contextLabel: String {
+        switch suggestion?.reason {
+        case "last_known_track_no_next":
+            return "During known play: after \"\(suggestion?.title ?? "a known track")\""
+        case "expected_next_track":
+            return "During known play: expected next track in album"
+        case "different_record":
+            let was = [suggestion?.sessionArtist?.nonEmpty, suggestion?.sessionAlbum?.nonEmpty]
+                .compactMap { $0 }.joined(separator: " – ")
+            return was.isEmpty ? "This sounds like another record." : "Was playing \(was). This sounds like another record."
+        default:
+            return (playTrackId ?? 0) > 0 ? "During known play" : "No active session context"
+        }
+    }
 }
 
 /// Why the recognizer proposed this particular match — surfaced in the
@@ -414,6 +437,10 @@ struct IdentificationSuggestion: Decodable, Hashable {
     var title: String?
     var ordinal: Int?
     var trackId: Int64?
+    /// `different_record` only: the record groove-identity's album programme
+    /// was following (groove-identity #101).
+    var sessionArtist: String?
+    var sessionAlbum: String?
 }
 
 struct PendingAssociationsResponse: Decodable {
