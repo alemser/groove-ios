@@ -257,8 +257,6 @@ struct AssociationRowView: View {
 
     private var hasSuggestion: Bool { (item.suggestedTrackId ?? 0) > 0 }
 
-    private var contextLabel: String { item.contextLabel }
-
     private var capturedDurationLabel: String? {
         guard let ms = item.capturedMs, ms > 0 else { return nil }
         return "captured \(Format.duration(ms))"
@@ -292,20 +290,9 @@ struct AssociationRowView: View {
                     Text(item.failureReason?.humanizedReason ?? "No suggestion")
                         .font(.subheadline).foregroundStyle(Brand.muted)
                 }
-                Text([contextLabel, capturedDurationLabel].compactMap { $0 }.joined(separator: " · "))
+                Text([item.contextLabel?.nonEmpty, capturedDurationLabel].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(Brand.teal)
-                // contextLabel above already spells out the album-programme
-                // reasons in full sentences — only show the raw humanized
-                // reason for anything else, to avoid saying the same thing twice.
-                if let reason = item.suggestion?.reason,
-                   !PendingAssociation.contextReasons.contains(reason),
-                   let humanized = reason.humanizedReason {
-                    Text(humanized)
-                        .font(.caption)
-                        .foregroundStyle(Brand.muted)
-                        .italic()
-                }
             }
             HStack(spacing: 10) {
                 if hasSuggestion {

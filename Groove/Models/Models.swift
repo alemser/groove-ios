@@ -402,45 +402,20 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
     /// open when this row is registered) — a hint toward which catalog track
     /// this might be, by comparing against known track durations.
     var capturedMs: Int64?
+    /// What was playing when this was captured, as groove-catalog words it
+    /// for every review screen (its `domain.PendingContextLabel`).
+    var contextLabel: String?
 
     var id: UInt64 { listenerEpoch }
-
-    /// Suggestion reasons `contextLabel` spells out in full, so the review
-    /// row does not repeat them as a humanized reason.
-    static let contextReasons: Set<String> = ["last_known_track_no_next", "expected_next_track", "different_record"]
-
-    /// Mirrors the web pending panel's `pendingContextLabel`: was this
-    /// captured mid a known, correctly-identified play (and after which
-    /// track), after the record seems to have changed, or with no session
-    /// context to anchor it at all?
-    var contextLabel: String {
-        switch suggestion?.reason {
-        case "last_known_track_no_next":
-            return "During known play: after \"\(suggestion?.title ?? "a known track")\""
-        case "expected_next_track":
-            return "During known play: expected next track in album"
-        case "different_record":
-            let was = [suggestion?.sessionArtist?.nonEmpty, suggestion?.sessionAlbum?.nonEmpty]
-                .compactMap { $0 }.joined(separator: " – ")
-            return was.isEmpty ? "This sounds like another record." : "Was playing \(was). This sounds like another record."
-        default:
-            return (playTrackId ?? 0) > 0 ? "During known play" : "No active session context"
-        }
-    }
 }
 
 /// Why the recognizer proposed this particular match — surfaced in the
 /// association review sheet so "Accept" isn't a leap of faith.
 struct IdentificationSuggestion: Decodable, Hashable {
     var source: String?
-    var reason: String?
     var title: String?
     var ordinal: Int?
     var trackId: Int64?
-    /// `different_record` only: the record groove-identity's album programme
-    /// was following (groove-identity #101).
-    var sessionArtist: String?
-    var sessionAlbum: String?
 }
 
 struct PendingAssociationsResponse: Decodable {
@@ -764,8 +739,6 @@ extension String {
         case "no_match": return "No match"
         case "provider_error": return "Provider error"
         case "programme_end": return "Programme end"
-        case "expected_next_track": return "Next track in album sequence"
-        case "last_known_track_no_next": return "Last confirmed track (no next expected)"
         default: return nonEmpty?.idWords
         }
     }
