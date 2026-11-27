@@ -8,6 +8,7 @@ final class UpdateModelsTests: XCTestCase {
     private let contractExample = """
     {
       "preference": "ask_first",
+      "time_zone": "Europe/Berlin",
       "phase": "waiting_for_idle",
       "installed": {
         "release": "2026.12.1",
@@ -65,6 +66,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertFalse(s.askUser)
         XCTAssertEqual(s.lastCheck?.at, "2026-12-14T11:02:00Z")
         XCTAssertEqual(s.lastResult?.outcome, .installed)
+        XCTAssertEqual(s.timeZone, "Europe/Berlin")
     }
 
     func testDecodesNullsBeforeTheFirstCheckAndInstall() throws {
@@ -78,6 +80,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertNil(s.lastResult)
         XCTAssertEqual(s.installedLabel, "Not a release")
         XCTAssertFalse(s.askUser, "a board from before the field asks nothing")
+        XCTAssertEqual(s.timeZone, "", "a board from before the field holds no zone")
     }
 
     /// A newer board may add fields and values: the answer still decodes.
@@ -103,6 +106,38 @@ final class UpdateModelsTests: XCTestCase {
     func testCaptureLevelBandStillDecodesUnknownValues() throws {
         let bands = try APIClient.decoder.decode([CaptureLevelBand].self, from: Data(#"["too_low", "deafening"]"#.utf8))
         XCTAssertEqual(bands, [.tooLow, .unknown])
+    }
+
+    // MARK: Time zone
+
+    func testSendsThePhonesZoneWhenTheBoardHoldsAnother() {
+        XCTAssertEqual(
+            TimeZoneSend.next(boardZone: "", phoneZone: "Europe/Berlin", board: "oceano-0003.local", tried: []),
+            TimeZoneSend(board: "oceano-0003.local", zone: "Europe/Berlin")
+        )
+        XCTAssertEqual(
+            TimeZoneSend.next(boardZone: "Europe/Lisbon", phoneZone: "Europe/Berlin", board: "oceano-0003.local", tried: []),
+            TimeZoneSend(board: "oceano-0003.local", zone: "Europe/Berlin")
+        )
+    }
+
+    func testSendsNothingWhenTheZonesAgree() {
+        XCTAssertNil(TimeZoneSend.next(boardZone: "Europe/Berlin", phoneZone: "Europe/Berlin", board: "oceano-0003.local", tried: []))
+    }
+
+    /// The board refused it, lacks the route, or the request is still on its way:
+    /// every poll would otherwise send it again.
+    func testSendsAPairOncePerSession() {
+        let tried: Set = [TimeZoneSend(board: "oceano-0003.local", zone: "Europe/Berlin")]
+        XCTAssertNil(TimeZoneSend.next(boardZone: "", phoneZone: "Europe/Berlin", board: "oceano-0003.local", tried: tried))
+        XCTAssertNotNil(
+            TimeZoneSend.next(boardZone: "", phoneZone: "Europe/Berlin", board: "oceano-0001.local", tried: tried),
+            "another board is asked"
+        )
+        XCTAssertNotNil(
+            TimeZoneSend.next(boardZone: "Europe/Berlin", phoneZone: "America/New_York", board: "oceano-0003.local", tried: tried),
+            "the phone moved to another zone"
+        )
     }
 
     // MARK: Settings status line

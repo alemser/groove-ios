@@ -1,11 +1,13 @@
 import Foundation
 import Observation
+import os
 
 /// The connected board's update status, app-wide: the first-use question and the
 /// update notices are presented from it, and Settings → Updates reads and changes
 /// it. The preference, the approval and the reminders live on the board
 /// (groove-updater owns them); this keeps only the last answer read and which
-/// install outcome the phone already showed.
+/// install outcome the phone already showed. It also gives the board the phone's
+/// time zone, which the board's night install window is read in.
 @MainActor
 @Observable
 final class UpdateCenter {
@@ -20,6 +22,13 @@ final class UpdateCenter {
     /// The available release whose swiped-away notice is on its way to the board as
     /// "Remind me tomorrow" (`dismiss`); nil otherwise.
     private var remindingRelease: String?
+
+    /// Time zones sent to a board during this app session, taken, refused or still on
+    /// their way: each board/zone pair is sent once, so a board that refuses it or has
+    /// no route for it is not asked on every read.
+    private var timeZoneTried: Set<TimeZoneSend> = []
+
+    private static let log = Logger(subsystem: "com.alemser.groove", category: "updates")
 
     private var settings: AppSettings?
     private var messages: MessageCenter?
@@ -77,7 +86,7 @@ final class UpdateCenter {
         } catch {
             // A transient failure keeps the last status.
         }
-        syncPolling()
+        statusRead()
     }
 
     // MARK: Changes the person asks for
@@ -138,9 +147,45 @@ final class UpdateCenter {
         let service = CatalogService(settings: settings)
         return await messages.attempt { [weak self] in
             let updated = try await action(service)
-            self?.status = updated
-            self?.syncPolling()
+            self?.adopt(updated)
         } != nil
+    }
+
+    /// Takes the status a write answered with.
+    private func adopt(_ updated: UpdateStatus) {
+        status = updated
+        statusRead()
+    }
+
+    /// A status was read from the board, or the read failed: poll while it changes,
+    /// and give the board the phone's time zone when it holds another one.
+    private func statusRead() {
+        syncPolling()
+        sendTimeZoneIfNeeded()
+    }
+
+    /// Silent: the person asked for nothing, so a refusal is only logged.
+    private func sendTimeZoneIfNeeded() {
+        guard let settings, let status,
+              let send = TimeZoneSend.next(
+                  boardZone: status.timeZone,
+                  phoneZone: TimeZone.current.identifier,
+                  board: settings.updateBoardKey,
+                  tried: timeZoneTried
+              )
+        else { return }
+        timeZoneTried.insert(send)
+        let service = CatalogService(settings: settings)
+        Task { [weak self] in
+            do {
+                let updated = try await service.setUpdateTimeZone(send.zone)
+                // The answer is about that board: another one may be connected by now.
+                guard let self, self.settings?.updateBoardKey == send.board else { return }
+                self.adopt(updated)
+            } catch {
+                Self.log.error("time zone not sent to the board, \(send.zone, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func syncPolling() {

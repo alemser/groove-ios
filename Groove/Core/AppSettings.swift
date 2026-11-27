@@ -41,7 +41,7 @@ final class AppSettings {
 
     /// The board the update memory belongs to: the stored host is its Bonjour name
     /// (or the address entered by hand), which stays the same across DHCP leases.
-    private var updateBoardKey: String { host.trimmingCharacters(in: .whitespaces) }
+    var updateBoardKey: String { host.trimmingCharacters(in: .whitespaces) }
 
     /// What this phone remembers about the connected board's update notices.
     var updateNoticeMemory: UpdateNoticeMemory {

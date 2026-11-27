@@ -85,6 +85,10 @@ struct UpdateStatus: Decodable, Equatable {
     var askUser: Bool
     var lastCheck: UpdateCheck?
     var lastResult: UpdateResult?
+    /// The IANA zone the board reads its night install window in, as a phone sent it
+    /// (`PUT /system/updates/time_zone`); `""` until one did, and on a board from
+    /// before the field.
+    var timeZone: String
 
     struct InstalledRelease: Decodable, Equatable {
         /// `""` on a board written from an image that was not a release.
@@ -116,7 +120,7 @@ struct UpdateStatus: Decodable, Equatable {
 
 extension UpdateStatus {
     private enum CodingKeys: String, CodingKey {
-        case preference, phase, installed, available, approvedRelease, askUser, lastCheck, lastResult
+        case preference, phase, installed, available, approvedRelease, askUser, lastCheck, lastResult, timeZone
     }
 
     init(from decoder: Decoder) throws {
@@ -129,6 +133,7 @@ extension UpdateStatus {
         askUser = try c.decodeIfPresent(Bool.self, forKey: .askUser) ?? false
         lastCheck = try c.decodeIfPresent(UpdateCheck.self, forKey: .lastCheck)
         lastResult = try c.decodeIfPresent(UpdateResult.self, forKey: .lastResult)
+        timeZone = try c.decodeIfPresent(String.self, forKey: .timeZone) ?? ""
     }
 }
 
@@ -259,6 +264,24 @@ enum UpdateNotice: Equatable, Identifiable {
             return .available(release: available.release, notes: available.notes, security: available.security)
         }
         return nil
+    }
+}
+
+/// The phone's time zone sent to one board (`PUT /system/updates/time_zone`):
+/// groove-updater reads its night install window in it.
+struct TimeZoneSend: Hashable {
+    /// `AppSettings.updateBoardKey` of the board.
+    var board: String
+    /// IANA name, as `TimeZone.identifier` gives it.
+    var zone: String
+
+    /// The send to make now, or nil: the board's zone differs from the phone's and
+    /// this pair is not in `tried` (on its way, or refused during this app session),
+    /// so a board that refuses the zone or lacks the route is not asked on every read.
+    static func next(boardZone: String, phoneZone: String, board: String, tried: Set<TimeZoneSend>) -> TimeZoneSend? {
+        guard !phoneZone.isEmpty, boardZone != phoneZone else { return nil }
+        let send = TimeZoneSend(board: board, zone: phoneZone)
+        return tried.contains(send) ? nil : send
     }
 }
 

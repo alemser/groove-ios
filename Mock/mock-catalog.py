@@ -43,6 +43,7 @@ Scenarios, for checking a screen against what a board does:
       older catalog: 404), off (the updater is off: 503). Unset: ask first and
       up to date. The preference, approval, reminder and check change the
       mock's state; ask_user turns false once the release is put off.
+      time_zone is "" until a phone sends one (PUT .../time_zone; 400 for "").
                   GET /system/logs answers a small gzip support log, 404 or 503 as above.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
@@ -274,7 +275,7 @@ FAIL_PREFIXES = [p for p in os.environ.get("FAIL_PREFIX", "").split(",") if p]
 UPDATES = os.environ.get("UPDATES", "")
 
 def update_status_initial():
-    s = {"preference": "ask_first", "phase": "idle",
+    s = {"preference": "ask_first", "time_zone": "", "phase": "idle",
          "installed": {"release": "2026.12.1", "components": [{"name": "groove-catalog", "version": "a1b2c3d"}]},
          "available": None, "approved_release": "",
          "last_check": {"at": "2026-12-14T11:02:00Z", "error": ""}, "last_result": None}
@@ -324,6 +325,9 @@ def update_route_raw(method, path, body):
         if body.get("preference") not in ("automatic", "ask_first"):
             return 400, {"error": "preference must be automatic or ask_first"}
         s["preference"] = body["preference"]; return 200, s
+    if method == "PUT" and path == "/system/updates/time_zone":
+        if not body.get("time_zone"): return 400, {"error": "time_zone must name a zone"}
+        s["time_zone"] = body["time_zone"]; return 200, s
     if s["preference"] == "unset": return 409, {"error": "no update preference set yet"}
     if method == "POST" and path == "/system/updates/check":
         s["last_check"] = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "error": ""}

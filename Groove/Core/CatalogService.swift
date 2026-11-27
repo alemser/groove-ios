@@ -52,6 +52,12 @@ struct CatalogService {
         return try await api.put("/system/updates/preference", body: Body(preference: preference))
     }
 
+    /// 400 for a name that is not a zone; an updater from before the route answers 404/405.
+    func setUpdateTimeZone(_ timeZone: String) async throws -> UpdateStatus {
+        struct Body: Encodable { let timeZone: String }
+        return try await api.put("/system/updates/time_zone", body: Body(timeZone: timeZone))
+    }
+
     /// Answers 202 with the status as the check starts; its result comes later.
     func checkForUpdates() async throws -> UpdateStatus {
         try await api.post("/system/updates/check", body: Empty())
