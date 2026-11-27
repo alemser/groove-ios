@@ -402,6 +402,9 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
     /// open when this row is registered) — a hint toward which catalog track
     /// this might be, by comparing against known track durations.
     var capturedMs: Int64?
+    /// What was playing when this was captured, as groove-catalog words it
+    /// for every review screen (its `domain.PendingContextLabel`).
+    var contextLabel: String?
 
     var id: UInt64 { listenerEpoch }
 }
@@ -410,7 +413,6 @@ struct PendingAssociation: Decodable, Identifiable, Hashable {
 /// association review sheet so "Accept" isn't a leap of faith.
 struct IdentificationSuggestion: Decodable, Hashable {
     var source: String?
-    var reason: String?
     var title: String?
     var ordinal: Int?
     var trackId: Int64?
@@ -737,8 +739,6 @@ extension String {
         case "no_match": return "No match"
         case "provider_error": return "Provider error"
         case "programme_end": return "Programme end"
-        case "expected_next_track": return "Next track in album sequence"
-        case "last_known_track_no_next": return "Last confirmed track (no next expected)"
         default: return nonEmpty?.idWords
         }
     }
