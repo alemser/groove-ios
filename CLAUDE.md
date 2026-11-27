@@ -84,7 +84,7 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   groove-catalog's `/system/updates`), app-wide: `MainTabView` presents its `notice` (the first-use
   question, an available release, an install's outcome) and Settings → Updates reads it. What to
   show for a status is decided in `Models/UpdateModels.swift` (pure, tested in `GrooveTests`). What
-  the phone already showed is kept per board in `AppSettings`. A 404/405/502/503 means the board has no
+  the phone already showed is kept per board in `AppSettings`. A 502/503 means the board has no
   update service: nothing about updates shows.
 - `Core/WifiSetupClient.swift` / `Features/Onboarding/` — the board's Wi-Fi setup routes
   (groove-provision's `PROTOCOL.md`); the setup network's prefix and address must match

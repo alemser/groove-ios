@@ -171,7 +171,7 @@ struct HomeView: View {
     // MARK: - Recognition pause
 
     /// Discreet top-of-Home quick toggle for "pause recognition, listen
-    /// freely / stop the noise on the kiosk when an album won't match" — the
+    /// freely / stop the noise on the screen when an album won't match" — the
     /// use case doesn't fit burying this in Settings, unlike Offline Mode.
     private var recognitionPauseButton: some View {
         Button {

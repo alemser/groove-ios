@@ -176,20 +176,16 @@ struct RigTargetStatus: Decodable, Identifiable {
 struct RigBackend: Decodable, Identifiable {
     var id: String
     var host: String?
-    var paired: Bool?
+    /// The bridge has a device to talk to.
+    var paired: Bool
     var healthy: Bool
     var error: String?
     var capabilities: RigBackendCapabilities?
-
-    /// The bridge has a device to talk to. `paired` is absent from a rig
-    /// that predates new installations shipping their bridge unpaired;
-    /// those always had theirs set up.
-    var isPaired: Bool { paired ?? true }
 }
 
 struct RigBackendCapabilities: Decodable {
     var pair: Bool?
-    /// Absent from a rig that can't search the network for bridges.
+    /// False for a bridge that can't be searched for on the network.
     var discover: Bool?
 }
 
@@ -209,7 +205,7 @@ struct RigSnapshot: Decodable {
     /// input is set by hand.
     var irBridgePaired: Bool {
         guard let backends else { return true }
-        return backends.contains(where: \.isPaired)
+        return backends.contains(where: \.paired)
     }
 }
 

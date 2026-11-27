@@ -17,6 +17,7 @@ struct ArrangeRemoteView: View {
     var body: some View {
         NavigationStack {
             Group {
+                // Arrange opens only once the layout is read, and a failed read keeps it.
                 if let layout = model.layout {
                     List {
                         ForEach(layout.panels) { panel in
@@ -43,9 +44,6 @@ struct ArrangeRemoteView: View {
                         }
                     }
                     .environment(\.editMode, .constant(.active))
-                } else {
-                    ContentUnavailableView("Can’t arrange the remote", systemImage: "rectangle.3.group",
-                                           description: Text("This Oceano needs a newer rig service."))
                 }
             }
             .scrollContentBackground(.hidden)

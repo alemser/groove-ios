@@ -43,15 +43,15 @@ final class SupportLogTests: XCTestCase {
         XCTAssertEqual(log.data, gzip)
     }
 
-    /// groove-catalog's answers without the updater: no route (404, 405), updater off or down (503, 502).
+    /// groove-catalog's answers without the updater: updater off or down (503, 502).
     func testABoardWithoutTheUpdaterSaysInPlainWordsItCantMakeALog() async {
-        for status in [404, 405, 502, 503] {
+        for status in [502, 503] {
             StubProtocol.answer = (status, [:], Data("updater unreachable\n".utf8))
             do {
                 _ = try await catalogSupportLog()
                 XCTFail("a \(status) read as a log")
             } catch {
-                XCTAssertEqual(error.localizedForDisplay, "This Oceano can't make a support log yet. Update it first.", "\(status)")
+                XCTAssertEqual(error.localizedForDisplay, "This Oceano can't make a support log right now: its update service isn't running.", "\(status)")
             }
         }
     }

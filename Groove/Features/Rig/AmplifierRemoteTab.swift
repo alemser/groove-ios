@@ -3,9 +3,9 @@ import SwiftUI
 /// Live control: the day-to-day "use it" screen, as opposed to
 /// Configuration (device attributes) or Equipment (teaching commands).
 /// What's on it and where comes from the remote layout groove-rig keeps
-/// (shared with the web remote, arranged via "Arrange"); against an older
-/// groove-rig without layouts it falls back to fixed amplifier cards plus
-/// one card per piece of equipment.
+/// (shared with the web remote, arranged via "Arrange"); until that layout
+/// is read it shows fixed amplifier cards plus one card per piece of
+/// equipment.
 struct AmplifierRemoteTab: View {
     let model: AmplifierModel
     let equipmentModel: EquipmentRemoteModel

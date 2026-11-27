@@ -7,8 +7,7 @@ import Observation
 @MainActor
 @Observable
 final class AmplifierStateModel {
-    /// nil until the first answer, and after a failed fetch: an older
-    /// groove-rig without the endpoint, or the catalog unreachable.
+    /// nil until the first answer, and after a failed fetch.
     private(set) var observation: RigAmplifierObservation?
     private(set) var hud: AmplifierHUD?
 

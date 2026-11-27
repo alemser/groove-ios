@@ -60,8 +60,7 @@ final class AmplifierConfigModel {
         }
         // Profiles and the format hint are supplementary — a failure fetching
         // either shouldn't blank a screen that already has a real config to
-        // show. An older groove-rig has no format-hint route at all, so a 404
-        // there must not block the rest of the screen either.
+        // show.
         if let profResp = try? await profs {
             profiles = profResp.profiles
             activeProfileId = profResp.activeProfileId

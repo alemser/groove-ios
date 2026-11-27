@@ -3,14 +3,14 @@ import Foundation
 /// Why Share Logs didn't get to the share sheet, in the words the person reads.
 /// Android says the same.
 enum SupportLogError: LocalizedError {
-    /// The board has no updater, which makes the log: it runs a release from before it.
+    /// The board's updater, which makes the log, is off or doesn't answer.
     case unavailable
     /// The phone couldn't keep the file.
     case onPhone
 
     var errorDescription: String? {
         switch self {
-        case .unavailable: "This Oceano can't make a support log yet. Update it first."
+        case .unavailable: "This Oceano can't make a support log right now: its update service isn't running."
         case .onPhone: "This phone couldn't prepare the log to share."
         }
     }

@@ -16,7 +16,7 @@ final class LibrarySuggestionsModel {
     /// A refused add the user may still force (tracklist warnings — never a
     /// missing duration, which has no override).
     var pendingForce: PendingForce?
-    /// A draft copy to open in the editor ("Edit First").
+    /// A copy to open in the editor ("Edit First").
     var forked: ForkedEdition?
 
     enum Phase: Equatable { case loading, loaded, error(String) }
@@ -104,7 +104,7 @@ final class LibrarySuggestionsModel {
         }
     }
 
-    /// Opens a draft copy of the edition in the editor. The suggestion stays
+    /// Opens a copy of the edition in the editor. The suggestion stays
     /// until that copy is saved — saving it is what adds it to the library.
     func edit(_ suggestion: LibrarySuggestion, _ edition: LibrarySuggestionEdition) async {
         guard let settings else { return }

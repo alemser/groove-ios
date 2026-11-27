@@ -41,9 +41,9 @@ extension Error {
         return (self as? APIError)?.localizedDescription ?? localizedDescription
     }
 
-    /// The board has no update service to reach: an older groove-catalog without the
-    /// `/system/updates` routes answers 404 or 405, and one whose groove-updater is off
-    /// or unreachable answers 503 or 502. The app then shows nothing about updates.
+    /// The board has no update service to reach: groove-catalog answers 503 when its
+    /// groove-updater is off and 502 when it doesn't answer. The app then shows nothing
+    /// about updates.
     var meansNoUpdater: Bool {
         guard case let .http(status, _)? = self as? APIError else { return false }
         return noUpdaterStatuses.contains(status)
@@ -60,8 +60,8 @@ extension Error {
 /// The status groove-catalog answers when its release check refuses a tracklist.
 private let httpUnprocessable = 422
 
-/// Not found, method not allowed, bad gateway, service unavailable: see `meansNoUpdater`.
-private let noUpdaterStatuses: Set<Int> = [404, 405, 502, 503]
+/// Bad gateway, service unavailable: see `meansNoUpdater`.
+private let noUpdaterStatuses: Set<Int> = [502, 503]
 
 /// The refusal body of a failed confirm or save, when the server sent one.
 func decodeRefusal(_ body: String) -> ConfirmPreflightError? {

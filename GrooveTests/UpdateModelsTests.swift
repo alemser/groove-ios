@@ -72,15 +72,14 @@ final class UpdateModelsTests: XCTestCase {
     func testDecodesNullsBeforeTheFirstCheckAndInstall() throws {
         let s = try decode("""
         {"preference": "unset", "phase": "idle", "installed": {"release": "", "components": []},
-         "available": null, "approved_release": "", "last_check": null, "last_result": null}
+         "available": null, "approved_release": "", "ask_user": false, "time_zone": "",
+         "last_check": null, "last_result": null}
         """)
         XCTAssertEqual(s.preference, .unset)
         XCTAssertNil(s.available)
         XCTAssertNil(s.lastCheck)
         XCTAssertNil(s.lastResult)
         XCTAssertEqual(s.installedLabel, "Not a release")
-        XCTAssertFalse(s.askUser, "a board from before the field asks nothing")
-        XCTAssertEqual(s.timeZone, "", "a board from before the field holds no zone")
     }
 
     /// A newer board may add fields and values: the answer still decodes.
@@ -88,7 +87,7 @@ final class UpdateModelsTests: XCTestCase {
         let s = try decode("""
         {"preference": "scheduled", "phase": "rebooting", "channel": "beta",
          "installed": {"release": "2026.12.1", "kernel": "6.18"},
-         "available": null, "approved_release": "", "last_check": null,
+         "available": null, "approved_release": "", "ask_user": false, "time_zone": "", "last_check": null,
          "last_result": {"release": "2026.12.1", "outcome": "partially_installed", "at": "2026-12-01T02:14:00Z", "notes": "", "error": ""}}
         """)
         XCTAssertEqual(s.preference, .unknown)
@@ -125,7 +124,7 @@ final class UpdateModelsTests: XCTestCase {
         XCTAssertNil(TimeZoneSend.next(boardZone: "Europe/Berlin", phoneZone: "Europe/Berlin", board: "oceano-0003.local", tried: []))
     }
 
-    /// The board refused it, lacks the route, or the request is still on its way:
+    /// The board refused it, or the request is still on its way:
     /// every poll would otherwise send it again.
     func testSendsAPairOncePerSession() {
         let tried: Set = [TimeZoneSend(board: "oceano-0003.local", zone: "Europe/Berlin")]
@@ -320,10 +319,11 @@ final class UpdateModelsTests: XCTestCase {
 
     // MARK: A board without the update service
 
-    func testOnlyMissingRoutesAndAnUnreachableUpdaterHideUpdates() {
-        for code in [404, 405, 502, 503] {
+    func testOnlyAnOffOrUnreachableUpdaterHidesUpdates() {
+        for code in [502, 503] {
             XCTAssertTrue(APIError.http(status: code, body: "").meansNoUpdater, "\(code)")
         }
+        XCTAssertFalse(APIError.http(status: 404, body: "").meansNoUpdater)
         XCTAssertFalse(APIError.http(status: 409, body: #"{"error": "release is not the available one"}"#).meansNoUpdater)
         XCTAssertFalse(APIError.http(status: 500, body: "").meansNoUpdater)
         XCTAssertFalse(APIError.unanswered.meansNoUpdater)

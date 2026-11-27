@@ -10,11 +10,11 @@ final class EquipmentRemoteModel {
     var isPerformingAction = false
     /// Well-known buttons and equipment templates from groove-rig — the
     /// server owns "which buttons does this kind of device have", not the
-    /// app. Supplementary: empty on an older server, and nothing breaks.
+    /// app. Supplementary: empty while unread, and nothing breaks.
     var vocabulary: [RigActionDef] = []
     var templates: [RigEquipmentTemplate] = []
     /// Built-in makes/models that ship IR codes. Supplementary like
-    /// templates: empty on a server without GET /rig/equipment/models.
+    /// templates (GET /rig/equipment/models).
     var builtInModels: [RigEquipmentModel] = []
     /// DeviceLink devices discovery lists now, for their online state;
     /// empty while the switch is off. Supplementary like templates.

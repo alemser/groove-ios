@@ -39,12 +39,12 @@ Scenarios, for checking a screen against what a board does:
       groove-catalog forwards it): nobody answered "automatic or ask first"
       yet, so the apps ask. Other values: available (ask first, a release with
       a security fix waits for approval), installed (automatic, a release just
-      installed), rolled_back (the last install was rolled back), none (an
-      older catalog: 404), off (the updater is off: 503). Unset: ask first and
+      installed), rolled_back (the last install was rolled back), off (the
+      updater is off: 503). Unset: ask first and
       up to date. The preference, approval, reminder and check change the
       mock's state; ask_user turns false once the release is put off.
       time_zone is "" until a phone sends one (PUT .../time_zone; 400 for "").
-                  GET /system/logs answers a small gzip support log, 404 or 503 as above.
+                  GET /system/logs answers a small gzip support log, 503 as above.
   MOCK_LOG=1      prints each request, with the seconds since start.
 """
 
@@ -317,7 +317,6 @@ def update_route(method, path, body):
     return code, update_answer(answer) if answer is UPDATE_STATUS else answer
 
 def update_route_raw(method, path, body):
-    if UPDATES == "none": return 404, {"error": "not found"}
     if UPDATES == "off": return 503, {"error": "groove-updater is not running"}
     s = UPDATE_STATUS
     if method == "GET" and path == "/system/updates": return 200, s
@@ -422,9 +421,8 @@ class H(http.server.BaseHTTPRequestHandler):
         self._json(answer, code); return True
     def _logs(self):
         """GET /system/logs: groove-updater's support log, a gzip file; the updater's
-        absence answers as on /system/updates (UPDATES=none 404, off 503)."""
+        absence answers as on /system/updates (UPDATES=off 503)."""
         if urlparse(self.path).path != "/system/logs": return False
-        if UPDATES == "none": self._json({"error": "not found"}, 404); return True
         if UPDATES == "off": self._json({"error": "groove-updater is not running"}, 503); return True
         import gzip
         b = gzip.compress(b"==== groove-updater status ====\n{\"phase\": \"idle\"}\n\n==== journalctl ====\nmock journal line\n")

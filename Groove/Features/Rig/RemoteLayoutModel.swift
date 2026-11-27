@@ -3,8 +3,8 @@ import Observation
 
 /// The remote's arrangement (GET/PUT/DELETE /rig/remote/layout) — shared
 /// with the web remote, so arranging it here rearranges it there too.
-/// `layout` stays nil against an older groove-rig without the route; the
-/// remote then falls back to its fixed cards.
+/// `layout` stays nil until the first read succeeds; the remote shows its
+/// fixed cards meanwhile.
 @MainActor
 @Observable
 final class RemoteLayoutModel {

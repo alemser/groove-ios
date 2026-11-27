@@ -79,11 +79,7 @@ final class EditReleaseModel {
         let service = CatalogService(settings: settings)
         do {
             // Resolved from the durable library release, never from
-            // `catalog_job_id` — that field names the job that *created* the
-            // release, whose draft has long since been consumed, so opening
-            // through it 404s (job gone) or races a job GC into a dangling
-            // foreign key on save. `libraryReleaseEdition` is the same fix
-            // the web studio already shipped for this.
+            // `catalog_job_id` (see `CatalogService.libraryReleaseEdition`).
             let resp = try await service.libraryReleaseEdition(source: release.source, releaseId: release.releaseId)
             if resp.job.id > 0 {
                 jobId = resp.job.id

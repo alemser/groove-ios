@@ -81,13 +81,12 @@ struct UpdateStatus: Decodable, Equatable {
     var approvedRelease: String
     /// The board asks the person about `available` now: it awaits approval and nobody
     /// put it off ("Remind me tomorrow" less than 24 h ago, "Don't ask again", a
-    /// withdrawn approval). The board decides it; false on a board from before the field.
+    /// withdrawn approval). The board decides it.
     var askUser: Bool
     var lastCheck: UpdateCheck?
     var lastResult: UpdateResult?
     /// The IANA zone the board reads its night install window in, as a phone sent it
-    /// (`PUT /system/updates/time_zone`); `""` until one did, and on a board from
-    /// before the field.
+    /// (`PUT /system/updates/time_zone`); `""` until one did.
     var timeZone: String
 
     struct InstalledRelease: Decodable, Equatable {
@@ -115,25 +114,6 @@ struct UpdateStatus: Decodable, Equatable {
 
         /// Tells this install apart from any other, so the phone acknowledges it once.
         var key: String { release + "@" + at }
-    }
-}
-
-extension UpdateStatus {
-    private enum CodingKeys: String, CodingKey {
-        case preference, phase, installed, available, approvedRelease, askUser, lastCheck, lastResult, timeZone
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        preference = try c.decode(UpdatePreference.self, forKey: .preference)
-        phase = try c.decode(UpdatePhase.self, forKey: .phase)
-        installed = try c.decode(InstalledRelease.self, forKey: .installed)
-        available = try c.decodeIfPresent(AvailableRelease.self, forKey: .available)
-        approvedRelease = try c.decode(String.self, forKey: .approvedRelease)
-        askUser = try c.decodeIfPresent(Bool.self, forKey: .askUser) ?? false
-        lastCheck = try c.decodeIfPresent(UpdateCheck.self, forKey: .lastCheck)
-        lastResult = try c.decodeIfPresent(UpdateResult.self, forKey: .lastResult)
-        timeZone = try c.decodeIfPresent(String.self, forKey: .timeZone) ?? ""
     }
 }
 
@@ -277,7 +257,7 @@ struct TimeZoneSend: Hashable {
 
     /// The send to make now, or nil: the board's zone differs from the phone's and
     /// this pair is not in `tried` (on its way, or refused during this app session),
-    /// so a board that refuses the zone or lacks the route is not asked on every read.
+    /// so a board that refuses the zone is not asked on every read.
     static func next(boardZone: String, phoneZone: String, board: String, tried: Set<TimeZoneSend>) -> TimeZoneSend? {
         guard !phoneZone.isEmpty, boardZone != phoneZone else { return nil }
         let send = TimeZoneSend(board: board, zone: phoneZone)

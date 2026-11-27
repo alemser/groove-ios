@@ -123,12 +123,8 @@ struct RigView: View {
     /// The switch, then — while it's on — the rig's own rows.
     private func loadRig() async {
         guard settings.isConfigured else { return }
-        do {
-            rigEnabled = try await CatalogService(settings: settings).rigControl().enabled
-        } catch {
-            // An older groove-rig has no switch: its rig is always on.
-            rigEnabled = true
-        }
+        // A failed read keeps what the switch showed (nil, disabled, at first).
+        rigEnabled = (try? await CatalogService(settings: settings).rigControl().enabled) ?? rigEnabled
         guard rigEnabled == true else { return }
         deviceLink.configure(settings, messages: messages)
         async let amp: Void = loadAmpStatus()
@@ -235,7 +231,7 @@ struct IRBridgeView: View {
                             Task { await model.search() }
                         } label: {
                             HStack {
-                                Text(model.isSearching ? "Searching…" : (bridge.isPaired ? "Search Again" : "Search for Bridges"))
+                                Text(model.isSearching ? "Searching…" : (bridge.paired ? "Search Again" : "Search for Bridges"))
                                 if model.isSearching {
                                     Spacer()
                                     ProgressView()
@@ -284,7 +280,7 @@ struct IRBridgeView: View {
     }
 
     private func statusText(_ bridge: RigBackend) -> String {
-        guard bridge.isPaired else { return "Not paired" }
+        guard bridge.paired else { return "Not paired" }
         let host = bridge.host?.nonEmpty.map { " · \($0)" } ?? ""
         return (bridge.healthy ? "Paired" : "Paired, not reachable") + host
     }
@@ -300,7 +296,7 @@ struct IRBridgeView: View {
                     .foregroundStyle(Brand.muted)
             }
             Spacer()
-            if bridge.isPaired, bridge.host == found.host {
+            if bridge.paired, bridge.host == found.host {
                 Text("Paired").font(.caption).foregroundStyle(Brand.ok)
             } else if found.locked {
                 Text("Locked — unlock it in its app").font(.caption).foregroundStyle(Brand.warn)

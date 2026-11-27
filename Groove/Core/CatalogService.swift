@@ -52,7 +52,7 @@ struct CatalogService {
         return try await api.put("/system/updates/preference", body: Body(preference: preference))
     }
 
-    /// 400 for a name that is not a zone; an updater from before the route answers 404/405.
+    /// 400 for a name that is not a zone.
     func setUpdateTimeZone(_ timeZone: String) async throws -> UpdateStatus {
         struct Body: Encodable { let timeZone: String }
         return try await api.put("/system/updates/time_zone", body: Body(timeZone: timeZone))
@@ -127,7 +127,7 @@ struct CatalogService {
 
     /// Re-matches `trackId` to a different release candidate entirely — e.g.
     /// swapping a wrongly-picked digital match for the vinyl edition actually
-    /// owned. Distinct from the draft-edit flow, which only edits fields of
+    /// owned. Distinct from editing a release, which only changes fields of
     /// whichever release is already confirmed rather than picking a new one.
     @discardableResult
     func applyReleaseFromSearch(trackId: Int64, hit: IdentifySearchHit) async throws -> ApplyReleaseResult {
@@ -261,12 +261,10 @@ struct CatalogService {
 
     /// Opens the edit session from the LIBRARY RELEASE itself rather than
     /// through its `catalog_job_id`. `catalog_job_id` names the job that
-    /// *created* the release — whose user-release draft has long since been
-    /// consumed — so resolving through it 404s (job gone) or, worse, races a
-    /// job GC into a dangling foreign key on save. groove-catalog's web
-    /// studio switched to this endpoint for exactly that reason (see
-    /// `PrepareUserReleaseForEditByRelease`'s doc comment server-side); this
-    /// is the only reliable way in.
+    /// *created* the release, which may be gone, so resolving through it
+    /// 404s or races a job GC into a dangling foreign key on save (see
+    /// `PrepareUserReleaseForEditByRelease`'s doc comment server-side). The
+    /// web studio opens it the same way.
     func libraryReleaseEdition(source: String, releaseId: String) async throws -> UserReleaseEditionResponse {
         let s = pathSegment(source)
         let r = pathSegment(releaseId)
@@ -348,7 +346,7 @@ struct CatalogService {
         )
     }
 
-    /// Copies the chosen edition into an editable draft without adding it.
+    /// Copies the chosen edition into an editable copy without adding it.
     /// The suggestion stays open until that edition is saved.
     func forkLibrarySuggestion(id: Int64, edition: LibrarySuggestionEdition) async throws -> LibraryForkResponse {
         try await api.post(
@@ -507,8 +505,7 @@ struct CatalogService {
     }
 
     /// The amplifier's own reading of its state, from its state provider —
-    /// not an inference like `power` above. An older groove-rig without the
-    /// endpoint answers 404.
+    /// not an inference like `power` above.
     func rigObserveAmplifier() async throws -> RigAmplifierObservation {
         try await api.get("/rig/observe/amplifier")
     }
