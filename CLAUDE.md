@@ -1,7 +1,7 @@
 # CLAUDE.md — groove-ios
 
-No `AGENTS.md` exists in this repo (unlike its 6 backend siblings) — nothing else to import,
-this file is the whole thing.
+No `AGENTS.md` exists in this repo (unlike its 7 backend siblings: catalog, detector, display,
+identity, listener, rig, updater) — nothing else to import, this file is the whole thing.
 
 ## Project overview
 
@@ -16,8 +16,7 @@ connection info.
 **Consumer-facing brand name is "Oceano"**, not "Groove" — the `groove-*` prefix is an internal
 codebase convention only (see `CFBundleDisplayName` in `Info.plist`, `OceanoWordmark`,
 `ConnectView`'s copy). Never let an internal repo name leak into UI copy, a network name, or
-anything else a user sees — this shipped wrong once already (a device advertised as
-"Groove-A909" before being caught and fixed).
+anything else a user sees, such as a device's advertised name.
 
 ## iOS and Android stay in step (hard rule)
 
@@ -49,14 +48,12 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
    there is no CI/OTA path. Say which of the two you verified rather than claiming it works.
 2. **Don't mirror a web Studio UI decision onto iOS sight-unseen.** What reads as decluttering
    on a wide settings page can read as "everything vanished" on a phone screen even when the
-   code does exactly what was asked — this has been wrong before and only caught once the
-   operator saw it running. Propose the port and ask, or name the concrete on-screen effect
+   code does exactly what was asked. Propose the port and ask, or name the concrete on-screen effect
    explicitly, before committing.
 3. **New risky/unverified functionality (Wi-Fi setup against a real board, anything touching real
    device credentials) goes on a feature branch, not `main`** — same branch-first + field-test
-   discipline as the backend repos, even though this repo has no service to restart. Low-risk
-   UI/bugfix work has historically landed directly on `main` here; use judgment, but anything
-   that can only be proven by a live device test belongs on a branch until that test happens.
+   discipline as the backend repos, even though this repo has no service to restart. Anything
+   that can only be proven by a live device test stays on a branch until that test happens.
 
 ## Architecture notes
 
@@ -69,14 +66,13 @@ Respond in **Portuguese (pt-BR)**. Code, comments, commit messages, and docs sta
   live state (`NowPlayingModel`, `CatalogSessionModel`, `AttentionCenter`) uses this instead of
   hand-rolling a `Task` loop. Add new pollers here, don't duplicate the loop shape.
 - `DesignSystem/Artwork.swift` — the one place cover art is fetched (its own URLSession loader,
-  not `AsyncImage`, because it needs the decoded image's size); it retries on failure (a single
-  blip fetching cover art over the LAN used to leave a permanent placeholder). A cover more than
+  not `AsyncImage`, because it needs the decoded image's size); it retries on failure, so a single
+  blip over the LAN never leaves a permanent placeholder. A cover more than
   10% off square (cassette J-card) is drawn whole inside the caller's square slot, never growing
   it — same rule as groove-display and the catalog Studio.
 - A model with more than one concurrent async fetch (`async let`) must gate its error phase on
   the *primary* fetch only — a secondary fetch failing should degrade to the previous value
-  (`(try? await x) ?? previousValue`), not blank the whole screen. This exact bug shipped in
-  `ReleasesModel` and 3 other models before being caught and fixed as a batch.
+  (`(try? await x) ?? previousValue`), not blank the whole screen.
 - `Core/MessageCenter.swift` is the one channel for an action that failed (save, delete, a rig
   button) and for a short acknowledgement: `messages.attempt { … }` runs a write and offers Retry
   when it fails. Retry runs the closure again and nothing else, so what must follow a success
@@ -111,5 +107,5 @@ each rule, and fix every deviation or name it in the report.
 | Change type | Update |
 |---|---|
 | New settings/connection fields | `AppSettings.swift`, this file if the behavior is non-obvious |
-| A screen's error-handling pattern changes | Check it doesn't reintroduce the all-or-nothing `async let` bug above |
+| A screen's error-handling pattern changes | Check it keeps gating on the primary fetch only (above) |
 | Wi-Fi setup protocol changes | groove-provision's `PROTOCOL.md` (shared contract, both sides must agree) |

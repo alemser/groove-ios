@@ -2,8 +2,8 @@
 
 A native SwiftUI companion for the [Groove](https://github.com/alemser/groove-catalog)
 music-recognition stack. Manage your library and catalog from your phone: watch
-recognitions land live, browse releases and tracks, fix up metadata, and clear
-the enrichment review queue — all against your `groove-catalog` server on the LAN.
+recognitions land live, browse releases and tracks, fix up metadata, clear
+the review queue and control the rig — all against your `groove-catalog` server on the LAN.
 
 <p align="center"><em>Dark, studio-cohesive design · live now-playing · offline-friendly editing</em></p>
 
@@ -11,17 +11,15 @@ the enrichment review queue — all against your `groove-catalog` server on the 
 
 | Tab | What it does | Catalog API |
 |-----|--------------|-------------|
-| **Now Playing** | Live now-playing with artwork, smooth progress, source/format/confidence badges. Polls while foregrounded. Floats the "which pressing is playing?" question when an album is in the library on more than one release. | `GET /status`, `POST /identity/album-programme/choose-edition`, `…/dismiss-edition-question` |
-| **History** | Paginated recognition feed with artwork, relative timestamps, "show unidentified" filter, swipe-to-delete, tap-through to the track. | `GET /catalog/plays`, `DELETE /catalog/plays/{epoch}` |
-| **Library → Releases** | Searchable grid of confirmed editions with owned badges; open a release to see metadata and remove owned editions. | `GET /catalog/releases`, `DELETE /catalog/library/releases/{source}/{release_id}` |
-| **Library → Tracks** | Infinite-scroll catalog with confirmed/edited/format badges and on-device filtering. | `GET /catalog/tracks` |
-| **Track detail** | Artwork, metadata, provider-vs-display names, recent plays, fingerprint count. Edit display title/artist/album + media format, reset to provider, or delete. | `GET /catalog/tracks/{id}/profile`, `PATCH …/display`, `DELETE …` |
-| **Review** | Pending associations (accept suggestion / dismiss) and enrich jobs; open a job to confirm or discard release candidates with tracklists. | `…/plays/pending-association`, `…/associate`, `…/enrich/jobs`, `…/enrich/releases/{id}/confirm` |
-| **Settings** | Connect to a server (with live test), set up a new device's Wi-Fi or change it, toggle metadata enrichers, view stack health. | `GET /status`, `GET /enrich/providers`, `PATCH /enrich/providers/{id}`; on the device, port 80: `GET/PUT /wifi`, `GET /wifi/networks`, `POST /wifi/setup` |
+| **Home** | Now playing (a mini bar opens the full player), catalog session, remote, stylus, what needs review, recognition pause, and a setup checklist on a new board. | `GET /status`, `POST /identity/album-programme/confirm-session`, `GET /rig/remote/layout`, `GET /catalog/stylus`, `PATCH /identity/recognition/settings` (`suspended`) |
+| **Now Playing** (from Home) | Live now-playing with artwork, smooth progress, source/format/confidence badges. Polls while foregrounded. Floats the "which pressing is playing?" question when an album is in the library on more than one release. | `GET /status`, `POST /identity/album-programme/choose-edition`, `…/dismiss-edition-question` |
+| **Library** | Release grid with the playing pressing marked, review banners, Needs Review (plays to associate, albums to add, enrich jobs to confirm or discard), drag a track onto an album, all releases, add a release by search or barcode, edit or remove a release. | `GET /catalog/releases`, `GET /catalog/library/suggestions`, `GET /catalog/plays/pending-association`, `GET /catalog/tracks/pending-release`, `GET /catalog/identify/search`, `POST /catalog/user-releases/save`, `…/enrich/jobs`, `…/enrich/releases/{id}/confirm`, `DELETE /catalog/library/releases/{source}/{release_id}` |
+| **Track detail** | Artwork, metadata, provider-vs-display names, recent plays, fingerprint count. Edit display title/artist/album + media format, change its release, reset to provider, or delete. | `GET /catalog/tracks/{id}/profile`, `PATCH …/display`, `DELETE …` |
+| **Rig** | Stylus tracking and audio input calibration; behind the Rig switch, the amplifier (model, inputs, profiles, whether the selected input may tell vinyl from digital, remote, equipment), the IR bridge, DeviceLink devices and rules. | `GET/PUT /catalog/stylus`, `/rig/capture/{level,gain,input-level}`, `GET/PATCH /rig/control`, `GET/PATCH /rig/amplifier`, `GET/PATCH /rig/amplifier/format-hint`, `/rig/equipment`, `/rig/remote/layout`, `/rig/backends`, `/rig/sessions/learn`, `/rig/devicelink`, `/rig/rules` |
+| **Settings** | Recognition providers, metadata enrichers, streaming, stack health, Share Logs for support, updates, switching server, changing the device's Wi-Fi network, device restart and shut down. | `GET /enrich/providers`, `PATCH /enrich/providers/{id}`, `GET /system/logs`, `POST /system/reboot`, `POST /system/poweroff`; on the device, port 80: `GET/PUT /wifi`, `GET /wifi/networks`, `POST /wifi/setup` |
 | **Settings → Recognition Providers** | What identifies a spinning record: offline (local-only) mode, chain mode/order/min-confidence, ACRCloud/AudD credentials, up to 3 custom HTTP providers (auth, request, response field mapping, paste-a-sample auto-fill), local-index/provider usage KPIs. | `GET/PATCH /identity/recognition/{providers,settings}`, `PUT …/providers/{id}/credentials`, `PUT …/providers/order`, `POST/PUT/DELETE …/custom-providers(/{slug})`, `GET /identity/observability/providers` |
 | **Settings → Streaming** | Turn the AirPlay and Bluetooth receivers on or off (third-party open-source projects; Bluetooth downloads on first use), then pick which ALSA device both play through, out to the amplifier — one wire, one setting. | `GET /rig/streaming/extras`, `POST /rig/streaming/extras/{name}`, `GET/POST /rig/streaming/audio-outputs(/select)` |
 | **Settings → Updates** | The board's version, how it installs updates (automatically when nothing is playing, or after asking), Check now, Update now and Cancel. The first connection to a board that has no answer yet asks the same question; an available release (ask first) shows as a notice while the board asks about it (`ask_user`), with Update, Remind me tomorrow and, unless it is a security fix, Don't ask again; swiping it away is Remind me tomorrow, and Cancel puts the release off for a day too. The outcome of an install shows once as a notice. The app gives the board the phone's time zone, which its night install window is read in, whenever the board holds another one. Hidden on a board without the update service. | `GET /system/updates`, `PUT …/preference`, `PUT …/time_zone`, `POST …/check`, `POST/DELETE …/approval`, `POST …/reminder` |
-| **Rig → Amplifier** | Model, inputs and profiles, plus whether the selected input may tell vinyl from digital. | `GET/PATCH /rig/amplifier`, `GET/PATCH /rig/amplifier/format-hint` |
 
 ### Which pressing is playing
 
@@ -56,7 +54,7 @@ Groove/
   Core/           AppSettings (persisted), APIClient, CatalogService, Formatters
   Models/         Codable models decoded with .convertFromSnakeCase
   DesignSystem/   Theme (brand palette), reusable Components, Artwork
-  Features/       NowPlaying · Plays · Library · TrackDetail · Review · Settings · Health
+  Features/       Home · NowPlaying · Session · Library · TrackDetail · Review · Rig · Settings · Updates · Health · Onboarding
 ```
 
 `CatalogService` is the single typed facade over every endpoint the app uses, so
@@ -101,8 +99,8 @@ open Groove.xcodeproj                    # press ▶︎ Run (⌘R) on an iPhone 
 
 In the app's connect screen, enter host **`127.0.0.1`**, port **`7073`**, scheme
 **http**, and tap **Connect**. The simulator shares your Mac's network, so it
-reaches the mock on localhost. Now Playing, History, Library, and Review are all
-populated with sample tracks and generated cover art.
+reaches the mock on localhost. Home, Library, Rig and Settings are all populated
+with sample tracks and generated cover art.
 
 > Prefer the command line? Build & launch headless:
 > ```bash
@@ -121,7 +119,3 @@ populated with sample tracks and generated cover art.
 - **[groove-catalog](https://github.com/alemser/groove-catalog)** — library store, enrichment, studio UI, and the API this app consumes
 - **[groove-identity](https://github.com/alemser/groove-identity)** — recognition runtime
 - **groove-listener / groove-detector** — acoustic hints and the PCM tap
-
----
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
