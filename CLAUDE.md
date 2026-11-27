@@ -109,3 +109,5 @@ each rule, and fix every deviation or name it in the report.
 | New settings/connection fields | `AppSettings.swift`, this file if the behavior is non-obvious |
 | A screen's error-handling pattern changes | Check it keeps gating on the primary fetch only (above) |
 | Wi-Fi setup protocol changes | groove-provision's `PROTOCOL.md` (shared contract, both sides must agree) |
+| Anything user-visible | groove-android, in the same piece of work |
+| A feature the owner sees is added, changed or removed | groove-system `product/capabilities.md` and `product/user-guide.md`, in the same piece of work |
